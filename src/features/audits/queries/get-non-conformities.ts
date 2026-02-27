@@ -1,4 +1,4 @@
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import type { NCStatus, NCsSeverity } from "@/types/database.types";
 
 export interface NonConformity {
@@ -21,7 +21,7 @@ export interface NonConformity {
 export async function getNonConformitiesByAudit(
   auditId: string
 ): Promise<NonConformity[]> {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("non_conformities")
@@ -74,7 +74,7 @@ export async function getNonConformitiesByAudit(
 export async function getNonConformity(
   ncId: string
 ): Promise<NonConformity | null> {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("non_conformities")

@@ -75,3 +75,22 @@ export const CA_STATUS_COLORS: Record<CorrectiveActionStatus, string> = {
 };
 
 export const correctiveActionStatusSchema = z.enum(['pending', 'in_progress', 'completed', 'overdue', 'cancelled']);
+
+// ===== AUDIT STATUS =====
+export type AuditStatus = 'Scheduled' | 'In Progress' | 'Review' | 'Closed';
+
+export const AUDIT_STATUS_LABELS: Record<AuditStatus, string> = {
+  'Scheduled': "Scheduled",
+  'In Progress': "In Progress",
+  'Review': "Review",
+  'Closed': "Closed",
+};
+
+export const AUDIT_STATUS_COLORS: Record<AuditStatus, string> = {
+  'Scheduled': "bg-slate-100 text-slate-800 border-slate-200",
+  'In Progress': "bg-blue-100 text-blue-800 border-blue-200",
+  'Review': "bg-amber-100 text-amber-800 border-amber-200",
+  'Closed': "bg-green-100 text-green-800 border-green-200",
+};
+
+export const auditStatusSchema = z.enum(['Scheduled', 'In Progress', 'Review', 'Closed']);

@@ -45,7 +45,7 @@ export async function getAudits(): Promise<Audit[]> {
   return audits.map((audit) => ({
     id: String(audit.id),
     title: (audit as { title?: string | null }).title ?? null,
-    status: (audit as { status?: AuditStatus | null }).status ?? "planned",
+    status: (audit as { status?: AuditStatus | null }).status ?? "Scheduled",
     scheduled_date:
       (audit as { scheduled_date?: string | null }).scheduled_date ?? null,
   }));

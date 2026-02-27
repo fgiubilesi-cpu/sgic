@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import {
   createCorrectiveActionSchema,
   updateCorrectiveActionSchema,
@@ -18,7 +18,7 @@ export async function createCorrectiveAction(
 ): Promise<ActionResult<{ id: string }>> {
   try {
     const validated = createCorrectiveActionSchema.parse(input);
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Get current user's organization
     const {
@@ -81,7 +81,7 @@ export async function updateCorrectiveAction(
 ): Promise<ActionResult<null>> {
   try {
     const validated = updateCorrectiveActionSchema.parse(input);
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     const { error } = await supabase
       .from("corrective_actions")
@@ -132,7 +132,7 @@ export async function completeCorrectiveAction(
 ): Promise<ActionResult<null>> {
   try {
     const validated = completeCorrectiveActionSchema.parse(input);
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     const now = new Date().toISOString();
     const { error } = await supabase

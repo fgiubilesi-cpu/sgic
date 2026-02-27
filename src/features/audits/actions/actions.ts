@@ -34,6 +34,33 @@ export async function updateChecklistItem(formData: FormData) {
 
   const { itemId, outcome, notes, evidenceUrl, path } = result.data
 
+  // Verify user's organization owns this checklist item (RLS security check)
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    return { error: "Not authenticated." }
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('organization_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile?.organization_id) {
+    return { error: "No organization found." }
+  }
+
+  // Verify checklist item belongs to user's organization
+  const { data: item } = await supabase
+    .from('checklist_items')
+    .select('organization_id')
+    .eq('id', itemId)
+    .single()
+
+  if (!item || item.organization_id !== profile.organization_id) {
+    return { error: "Unauthorized." }
+  }
+
   const updateData: Record<string, string> = {
     updated_at: new Date().toISOString()
   }
@@ -60,7 +87,7 @@ export async function updateChecklistItem(formData: FormData) {
 
 const UpdateAuditStatusSchema = z.object({
   auditId: z.string().uuid(),
-  status: z.enum(['planned', 'in_progress', 'completed', 'archived']),
+  status: z.enum(['Scheduled', 'In Progress', 'Review', 'Closed']),
 })
 
 export async function updateAuditStatus(auditId: string, status: string) {
@@ -72,14 +99,59 @@ export async function updateAuditStatus(auditId: string, status: string) {
     return { error: "Invalid data." }
   }
 
+  // Verify user's organization owns this audit (RLS security check)
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    return { error: "Not authenticated." }
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('organization_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile?.organization_id) {
+    return { error: "No organization found." }
+  }
+
+  // Verify audit belongs to user's organization
+  const { data: audit } = await supabase
+    .from('audits')
+    .select('organization_id, status')
+    .eq('id', result.data.auditId)
+    .single()
+
+  if (!audit || audit.organization_id !== profile.organization_id) {
+    return { error: "Unauthorized." }
+  }
+
+  const updatedAt = new Date().toISOString()
   const { error } = await supabase
     .from('audits')
-    .update({ status: result.data.status, updated_at: new Date().toISOString() })
+    .update({ status: result.data.status, updated_at: updatedAt })
     .eq('id', result.data.auditId)
 
   if (error) {
     console.error("Supabase Update Audit Status Error:", error)
     return { error: "Failed to update audit status." }
+  }
+
+  // Log status change to audit trail
+  const { error: trailError } = await supabase
+    .from('audit_trail')
+    .insert({
+      audit_id: result.data.auditId,
+      organization_id: profile.organization_id,
+      old_status: audit.status || null,
+      new_status: result.data.status,
+      changed_by: user.id,
+      changed_at: updatedAt,
+    })
+
+  if (trailError) {
+    console.error("Failed to log audit trail:", trailError)
+    // Don't fail the operation if trail logging fails
   }
 
   revalidatePath(`/audits/${auditId}`)
@@ -131,7 +203,7 @@ export async function createAuditFromTemplate(input: {
     .from('audits')
     .insert({
       title,
-      status: 'planned',
+      status: 'Scheduled',
       scheduled_date: scheduled_date || null,
       organization_id: profile.organization_id,
     })
@@ -145,6 +217,7 @@ export async function createAuditFromTemplate(input: {
 
   // 4. Snapshot: Copy template questions to checklist items (critical for ISO 9001)
   // Only copy active (non-soft-deleted) questions
+  // Each checklist item gets BOTH a snapshot of the question text AND a reference to the source
   const { data: questions } = await supabase
     .from('template_questions')
     .select('*')
@@ -155,7 +228,8 @@ export async function createAuditFromTemplate(input: {
   if (questions && questions.length > 0) {
     const checklistItems = questions.map(q => ({
       audit_id: audit.id,
-      question: q.question,
+      source_question_id: q.id,  // Reference to original template question (audit trail)
+      question: q.question,      // Snapshot of question text (what was actually audited)
       organization_id: profile.organization_id,
       outcome: 'pending',
       sort_order: q.sort_order,

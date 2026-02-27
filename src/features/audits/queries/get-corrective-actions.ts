@@ -1,4 +1,4 @@
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import type { CorrectiveActionStatus } from "@/types/database.types";
 
 export interface CorrectiveAction {
@@ -19,7 +19,7 @@ export interface CorrectiveAction {
 export async function getCorrectiveActionsByNonConformity(
   ncId: string
 ): Promise<CorrectiveAction[]> {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("corrective_actions")
@@ -51,7 +51,7 @@ export async function getCorrectiveActionsByNonConformity(
 export async function getCorrectiveAction(
   caId: string
 ): Promise<CorrectiveAction | null> {
-  const supabase = await createServerClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("corrective_actions")

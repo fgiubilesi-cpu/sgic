@@ -23,7 +23,7 @@ import {
   Home as HomeIcon,
   Menu,
   Settings,
-  Layout, // <--- AGGIUNTO
+  Layout,
 } from "lucide-react";
 
 type DashboardLayoutProps = {
@@ -41,32 +41,46 @@ const NAV_ITEMS: Array<{
   href: string;
   icon: React.ElementType;
 }> = [
-  {
-    label: "Dashboard",
-    href: "/",
-    icon: HomeIcon,
-  },
-  {
-    label: "Audits",
-    href: "/audits",
-    icon: ClipboardCheck,
-  },
-  {
-    label: "Template Checklist", // <--- AGGIUNTO
-    href: "/templates",          // <--- AGGIUNTO
-    icon: Layout,                // <--- AGGIUNTO
-  },
-  {
-    label: "Organizzazione",
-    href: "/organization",
-    icon: Building2,
-  },
-  {
-    label: "Impostazioni",
-    href: "/impostazioni",
-    icon: Settings,
-  },
+  { label: "Dashboard", href: "/dashboard", icon: HomeIcon },
+  { label: "Audits", href: "/audits", icon: ClipboardCheck },
+  { label: "Templates", href: "/templates", icon: Layout },
+  { label: "Organisation", href: "/organization", icon: Building2 },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
+
+function NavLinks() {
+  return (
+    <nav className="flex-1 space-y-1 px-3 py-4">
+      {NAV_ITEMS.map((item) => {
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+          >
+            <Icon className="h-4 w-4 text-zinc-500" />
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function BrandLogo() {
+  return (
+    <div className="flex h-16 items-center gap-2 border-b px-6">
+      <div className="flex h-9 w-9 items-center justify-center rounded-md bg-zinc-900 text-white text-sm font-semibold">
+        SG
+      </div>
+      <div className="flex flex-col">
+        <span className="text-sm font-semibold tracking-tight">SGIC</span>
+        <span className="text-xs text-zinc-500">ISO 9001 Audit Suite</span>
+      </div>
+    </div>
+  );
+}
 
 export default async function DashboardLayout({
   children,
@@ -100,36 +114,10 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
       <div className="flex h-screen">
-        {/* Sidebar desktop */}
+        {/* Desktop sidebar */}
         <aside className="border-r bg-white/80 backdrop-blur-sm hidden md:flex md:w-64 md:flex-col">
-          <div className="flex h-16 items-center gap-2 border-b px-6">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-zinc-900 text-white text-sm font-semibold">
-              SG
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold tracking-tight">
-                SGIC
-              </span>
-              <span className="text-xs text-zinc-500">
-                ISO 9001 Audit Suite
-              </span>
-            </div>
-          </div>
-          <nav className="flex-1 space-y-1 px-3 py-4">
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
-                >
-                  <Icon className="h-4 w-4 text-zinc-500" />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
+          <BrandLogo />
+          <NavLinks />
           <div className="border-t px-4 py-3">
             <UserNav user={dashboardUser} />
           </div>
@@ -148,40 +136,14 @@ export default async function DashboardLayout({
                       variant="ghost"
                       size="icon"
                       className="mr-1"
-                      aria-label="Apri navigazione"
+                      aria-label="Open navigation"
                     >
                       <Menu className="h-5 w-5" />
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="left" className="flex w-72 flex-col p-0">
-                    <div className="flex h-16 items-center gap-2 border-b px-6">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-md bg-zinc-900 text-white text-sm font-semibold">
-                        SG
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold tracking-tight">
-                          SGIC
-                        </span>
-                        <span className="text-xs text-zinc-500">
-                          ISO 9001 Audit Suite
-                        </span>
-                      </div>
-                    </div>
-                    <nav className="flex-1 space-y-1 px-3 py-4">
-                      {NAV_ITEMS.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
-                          >
-                            <Icon className="h-4 w-4 text-zinc-500" />
-                            <span>{item.label}</span>
-                          </Link>
-                        );
-                      })}
-                    </nav>
+                    <BrandLogo />
+                    <NavLinks />
                     <div className="border-t px-4 py-3">
                       <UserNav user={dashboardUser} />
                     </div>
@@ -195,7 +157,7 @@ export default async function DashboardLayout({
                   <BreadcrumbList>
                     <BreadcrumbItem>
                       <Link
-                        href="/"
+                        href="/dashboard"
                         className="text-xs font-medium text-zinc-500 hover:text-zinc-700"
                       >
                         SGIC
@@ -210,7 +172,7 @@ export default async function DashboardLayout({
                   </BreadcrumbList>
                 </Breadcrumb>
                 <span className="text-sm font-semibold text-zinc-900">
-                  Pannello di controllo
+                  Control Panel
                 </span>
               </div>
             </div>
@@ -224,9 +186,7 @@ export default async function DashboardLayout({
 
           {/* Main content */}
           <main className="flex-1 overflow-y-auto bg-zinc-50 px-4 py-6 md:px-6 lg:px-8">
-            <div className="mx-auto max-w-6xl">
-              {children}
-            </div>
+            <div className="mx-auto max-w-6xl">{children}</div>
           </main>
         </div>
       </div>

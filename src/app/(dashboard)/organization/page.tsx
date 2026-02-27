@@ -1,5 +1,10 @@
 import { AlertTriangle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { getOrganization } from "@/features/organization/queries/get-organization";
 import { OrgSettingsForm } from "@/features/organization/components/org-settings-form";
 
@@ -16,11 +21,11 @@ export default async function OrganizationPage() {
             </div>
             <div>
               <CardTitle className="text-sm font-semibold text-amber-900">
-                Nessuna organizzazione trovata
+                No organisation found
               </CardTitle>
               <CardDescription className="pt-1 text-sm text-amber-800">
-                Il tuo profilo non risulta collegato ad alcuna organizzazione. Contatta
-                l&apos;amministratore SGIC per completare la configurazione del tenant.
+                Your profile is not linked to any organisation. Please contact your
+                SGIC administrator to complete the tenant setup.
               </CardDescription>
             </div>
           </CardHeader>
@@ -33,11 +38,11 @@ export default async function OrganizationPage() {
     <section className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
-          Organizzazione
+          Organisation
         </h1>
         <p className="text-sm text-zinc-500">
-          Gestisci le informazioni anagrafiche della tua organizzazione. Questi dati
-          vengono utilizzati per audit, report e tracciabilità ISO 9001.
+          Manage your organisation&apos;s registration details. This data is
+          used in audits, reports, and ISO 9001 traceability.
         </p>
       </div>
 
@@ -45,4 +50,3 @@ export default async function OrganizationPage() {
     </section>
   );
 }
-

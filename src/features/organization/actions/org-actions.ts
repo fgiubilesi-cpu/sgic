@@ -18,9 +18,7 @@ export async function updateOrganization(
   const parsed = organizationUpdateSchema.safeParse(values);
 
   if (!parsed.success) {
-    return {
-      error: "Dati non validi. Controlla i campi del form.",
-    };
+    return { error: "Invalid data. Please check the form fields." };
   }
 
   const { name, vat_number, slug } = parsed.data;
@@ -33,9 +31,7 @@ export async function updateOrganization(
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    return {
-      error: "Non sei autenticato. Effettua nuovamente l'accesso.",
-    };
+    return { error: "Not authenticated. Please sign in again." };
   }
 
   const { data: profile, error: profileError } = await supabase
@@ -46,8 +42,7 @@ export async function updateOrganization(
 
   if (profileError || !profile?.organization_id) {
     return {
-      error:
-        "Profilo non collegato ad alcuna organizzazione. Contatta l'amministratore.",
+      error: "Profile not linked to any organisation. Contact your administrator.",
     };
   }
 
@@ -61,25 +56,14 @@ export async function updateOrganization(
     .eq("id", profile.organization_id);
 
   if (updateError) {
-    // Gestione mirata per slug duplicato (vincolo di univocità lato DB)
     if (updateError.code === "23505") {
       return {
-        error:
-          "Lo slug scelto è già in uso da un'altra organizzazione. Scegli uno slug diverso.",
+        error: "This slug is already in use by another organisation. Please choose a different one.",
       };
     }
-
-    return {
-      error:
-        "Impossibile aggiornare l'organizzazione in questo momento. Riprova più tardi.",
-    };
+    return { error: "Unable to update organisation. Please try again later." };
   }
 
-  // Invalida la cache della pagina di organizzazione
   revalidatePath("/organization");
-
-  return {
-    success: "Organizzazione aggiornata con successo.",
-  };
+  return { success: "Organisation updated successfully." };
 }
-

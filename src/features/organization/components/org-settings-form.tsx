@@ -3,7 +3,13 @@
 import { useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,14 +50,14 @@ export function OrgSettingsForm({ organization }: OrgSettingsFormProps) {
       const result = await updateOrganization(values);
 
       if (result.error) {
-        toast.error("Errore aggiornamento organizzazione", {
+        toast.error("Failed to update organisation", {
           description: result.error,
         });
         return;
       }
 
-      toast.success("Organizzazione aggiornata", {
-        description: result.success ?? "I dati sono stati salvati correttamente.",
+      toast.success("Organisation updated", {
+        description: result.success ?? "Changes saved successfully.",
       });
     });
   };
@@ -60,34 +66,31 @@ export function OrgSettingsForm({ organization }: OrgSettingsFormProps) {
     <Card className="max-w-2xl border-zinc-200 shadow-sm">
       <CardHeader>
         <CardTitle className="text-lg font-semibold">
-          Impostazioni organizzazione
+          Organisation Settings
         </CardTitle>
         <CardDescription className="text-sm text-zinc-500">
-          Aggiorna le informazioni principali della tua organizzazione. Questi dati
-          verranno utilizzati nei report e nei documenti di audit.
+          Update your organisation&apos;s core information. This data is used in
+          audit reports and ISO 9001 documentation.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="space-y-6"
-          >
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
               control={form.control}
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nome azienda</FormLabel>
+                  <FormLabel>Company Name</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
-                      placeholder="Es. ACME S.p.A."
+                      placeholder="e.g. ACME Ltd."
                       autoComplete="organization"
                     />
                   </FormControl>
                   <FormDescription>
-                    Nome legale dell&apos;organizzazione come apparirà nei documenti.
+                    Legal name of the organisation as it will appear in documents.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -99,16 +102,16 @@ export function OrgSettingsForm({ organization }: OrgSettingsFormProps) {
               name="vat_number"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Partita IVA</FormLabel>
+                  <FormLabel>VAT Number</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
-                      placeholder="Es. 01234567890"
+                      placeholder="e.g. GB123456789"
                       inputMode="numeric"
                     />
                   </FormControl>
                   <FormDescription>
-                    Campo opzionale. Utilizzato per le intestazioni fiscali e di fatturazione.
+                    Optional. Used for invoicing and fiscal headers.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -124,14 +127,14 @@ export function OrgSettingsForm({ organization }: OrgSettingsFormProps) {
                   <FormControl>
                     <Input
                       {...field}
-                      placeholder="es. acme-audit"
+                      placeholder="e.g. acme-audit"
                       autoCapitalize="none"
                       autoCorrect="off"
                     />
                   </FormControl>
                   <FormDescription>
-                    Identificativo univoco utilizzato negli URL (es. dominio/organization/
-                    <span className="font-mono text-xs">acme-audit</span>). Deve essere unico.
+                    Unique identifier used in URLs (e.g. domain/org/
+                    <span className="font-mono text-xs">acme-audit</span>). Must be unique.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -139,11 +142,8 @@ export function OrgSettingsForm({ organization }: OrgSettingsFormProps) {
             />
 
             <div className="flex justify-end gap-3">
-              <Button
-                type="submit"
-                disabled={isPending}
-              >
-                {isPending ? "Salvataggio in corso..." : "Salva modifiche"}
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Saving..." : "Save changes"}
               </Button>
             </div>
           </form>
@@ -152,4 +152,3 @@ export function OrgSettingsForm({ organization }: OrgSettingsFormProps) {
     </Card>
   );
 }
-

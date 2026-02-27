@@ -1,12 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Audit } from "@/features/audits/queries/get-audits";
 import type { AuditStatus } from "@/features/audits/schemas/audit-schema";
+import type { AuditOutcome } from "@/types/database.types";
 
 export type ChecklistItem = {
   id: string;
   question: string | null;
-  status: string | null;
+  outcome: AuditOutcome | null;
   notes?: string | null;
+  evidence_url?: string | null;
   created_at: string | null;
 };
 
@@ -46,7 +48,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
   const { data: audit, error: auditError } = await supabase
     .from("audits")
     .select(
-      "id, title, status, scheduled_date, organization_id, checklists(id, title, created_at, checklist_items(id, question, status, notes, created_at))",
+      "id, title, status, scheduled_date, organization_id, checklists(id, title, created_at, checklist_items(id, question, outcome, notes, evidence_url, created_at))"
     )
     .eq("id", id)
     .eq("organization_id", profile.organization_id)
@@ -57,10 +59,8 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
   }
 
   const rawStatus = (audit as { status?: string | null }).status ?? "planned";
-  const allowedStatuses: AuditStatus[] = ["planned", "in_progress", "completed"];
-  const status: AuditStatus = allowedStatuses.includes(
-    rawStatus as AuditStatus,
-  )
+  const allowedStatuses: AuditStatus[] = ["planned", "in_progress", "completed", "archived"];
+  const status: AuditStatus = allowedStatuses.includes(rawStatus as AuditStatus)
     ? (rawStatus as AuditStatus)
     : "planned";
 
@@ -81,16 +81,24 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
       const item = rawItem as {
         id?: string | number;
         question?: string | null;
-        status?: string | null;
+        outcome?: string | null;
         notes?: string | null;
+        evidence_url?: string | null;
         created_at?: string | null;
       };
+
+      const validOutcomes: AuditOutcome[] = ["compliant", "non_compliant", "not_applicable", "pending"];
+      const rawOutcome = item.outcome ?? "pending";
+      const outcome: AuditOutcome = validOutcomes.includes(rawOutcome as AuditOutcome)
+        ? (rawOutcome as AuditOutcome)
+        : "pending";
 
       return {
         id: String(item.id),
         question: item.question ?? null,
-        status: item.status ?? null,
+        outcome,
         notes: item.notes ?? null,
+        evidence_url: item.evidence_url ?? null,
         created_at: item.created_at ?? null,
       };
     });
@@ -107,9 +115,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
     id: String(audit.id),
     title: (audit as { title?: string | null }).title ?? null,
     status,
-    scheduled_date:
-      (audit as { scheduled_date?: string | null }).scheduled_date ?? null,
+    scheduled_date: (audit as { scheduled_date?: string | null }).scheduled_date ?? null,
     checklists,
   };
 }
-

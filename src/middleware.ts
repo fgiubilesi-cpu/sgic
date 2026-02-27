@@ -1,27 +1,32 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-const PROTECTED_PATHS = ["/dashboard", "/organization"];
-
 export async function middleware(request: NextRequest) {
   const { user, response } = await updateSession(request);
   const { pathname } = request.nextUrl;
 
   const url = request.nextUrl.clone();
 
-  // Root: redirect in base alla sessione
+  // Root: redirect based on session state
   if (pathname === "/") {
     url.pathname = user ? "/dashboard" : "/login";
     return NextResponse.redirect(url);
   }
 
-  // Pagine protette senza sessione -> login
-  if (PROTECTED_PATHS.includes(pathname) && !user) {
+  // All dashboard routes require authentication
+  const isDashboardRoute =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/audits") ||
+    pathname.startsWith("/templates") ||
+    pathname.startsWith("/organization") ||
+    pathname.startsWith("/impostazioni");
+
+  if (isDashboardRoute && !user) {
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // Utente loggato non deve vedere la pagina di login
+  // Authenticated users should not see the login page
   if (pathname === "/login" && user) {
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
@@ -31,6 +36,14 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/dashboard", "/organization"],
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization)
+     * - favicon.ico
+     * - public folder files
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
-

@@ -10,10 +10,10 @@ export default async function AuditsPage() {
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
-            Audit Programmati
+            Scheduled Audits
           </h1>
           <p className="text-sm text-zinc-500">
-            Visualizza e gestisci gli audit pianificati per la tua organizzazione.
+            View and manage all audits planned for your organisation.
           </p>
         </div>
         <CreateAuditSheet />
@@ -23,4 +23,3 @@ export default async function AuditsPage() {
     </section>
   );
 }
-

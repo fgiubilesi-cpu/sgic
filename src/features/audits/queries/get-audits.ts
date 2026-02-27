@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import type { AuditStatus } from "@/features/audits/schemas/audit-schema";
 
+export type { AuditStatus };
+
 export type Audit = {
   id: string;
   title: string | null;

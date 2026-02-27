@@ -1,74 +1,105 @@
 "use client";
-import { useState } from "react";
+
+import { useState, useTransition } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  addTemplateQuestion,
+  softDeleteTemplateQuestion,
+} from "@/features/audits/actions";
 
-export function TemplateEditor({ template }: any) {
-  const [questions, setQuestions] = useState(template.template_questions || []);
+type Question = {
+  id: string;
+  question: string;
+};
+
+type TemplateEditorProps = {
+  templateId: string;
+  initialQuestions: Question[];
+};
+
+export function TemplateEditor({
+  templateId,
+  initialQuestions,
+}: TemplateEditorProps) {
+  const [questions, setQuestions] = useState<Question[]>(initialQuestions);
   const [newQuestion, setNewQuestion] = useState("");
-  const [loading, setLoading] = useState(false);
-  const supabase = createClient();
+  const [isPending, startTransition] = useTransition();
 
-  const addQuestion = async () => {
-    if (!newQuestion) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("template_questions")
-      .insert({ template_id: template.id, question: newQuestion })
-      .select().single();
-    
-    if (!error) {
-      setQuestions([...questions, data]);
-      setNewQuestion("");
-      toast.success("Domanda aggiunta");
-    }
-    setLoading(false);
+  const handleAddQuestion = () => {
+    const text = newQuestion.trim();
+    if (!text) return;
+
+    startTransition(async () => {
+      const result = await addTemplateQuestion(templateId, text);
+      if (result.success) {
+        setQuestions((prev) => [...prev, result.question]);
+        setNewQuestion("");
+        toast.success("Question added");
+      } else {
+        toast.error("Failed to add question", { description: result.error });
+      }
+    });
   };
 
-  const deleteQuestion = async (id: string) => {
-    const { error } = await supabase
-      .from("template_questions")
-      .delete()
-      .eq("id", id);
-    
-    if (!error) {
-      setQuestions(questions.filter((q: any) => q.id !== id));
-      toast.success("Domanda rimossa");
-    }
+  const handleDeleteQuestion = (questionId: string) => {
+    startTransition(async () => {
+      const result = await softDeleteTemplateQuestion(questionId, templateId);
+      if (result.success) {
+        setQuestions((prev) => prev.filter((q) => q.id !== questionId));
+        toast.success("Question removed");
+      } else {
+        toast.error("Failed to remove question", { description: result.error });
+      }
+    });
   };
 
   return (
     <div className="space-y-4 max-w-2xl">
       <div className="flex gap-2">
-        <Input 
-          value={newQuestion} 
-          onChange={(e) => setNewQuestion(e.target.value)} 
-          placeholder="Scrivi una nuova domanda..." 
-          onKeyDown={(e) => e.key === 'Enter' && addQuestion()}
+        <Input
+          value={newQuestion}
+          onChange={(e) => setNewQuestion(e.target.value)}
+          placeholder="Type a new question..."
+          onKeyDown={(e) =>
+            e.key === "Enter" && !isPending && handleAddQuestion()
+          }
+          disabled={isPending}
         />
-        <Button onClick={addQuestion} disabled={loading}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />} 
-          Aggiungi
+        <Button
+          onClick={handleAddQuestion}
+          disabled={isPending || !newQuestion.trim()}
+        >
+          {isPending ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Plus className="w-4 h-4 mr-2" />
+          )}
+          Add
         </Button>
       </div>
-      
+
       <div className="bg-white border rounded-lg divide-y shadow-sm">
         {questions.length === 0 && (
           <p className="p-8 text-center text-sm text-slate-500 italic">
-            Nessuna domanda in questo template. Comincia a scriverne una sopra!
+            No questions in this template yet. Add one above to get started.
           </p>
         )}
-        {questions.map((q: any) => (
-          <div key={q.id} className="p-4 flex justify-between items-center text-sm group hover:bg-slate-50 transition-colors">
+        {questions.map((q) => (
+          <div
+            key={q.id}
+            className="p-4 flex justify-between items-center text-sm group hover:bg-slate-50 transition-colors"
+          >
             <span className="font-medium text-slate-700">{q.question}</span>
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="text-slate-300 hover:text-red-600 transition-colors"
-              onClick={() => deleteQuestion(q.id)}
+              onClick={() => handleDeleteQuestion(q.id)}
+              disabled={isPending}
+              aria-label="Remove question"
             >
               <Trash2 className="w-4 h-4" />
             </Button>

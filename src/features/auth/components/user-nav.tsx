@@ -32,9 +32,7 @@ export function UserNav({ user }: UserNavProps) {
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
       .join("") ||
-    user.email
-      .slice(0, 2)
-      .toUpperCase();
+    user.email.slice(0, 2).toUpperCase();
 
   const handleLogout = () => {
     startTransition(async () => {
@@ -52,7 +50,10 @@ export function UserNav({ user }: UserNavProps) {
         >
           <Avatar size="sm">
             {user.avatarUrl ? (
-              <AvatarImage src={user.avatarUrl} alt={user.fullName ?? user.email} />
+              <AvatarImage
+                src={user.avatarUrl}
+                alt={user.fullName ?? user.email}
+              />
             ) : null}
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
@@ -67,14 +68,14 @@ export function UserNav({ user }: UserNavProps) {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="flex flex-col">
           <span className="text-sm font-medium">
-            {user.fullName ?? "Account utente"}
+            {user.fullName ?? "User Account"}
           </span>
           <span className="text-xs text-zinc-500 truncate">{user.email}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="cursor-pointer">
           <User className="mr-2 h-4 w-4" />
-          <span>Profilo</span>
+          <span>Profile</span>
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer">
           <Users className="mr-2 h-4 w-4" />
@@ -83,13 +84,12 @@ export function UserNav({ user }: UserNavProps) {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={handleLogout}
-          className="cursor-pointer text-red-600 focus:text-red-600 data-[variant=destructive]:text-red-600"
+          className="cursor-pointer text-red-600 focus:text-red-600"
         >
           <LogOut className="mr-2 h-4 w-4" />
-          <span>Logout</span>
+          <span>Sign out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
-

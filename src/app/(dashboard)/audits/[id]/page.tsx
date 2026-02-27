@@ -1,8 +1,8 @@
-import { AuditStatusBadge } from "@/features/audits/components/audit-status-badge";
 import { notFound } from "next/navigation";
 import { getAudit } from "@/features/audits/queries/get-audit";
+import { AuditStatusBadge } from "@/features/audits/components/audit-status-badge";
 import { ChecklistManager } from "@/features/audits/components/checklist-manager";
-import { AuditStats } from "@/features/audits/components/audit-stats"; // <--- 1. IMPORTA QUESTO
+import { AuditStats } from "@/features/audits/components/audit-stats";
 
 export default async function AuditDetailPage({
   params,
@@ -16,29 +16,29 @@ export default async function AuditDetailPage({
     notFound();
   }
 
-  // Formattiamo la data
-  const formattedDate = audit.scheduled_date 
-    ? new Date(audit.scheduled_date).toLocaleDateString("it-IT") 
-    : "Data non definita";
+  const formattedDate = audit.scheduled_date
+    ? new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }).format(new Date(audit.scheduled_date))
+    : "No date set";
 
   return (
     <div className="flex flex-col space-y-6">
-      {/* Header Semplice */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">{audit.title}</h1>
         <div className="flex items-center gap-2 text-muted-foreground mt-1">
-        <AuditStatusBadge 
-     auditId={audit.id} 
-     currentStatus={audit.status || "planned"} 
-/>
-           <span className="text-sm">Programmato per: {formattedDate}</span>
+          <AuditStatusBadge
+            auditId={audit.id}
+            currentStatus={audit.status ?? "planned"}
+          />
+          <span className="text-sm">Scheduled for: {formattedDate}</span>
         </div>
       </div>
 
-      {/* 2. INSERISCI LE STATISTICHE QUI */}
       <AuditStats audit={audit} />
 
-      {/* Checklist */}
       <ChecklistManager audit={audit} />
     </div>
   );

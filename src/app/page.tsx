@@ -8,17 +8,15 @@ export default function HomePage() {
           SGIC - Audit Management
         </h1>
         <p className="max-w-md text-sm text-zinc-500">
-          Stai per essere reindirizzato alla dashboard. Se il redirect non avviene,
-          usa il link qui sotto.
+          Redirecting you to the dashboard...
         </p>
         <Link
           href="/dashboard"
           className="text-sm font-medium text-zinc-900 underline-offset-4 hover:underline"
         >
-          Vai alla Dashboard
+          Go to Dashboard
         </Link>
       </div>
     </main>
   );
 }
-

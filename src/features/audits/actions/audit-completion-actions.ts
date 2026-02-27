@@ -311,3 +311,94 @@ export async function getAuditSummary(
     return { success: false, error: message };
   }
 }
+
+/**
+ * Close an audit that is in Review status
+ * Moves audit from Review → Closed
+ * Requires organization ownership verification
+ */
+export async function closeAudit(
+  input: { auditId: string }
+): Promise<ActionResult<{ closedAt: string }>> {
+  try {
+    const supabase = await createClient();
+
+    // Security: Verify user's organization owns this audit
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile?.organization_id) {
+      return { success: false, error: "Organization not found" };
+    }
+
+    // Verify audit belongs to user's organization
+    const { data: audit, error: auditError } = await supabase
+      .from("audits")
+      .select("organization_id, status")
+      .eq("id", input.auditId)
+      .single();
+
+    if (auditError || !audit || audit.organization_id !== profile.organization_id) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // Verify audit is in Review status
+    if (audit.status !== "Review") {
+      return {
+        success: false,
+        error: `Audit is in ${audit.status} status. Only audits in Review status can be closed.`,
+      };
+    }
+
+    // Update audit status to Closed
+    const closedAt = new Date().toISOString();
+    const { error: updateError } = await supabase
+      .from("audits")
+      .update({
+        status: "Closed",
+        updated_at: closedAt,
+      })
+      .eq("id", input.auditId)
+      .eq("organization_id", profile.organization_id);
+
+    if (updateError) {
+      return { success: false, error: updateError.message };
+    }
+
+    // Log status change to audit trail
+    const { error: trailError } = await supabase
+      .from("audit_trail")
+      .insert({
+        audit_id: input.auditId,
+        organization_id: profile.organization_id,
+        old_status: "Review",
+        new_status: "Closed",
+        changed_by: user.id,
+        changed_at: closedAt,
+      });
+
+    if (trailError) {
+      console.error("Failed to log audit trail:", trailError);
+      // Don't fail the operation if trail logging fails
+    }
+
+    revalidatePath(`/audits/${input.auditId}`);
+    revalidatePath("/audits");
+
+    return { success: true, data: { closedAt } };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return { success: false, error: message };
+  }
+}

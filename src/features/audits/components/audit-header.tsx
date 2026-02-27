@@ -18,12 +18,14 @@ type AuditHeaderProps = {
 
 function formatStatus(status: AuditStatus): { label: string; className: string } {
   switch (status) {
-    case "planned":
-      return { label: "Planned", className: "border-blue-200 bg-blue-50 text-blue-700" };
-    case "in_progress":
-      return { label: "In Progress", className: "border-amber-200 bg-amber-50 text-amber-700" };
-    case "completed":
-      return { label: "Completed", className: "border-emerald-200 bg-emerald-50 text-emerald-700" };
+    case "Scheduled":
+      return { label: "Scheduled", className: "border-slate-200 bg-slate-50 text-slate-700" };
+    case "In Progress":
+      return { label: "In Progress", className: "border-blue-200 bg-blue-50 text-blue-700" };
+    case "Review":
+      return { label: "Review", className: "border-amber-200 bg-amber-50 text-amber-700" };
+    case "Closed":
+      return { label: "Closed", className: "border-green-200 bg-green-50 text-green-700" };
     default:
       return { label: status, className: "border-zinc-200 bg-zinc-50 text-zinc-700" };
   }

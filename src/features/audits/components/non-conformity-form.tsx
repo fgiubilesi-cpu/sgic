@@ -18,8 +18,10 @@ import type { AuditOutcome } from "@/types/database.types";
 interface ChecklistItem {
   id: string;
   question: string;
-  outcome: AuditOutcome;
-  notes: string | null;
+  outcome: AuditOutcome | null;
+  notes?: string | null;
+  evidence_url?: string | null;
+  created_at?: string | null;
 }
 
 interface NonConformityFormProps {

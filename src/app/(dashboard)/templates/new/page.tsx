@@ -59,7 +59,7 @@ async function createTemplate(formData: FormData) {
   redirect(`/templates/${data.id}`);
 }
 
-export default function NewTemplatePage() {
+export default async function NewTemplatePage() {
   return (
     <div className="max-w-2xl mx-auto py-10">
       <Card>

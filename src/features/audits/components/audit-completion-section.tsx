@@ -75,7 +75,7 @@ export function AuditCompletionSection({
     }
   };
 
-  const isAuditComplete = audit.status === "completed" || audit.status === "archived";
+  const isAuditComplete = audit.status === "Closed";
 
   if (isLoadingSummary) {
     return (

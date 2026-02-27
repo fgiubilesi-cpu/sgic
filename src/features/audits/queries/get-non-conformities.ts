@@ -1,4 +1,4 @@
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import type { NCStatus, NCsSeverity } from "@/types/database.types";
 
 export interface NonConformity {

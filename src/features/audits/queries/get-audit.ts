@@ -5,7 +5,7 @@ import type { AuditOutcome } from "@/types/database.types";
 
 export type ChecklistItem = {
   id: string;
-  question: string | null;
+  question: string;  // Always required - comes from template or manual entry
   outcome: AuditOutcome | null;
   notes?: string | null;
   evidence_url?: string | null;
@@ -58,11 +58,11 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
     return null;
   }
 
-  const rawStatus = (audit as { status?: string | null }).status ?? "planned";
-  const allowedStatuses: AuditStatus[] = ["planned", "in_progress", "completed", "archived"];
+  const rawStatus = (audit as { status?: string | null }).status ?? "Scheduled";
+  const allowedStatuses: AuditStatus[] = ["Scheduled", "In Progress", "Review", "Closed"];
   const status: AuditStatus = allowedStatuses.includes(rawStatus as AuditStatus)
     ? (rawStatus as AuditStatus)
-    : "planned";
+    : "Scheduled";
 
   const rawChecklists =
     (audit as { checklists?: unknown[] | null }).checklists ?? [];
@@ -95,7 +95,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
 
       return {
         id: String(item.id),
-        question: item.question ?? null,
+        question: item.question ?? "Untitled Question",  // Always required
         outcome,
         notes: item.notes ?? null,
         evidence_url: item.evidence_url ?? null,

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
 const completeAuditSchema = z.object({
@@ -17,14 +17,14 @@ export async function completeAudit(
 ): Promise<ActionResult<{ completedAt: string }>> {
   try {
     const validated = completeAuditSchema.parse(input);
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     const completedAt = new Date().toISOString();
 
     const { error } = await supabase
       .from("audits")
       .update({
-        status: "completed",
+        status: "Closed",
         updated_at: completedAt,
       })
       .eq("id", validated.auditId);
@@ -61,7 +61,7 @@ export async function getAuditSummary(
   pendingActions: number;
 }>> {
   try {
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Get checklist items summary
     const { data: items, error: itemsError } = await supabase

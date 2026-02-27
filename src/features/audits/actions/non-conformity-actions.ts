@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import {
   createNonConformitySchema,
   updateNonConformitySchema,
@@ -18,7 +18,7 @@ export async function createNonConformity(
 ): Promise<ActionResult<{ id: string }>> {
   try {
     const validated = createNonConformitySchema.parse(input);
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     // Get current user's organization
     const {
@@ -70,7 +70,7 @@ export async function updateNonConformity(
 ): Promise<ActionResult<null>> {
   try {
     const validated = updateNonConformitySchema.parse(input);
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     const { error } = await supabase
       .from("non_conformities")
@@ -110,7 +110,7 @@ export async function closeNonConformity(
 ): Promise<ActionResult<null>> {
   try {
     const validated = closeNonConformitySchema.parse(input);
-    const supabase = await createServerClient();
+    const supabase = await createClient();
 
     const now = new Date().toISOString();
     const { error } = await supabase

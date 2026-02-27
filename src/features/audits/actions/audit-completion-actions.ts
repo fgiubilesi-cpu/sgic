@@ -157,6 +157,13 @@ export async function completeAudit(
       };
     }
 
+    // Get current audit status before change
+    const { data: currentAudit } = await supabase
+      .from("audits")
+      .select("status")
+      .eq("id", validated.auditId)
+      .single();
+
     // Update audit status to "Review" (new enum value - next step before "Closed")
     const completedAt = new Date().toISOString();
     const { error: updateError } = await supabase
@@ -170,6 +177,23 @@ export async function completeAudit(
 
     if (updateError) {
       return { success: false, error: updateError.message };
+    }
+
+    // Log status change to audit trail
+    const { error: trailError } = await supabase
+      .from("audit_trail")
+      .insert({
+        audit_id: validated.auditId,
+        organization_id: profile.organization_id,
+        old_status: currentAudit?.status || null,
+        new_status: "Review",
+        changed_by: user.id,
+        changed_at: completedAt,
+      });
+
+    if (trailError) {
+      console.error("Failed to log audit trail:", trailError);
+      // Don't fail the operation if trail logging fails
     }
 
     revalidatePath(`/audits/${validated.auditId}`);

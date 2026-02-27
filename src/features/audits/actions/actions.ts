@@ -118,7 +118,7 @@ export async function updateAuditStatus(auditId: string, status: string) {
   // Verify audit belongs to user's organization
   const { data: audit } = await supabase
     .from('audits')
-    .select('organization_id')
+    .select('organization_id, status')
     .eq('id', result.data.auditId)
     .single()
 
@@ -126,14 +126,32 @@ export async function updateAuditStatus(auditId: string, status: string) {
     return { error: "Unauthorized." }
   }
 
+  const updatedAt = new Date().toISOString()
   const { error } = await supabase
     .from('audits')
-    .update({ status: result.data.status, updated_at: new Date().toISOString() })
+    .update({ status: result.data.status, updated_at: updatedAt })
     .eq('id', result.data.auditId)
 
   if (error) {
     console.error("Supabase Update Audit Status Error:", error)
     return { error: "Failed to update audit status." }
+  }
+
+  // Log status change to audit trail
+  const { error: trailError } = await supabase
+    .from('audit_trail')
+    .insert({
+      audit_id: result.data.auditId,
+      organization_id: profile.organization_id,
+      old_status: audit.status || null,
+      new_status: result.data.status,
+      changed_by: user.id,
+      changed_at: updatedAt,
+    })
+
+  if (trailError) {
+    console.error("Failed to log audit trail:", trailError)
+    // Don't fail the operation if trail logging fails
   }
 
   revalidatePath(`/audits/${auditId}`)

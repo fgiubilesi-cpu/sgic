@@ -72,7 +72,37 @@ export async function updateNonConformity(
     const validated = updateNonConformitySchema.parse(input);
     const supabase = await createClient();
 
-    const { error } = await supabase
+    // Security: Verify user's organization owns this non-conformity
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile?.organization_id) {
+      return { success: false, error: "Organization not found" };
+    }
+
+    // Verify non-conformity belongs to user's organization
+    const { data: nc, error: ncError } = await supabase
+      .from("non_conformities")
+      .select("organization_id")
+      .eq("id", validated.id)
+      .single();
+
+    if (ncError || !nc || nc.organization_id !== profile.organization_id) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const { error: updateError } = await supabase
       .from("non_conformities")
       .update({
         title: validated.title,
@@ -81,21 +111,22 @@ export async function updateNonConformity(
         status: validated.status,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", validated.id);
+      .eq("id", validated.id)
+      .eq("organization_id", profile.organization_id);
 
-    if (error) {
-      return { success: false, error: error.message };
+    if (updateError) {
+      return { success: false, error: updateError.message };
     }
 
     // Get the audit ID to revalidate the correct path
-    const { data: nc } = await supabase
+    const { data: ncUpdated } = await supabase
       .from("non_conformities")
       .select("audit_id")
       .eq("id", validated.id)
       .single();
 
-    if (nc?.audit_id) {
-      revalidatePath(`/audits/${nc.audit_id}`);
+    if (ncUpdated?.audit_id) {
+      revalidatePath(`/audits/${ncUpdated.audit_id}`);
     }
 
     return { success: true, data: null };
@@ -112,29 +143,60 @@ export async function closeNonConformity(
     const validated = closeNonConformitySchema.parse(input);
     const supabase = await createClient();
 
+    // Security: Verify user's organization owns this non-conformity
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile?.organization_id) {
+      return { success: false, error: "Organization not found" };
+    }
+
+    // Verify non-conformity belongs to user's organization
+    const { data: nc, error: ncError } = await supabase
+      .from("non_conformities")
+      .select("organization_id")
+      .eq("id", validated.id)
+      .single();
+
+    if (ncError || !nc || nc.organization_id !== profile.organization_id) {
+      return { success: false, error: "Unauthorized" };
+    }
+
     const now = new Date().toISOString();
-    const { error } = await supabase
+    const { error: closeError } = await supabase
       .from("non_conformities")
       .update({
         status: "closed",
         closed_at: now,
         updated_at: now,
       })
-      .eq("id", validated.id);
+      .eq("id", validated.id)
+      .eq("organization_id", profile.organization_id);
 
-    if (error) {
-      return { success: false, error: error.message };
+    if (closeError) {
+      return { success: false, error: closeError.message };
     }
 
     // Get the audit ID to revalidate the correct path
-    const { data: nc } = await supabase
+    const { data: ncUpdated } = await supabase
       .from("non_conformities")
       .select("audit_id")
       .eq("id", validated.id)
       .single();
 
-    if (nc?.audit_id) {
-      revalidatePath(`/audits/${nc.audit_id}`);
+    if (ncUpdated?.audit_id) {
+      revalidatePath(`/audits/${ncUpdated.audit_id}`);
     }
 
     return { success: true, data: null };

@@ -2,18 +2,19 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import type { AuditStatus } from "@/features/audits/schemas/audit-schema";
 import { updateAuditStatus } from "../actions";
 
 type Props = {
   auditId: string;
-  currentStatus: string;
+  currentStatus: AuditStatus;
 };
 
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  planned: { label: "Planned", color: "bg-blue-100 text-blue-700 border-blue-200" },
-  in_progress: { label: "In Progress", color: "bg-amber-100 text-amber-700 border-amber-200" },
-  completed: { label: "Completed", color: "bg-green-100 text-green-700 border-green-200" },
-  archived: { label: "Archived", color: "bg-slate-100 text-slate-700 border-slate-200" },
+const STATUS_CONFIG: Record<AuditStatus, { label: string; color: string }> = {
+  "Scheduled": { label: "Scheduled", color: "bg-slate-100 text-slate-700 border-slate-200" },
+  "In Progress": { label: "In Progress", color: "bg-blue-100 text-blue-700 border-blue-200" },
+  "Review": { label: "Review", color: "bg-amber-100 text-amber-700 border-amber-200" },
+  "Closed": { label: "Closed", color: "bg-green-100 text-green-700 border-green-200" },
 };
 
 export function AuditStatusBadge({ auditId, currentStatus }: Props) {
@@ -44,7 +45,7 @@ export function AuditStatusBadge({ auditId, currentStatus }: Props) {
         className={`px-2.5 py-0.5 rounded-full text-xs font-medium border flex items-center gap-1.5 cursor-pointer transition-colors ${activeConfig.color}`}
       >
         <span className="relative flex h-2 w-2">
-          {status === "in_progress" && (
+          {status === "In Progress" && (
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-current" />
           )}
           <span className="relative inline-flex rounded-full h-2 w-2 bg-current" />
@@ -58,15 +59,15 @@ export function AuditStatusBadge({ auditId, currentStatus }: Props) {
         {/* Invisible select overlay */}
         <select
           value={status}
-          onChange={(e) => handleChange(e.target.value)}
+          onChange={(e) => handleChange(e.target.value as AuditStatus)}
           disabled={loading}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           aria-label="Change audit status"
         >
-          <option value="planned">Planned</option>
-          <option value="in_progress">In Progress</option>
-          <option value="completed">Completed</option>
-          <option value="archived">Archived</option>
+          <option value="Scheduled">Scheduled</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Review">Review</option>
+          <option value="Closed">Closed</option>
         </select>
       </div>
     </div>

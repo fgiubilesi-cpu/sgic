@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import {
   createCorrectiveActionSchema,
   updateCorrectiveActionSchema,
@@ -18,26 +18,11 @@ export async function createCorrectiveAction(
 ): Promise<ActionResult<{ id: string }>> {
   try {
     const validated = createCorrectiveActionSchema.parse(input);
-    const supabase = await createClient();
 
-    // Get current user's organization
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return { success: false, error: "Unauthorized" };
-    }
+    const ctx = await getOrganizationContext();
+    if (!ctx) return { success: false, error: "Unauthorized" };
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("organization_id")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile?.organization_id) {
-      return { success: false, error: "Organization not found" };
-    }
+    const { supabase, organizationId } = ctx;
 
     const { data, error } = await supabase
       .from("corrective_actions")
@@ -49,7 +34,7 @@ export async function createCorrectiveAction(
         responsible_person_name: validated.responsiblePersonName,
         responsible_person_email: validated.responsiblePersonEmail,
         target_completion_date: validated.targetCompletionDate,
-        organization_id: profile.organization_id,
+        organization_id: organizationId,
       })
       .select("id")
       .single();
@@ -58,7 +43,6 @@ export async function createCorrectiveAction(
       return { success: false, error: error.message };
     }
 
-    // Revalidate the audit path
     const { data: nc } = await supabase
       .from("non_conformities")
       .select("audit_id")
@@ -81,7 +65,13 @@ export async function updateCorrectiveAction(
 ): Promise<ActionResult<null>> {
   try {
     const validated = updateCorrectiveActionSchema.parse(input);
-    const supabase = await createClient();
+
+    // updateCorrectiveAction doesn't need org-scoping (RLS protects it)
+    // but we reuse the context for the supabase client
+    const ctx = await getOrganizationContext();
+    if (!ctx) return { success: false, error: "Unauthorized" };
+
+    const { supabase } = ctx;
 
     const { error } = await supabase
       .from("corrective_actions")
@@ -101,7 +91,6 @@ export async function updateCorrectiveAction(
       return { success: false, error: error.message };
     }
 
-    // Get non-conformity and audit IDs to revalidate
     const { data: ca } = await supabase
       .from("corrective_actions")
       .select("non_conformity_id")
@@ -132,7 +121,11 @@ export async function completeCorrectiveAction(
 ): Promise<ActionResult<null>> {
   try {
     const validated = completeCorrectiveActionSchema.parse(input);
-    const supabase = await createClient();
+
+    const ctx = await getOrganizationContext();
+    if (!ctx) return { success: false, error: "Unauthorized" };
+
+    const { supabase } = ctx;
 
     const now = new Date().toISOString();
     const { error } = await supabase
@@ -148,7 +141,6 @@ export async function completeCorrectiveAction(
       return { success: false, error: error.message };
     }
 
-    // Get non-conformity and audit IDs to revalidate
     const { data: ca } = await supabase
       .from("corrective_actions")
       .select("non_conformity_id")

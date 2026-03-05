@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import {
   createNonConformitySchema,
   updateNonConformitySchema,
@@ -18,26 +18,11 @@ export async function createNonConformity(
 ): Promise<ActionResult<{ id: string }>> {
   try {
     const validated = createNonConformitySchema.parse(input);
-    const supabase = await createClient();
 
-    // Get current user's organization
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return { success: false, error: "Unauthorized" };
-    }
+    const ctx = await getOrganizationContext();
+    if (!ctx) return { success: false, error: "Unauthorized" };
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("organization_id")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile?.organization_id) {
-      return { success: false, error: "Organization not found" };
-    }
+    const { supabase, organizationId } = ctx;
 
     const { data, error } = await supabase
       .from("non_conformities")
@@ -47,7 +32,7 @@ export async function createNonConformity(
         title: validated.title,
         description: validated.description,
         severity: validated.severity,
-        organization_id: profile.organization_id,
+        organization_id: organizationId,
       })
       .select("id")
       .single();
@@ -70,26 +55,11 @@ export async function updateNonConformity(
 ): Promise<ActionResult<null>> {
   try {
     const validated = updateNonConformitySchema.parse(input);
-    const supabase = await createClient();
 
-    // Security: Verify user's organization owns this non-conformity
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return { success: false, error: "Unauthorized" };
-    }
+    const ctx = await getOrganizationContext();
+    if (!ctx) return { success: false, error: "Unauthorized" };
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("organization_id")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile?.organization_id) {
-      return { success: false, error: "Organization not found" };
-    }
+    const { supabase, organizationId } = ctx;
 
     // Verify non-conformity belongs to user's organization
     const { data: nc, error: ncError } = await supabase
@@ -98,7 +68,7 @@ export async function updateNonConformity(
       .eq("id", validated.id)
       .single();
 
-    if (ncError || !nc || nc.organization_id !== profile.organization_id) {
+    if (ncError || !nc || nc.organization_id !== organizationId) {
       return { success: false, error: "Unauthorized" };
     }
 
@@ -112,13 +82,12 @@ export async function updateNonConformity(
         updated_at: new Date().toISOString(),
       })
       .eq("id", validated.id)
-      .eq("organization_id", profile.organization_id);
+      .eq("organization_id", organizationId);
 
     if (updateError) {
       return { success: false, error: updateError.message };
     }
 
-    // Get the audit ID to revalidate the correct path
     const { data: ncUpdated } = await supabase
       .from("non_conformities")
       .select("audit_id")
@@ -141,26 +110,11 @@ export async function closeNonConformity(
 ): Promise<ActionResult<null>> {
   try {
     const validated = closeNonConformitySchema.parse(input);
-    const supabase = await createClient();
 
-    // Security: Verify user's organization owns this non-conformity
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return { success: false, error: "Unauthorized" };
-    }
+    const ctx = await getOrganizationContext();
+    if (!ctx) return { success: false, error: "Unauthorized" };
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("organization_id")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile?.organization_id) {
-      return { success: false, error: "Organization not found" };
-    }
+    const { supabase, organizationId } = ctx;
 
     // Verify non-conformity belongs to user's organization
     const { data: nc, error: ncError } = await supabase
@@ -169,7 +123,7 @@ export async function closeNonConformity(
       .eq("id", validated.id)
       .single();
 
-    if (ncError || !nc || nc.organization_id !== profile.organization_id) {
+    if (ncError || !nc || nc.organization_id !== organizationId) {
       return { success: false, error: "Unauthorized" };
     }
 
@@ -182,13 +136,12 @@ export async function closeNonConformity(
         updated_at: now,
       })
       .eq("id", validated.id)
-      .eq("organization_id", profile.organization_id);
+      .eq("organization_id", organizationId);
 
     if (closeError) {
       return { success: false, error: closeError.message };
     }
 
-    // Get the audit ID to revalidate the correct path
     const { data: ncUpdated } = await supabase
       .from("non_conformities")
       .select("audit_id")

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import type { AuditStatus } from "@/features/audits/schemas/audit-schema";
 
 export type { AuditStatus };
@@ -11,31 +11,15 @@ export type Audit = {
 };
 
 export async function getAudits(): Promise<Audit[]> {
-  const supabase = await createClient();
+  const ctx = await getOrganizationContext();
+  if (!ctx) return [];
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return [];
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || !profile?.organization_id) {
-    return [];
-  }
+  const { supabase, organizationId } = ctx;
 
   const { data: audits, error: auditsError } = await supabase
     .from("audits")
     .select("id, title, status, scheduled_date")
-    .eq("organization_id", profile.organization_id)
+    .eq("organization_id", organizationId)
     .order("scheduled_date", { ascending: false });
 
   if (auditsError || !audits) {
@@ -50,4 +34,3 @@ export async function getAudits(): Promise<Audit[]> {
       (audit as { scheduled_date?: string | null }).scheduled_date ?? null,
   }));
 }
-

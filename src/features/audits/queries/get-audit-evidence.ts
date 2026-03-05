@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 
 export type EvidenceItem = {
   id: string;
@@ -17,32 +17,15 @@ export type AuditEvidence = {
 };
 
 /**
- * Fetch all evidence (photos) linked to a specific audit
- * Includes the associated checklist question text for context
- * Enforces organization_id security check
+ * Fetch all evidence (photos) linked to a specific audit.
+ * Includes the associated checklist question text for context.
+ * Enforces organization_id security check.
  */
 export async function getAuditEvidence(auditId: string): Promise<AuditEvidence | null> {
-  const supabase = await createClient();
+  const ctx = await getOrganizationContext();
+  if (!ctx) return null;
 
-  // Get current user's organization
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return null;
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || !profile?.organization_id) {
-    return null;
-  }
+  const { supabase, organizationId } = ctx;
 
   // Verify audit belongs to user's organization
   const { data: audit, error: auditError } = await supabase
@@ -51,11 +34,10 @@ export async function getAuditEvidence(auditId: string): Promise<AuditEvidence |
     .eq("id", auditId)
     .single();
 
-  if (auditError || !audit || audit.organization_id !== profile.organization_id) {
+  if (auditError || !audit || audit.organization_id !== organizationId) {
     return null;
   }
 
-  // Fetch all checklist items with evidence for this audit
   const { data: items, error: itemsError } = await supabase
     .from("checklist_items")
     .select("id, question, outcome, evidence_url, created_at")
@@ -78,40 +60,23 @@ export async function getAuditEvidence(auditId: string): Promise<AuditEvidence |
 
   return {
     auditId,
-    organizationId: profile.organization_id,
+    organizationId,
     evidenceItems,
     totalCount: evidenceItems.length,
   };
 }
 
 /**
- * Fetch evidence by specific outcome type (e.g., only "non_compliant" items with evidence)
+ * Fetch evidence by specific outcome type (e.g., only "non_compliant" items with evidence).
  */
 export async function getAuditEvidenceByOutcome(
   auditId: string,
   outcome: string
 ): Promise<EvidenceItem[]> {
-  const supabase = await createClient();
+  const ctx = await getOrganizationContext();
+  if (!ctx) return [];
 
-  // Get current user's organization
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return [];
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || !profile?.organization_id) {
-    return [];
-  }
+  const { supabase, organizationId } = ctx;
 
   // Verify audit belongs to user's organization
   const { data: audit, error: auditError } = await supabase
@@ -120,11 +85,10 @@ export async function getAuditEvidenceByOutcome(
     .eq("id", auditId)
     .single();
 
-  if (auditError || !audit || audit.organization_id !== profile.organization_id) {
+  if (auditError || !audit || audit.organization_id !== organizationId) {
     return [];
   }
 
-  // Fetch checklist items with evidence matching the specific outcome
   const { data: items, error: itemsError } = await supabase
     .from("checklist_items")
     .select("id, question, outcome, evidence_url, created_at")

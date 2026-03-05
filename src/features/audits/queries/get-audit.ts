@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import type { Audit } from "@/features/audits/queries/get-audits";
 import type { AuditStatus } from "@/features/audits/schemas/audit-schema";
 import type { AuditOutcome } from "@/types/database.types";
@@ -24,26 +24,10 @@ export type AuditWithChecklists = Audit & {
 };
 
 export async function getAudit(id: string): Promise<AuditWithChecklists | null> {
-  const supabase = await createClient();
+  const ctx = await getOrganizationContext();
+  if (!ctx) return null;
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return null;
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || !profile?.organization_id) {
-    return null;
-  }
+  const { supabase, organizationId } = ctx;
 
   const { data: audit, error: auditError } = await supabase
     .from("audits")
@@ -51,7 +35,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
       "id, title, status, scheduled_date, organization_id, checklists(id, title, created_at, checklist_items(id, question, outcome, notes, evidence_url, created_at))"
     )
     .eq("id", id)
-    .eq("organization_id", profile.organization_id)
+    .eq("organization_id", organizationId)
     .single();
 
   if (auditError || !audit) {

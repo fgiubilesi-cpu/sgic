@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 
 export type Organization = {
   id: string;
@@ -8,31 +8,15 @@ export type Organization = {
 };
 
 export async function getOrganization(): Promise<Organization | null> {
-  const supabase = await createClient();
+  const ctx = await getOrganizationContext();
+  if (!ctx) return null;
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return null;
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || !profile?.organization_id) {
-    return null;
-  }
+  const { supabase, organizationId } = ctx;
 
   const { data: organization, error: orgError } = await supabase
     .from("organizations")
     .select("id, name, vat_number, slug")
-    .eq("id", profile.organization_id)
+    .eq("id", organizationId)
     .single();
 
   if (orgError || !organization) {
@@ -46,4 +30,3 @@ export async function getOrganization(): Promise<Organization | null> {
     slug: organization.slug ?? null,
   };
 }
-

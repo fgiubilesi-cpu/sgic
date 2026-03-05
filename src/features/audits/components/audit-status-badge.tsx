@@ -21,16 +21,16 @@ export function AuditStatusBadge({ auditId, currentStatus }: Props) {
   const [status, setStatus] = useState(currentStatus);
   const [loading, setLoading] = useState(false);
 
-  const activeConfig = STATUS_CONFIG[status] ?? STATUS_CONFIG["planned"];
+  const activeConfig = STATUS_CONFIG[status];
 
-  const handleChange = async (newStatus: string) => {
+  const handleChange = async (newStatus: AuditStatus) => {
     setLoading(true);
     const oldStatus = status;
     setStatus(newStatus);
 
     try {
       await updateAuditStatus(auditId, newStatus);
-      toast.success(`Status updated: ${STATUS_CONFIG[newStatus]?.label ?? newStatus}`);
+      toast.success(`Status updated: ${STATUS_CONFIG[newStatus].label}`);
     } catch {
       setStatus(oldStatus);
       toast.error("Failed to update status.");

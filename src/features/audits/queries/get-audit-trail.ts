@@ -160,7 +160,7 @@ export async function getLatestAuditStatusChange(
     return null;
   }
 
-  const profile = Array.isArray(entry.profiles) ? entry.profiles[0] : entry.profiles;
+  const authorProfile = Array.isArray(entry.profiles) ? entry.profiles[0] : entry.profiles;
   return {
     id: String(entry.id),
     auditId: String(entry.audit_id),
@@ -168,6 +168,6 @@ export async function getLatestAuditStatusChange(
     newStatus: entry.new_status,
     changedBy: String(entry.changed_by),
     changedAt: entry.changed_at,
-    changedByEmail: profile?.email,
+    changedByEmail: authorProfile?.email,
   };
 }

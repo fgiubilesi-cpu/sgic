@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,12 +35,7 @@ import {
 } from "@/components/ui/sheet";
 
 import { createAuditFromTemplate } from "@/features/audits/actions";
-import { createClient } from "@/lib/supabase/client";
-
-type Template = {
-  id: string;
-  title: string;
-};
+import type { AuditTemplate } from "@/features/audits/queries/get-templates";
 
 const formSchema = z.object({
   title: z.string().min(2, "Title is required"),
@@ -50,12 +45,15 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function CreateAuditSheet() {
+interface CreateAuditSheetProps {
+  /** Pre-fetched server-side from audits/page.tsx — no client-side fetch needed. */
+  templates: AuditTemplate[];
+}
+
+export function CreateAuditSheet({ templates }: CreateAuditSheetProps) {
   const [open, setOpen] = useState(false);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -66,26 +64,8 @@ export function CreateAuditSheet() {
     },
   });
 
-  useEffect(() => {
-    if (!open) return;
-
-    async function fetchTemplates() {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from("checklist_templates")
-        .select("id, title")
-        .order("title");
-
-      if (data) setTemplates(data);
-      if (error) toast.error("Failed to load templates.");
-      setIsLoading(false);
-    }
-
-    fetchTemplates();
-  }, [open, supabase]);
-
   async function onSubmit(values: FormValues) {
-    setIsLoading(true);
+    setIsSubmitting(true);
     try {
       const result = await createAuditFromTemplate({
         title: values.title,
@@ -104,7 +84,7 @@ export function CreateAuditSheet() {
     } catch {
       toast.error("An unexpected error occurred.");
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   }
 
@@ -166,7 +146,7 @@ export function CreateAuditSheet() {
                   >
                     <FormControl>
                       <SelectTrigger className="w-full bg-white border-zinc-200">
-                        <SelectValue placeholder={isLoading ? "Loading..." : "Select a template..."} />
+                        <SelectValue placeholder="Select a template..." />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent position="popper" className="z-[100] max-h-[200px]">
@@ -175,7 +155,7 @@ export function CreateAuditSheet() {
                           {t.title}
                         </SelectItem>
                       ))}
-                      {templates.length === 0 && !isLoading && (
+                      {templates.length === 0 && (
                         <div className="px-2 py-4 text-sm text-center text-zinc-400">
                           No templates found. Create one first.
                         </div>
@@ -190,9 +170,9 @@ export function CreateAuditSheet() {
             <Button
               type="submit"
               className="w-full h-11 bg-zinc-900"
-              disabled={isLoading}
+              disabled={isSubmitting}
             >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create Audit"}
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create Audit"}
             </Button>
           </form>
         </Form>

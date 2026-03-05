@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { getAudit } from "@/features/audits/queries/get-audit";
 import { getNonConformitiesByAudit } from "@/features/audits/queries/get-non-conformities";
+import { getCorrectiveActionsByAudit } from "@/features/audits/queries/get-corrective-actions";
+import { getAuditSummary } from "@/features/audits/queries/get-audit-summary";
 import { AuditStatusBadge } from "@/features/audits/components/audit-status-badge";
 import { ChecklistManager } from "@/features/audits/components/checklist-manager";
 import { AuditStats } from "@/features/audits/components/audit-stats";
@@ -19,7 +21,11 @@ export default async function AuditDetailPage({
     notFound();
   }
 
-  const nonConformities = await getNonConformitiesByAudit(id);
+  const [nonConformities, correctiveActions, summary] = await Promise.all([
+    getNonConformitiesByAudit(id),
+    getCorrectiveActionsByAudit(id),
+    getAuditSummary(id),
+  ]);
 
   const formattedDate = audit.scheduled_date
     ? new Intl.DateTimeFormat("en-GB", {
@@ -46,9 +52,9 @@ export default async function AuditDetailPage({
 
       <ChecklistManager audit={audit} />
 
-      <NonConformitiesList audit={audit} nonConformities={nonConformities} />
+      <NonConformitiesList audit={audit} nonConformities={nonConformities} correctiveActions={correctiveActions} />
 
-      <AuditCompletionSection audit={audit} nonConformitiesCount={nonConformities.length} />
+      <AuditCompletionSection audit={audit} summary={summary} />
     </div>
   );
 }

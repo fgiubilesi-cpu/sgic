@@ -94,3 +94,52 @@ export const AUDIT_STATUS_COLORS: Record<AuditStatus, string> = {
 };
 
 export const auditStatusSchema = z.enum(['Scheduled', 'In Progress', 'Review', 'Closed']);
+
+// ===== SUPABASE-COMPATIBLE ROW TYPES =====
+// Minimal row type definitions for unimplemented features.
+// Replace with full Supabase-generated types once available.
+
+export interface PersonnelRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  is_active: boolean;
+  tax_code: string;
+  hire_date: string;
+  organization_id: string;
+  training_records?: TrainingRecordRow[];
+}
+
+export interface TrainingCourseRow {
+  id: string;
+  title: string;
+  duration_hours: number;
+  validity_months: number | null;
+  category: string;
+  organization_id: string;
+}
+
+export interface TrainingRecordRow {
+  id: string;
+  personnel_id: string;
+  course_id: string;
+  completion_date: string;
+  expiry_date: string | null;
+  certificate_url: string | null;
+  organization_id: string;
+  training_courses?: { title: string; duration_hours: number; category: string } | null;
+}
+
+export interface Database {
+  public: {
+    Tables: {
+      personnel: { Row: PersonnelRow };
+      training_courses: { Row: TrainingCourseRow };
+      training_records: { Row: TrainingRecordRow };
+    };
+  };
+}
+
+export type Tables<T extends keyof Database["public"]["Tables"]> =
+  Database["public"]["Tables"][T]["Row"];

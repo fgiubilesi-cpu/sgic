@@ -1,9 +1,11 @@
 import { getAudits } from "@/features/audits/queries/get-audits";
+import { getAuditTemplates } from "@/features/audits/queries/get-templates";
 import { AuditTable } from "@/features/audits/components/audit-table";
 import { CreateAuditSheet } from "@/features/audits/components/create-audit-sheet";
 
 export default async function AuditsPage() {
-  const audits = await getAudits();
+  // Both queries run in parallel — no serial waterfall.
+  const [audits, templates] = await Promise.all([getAudits(), getAuditTemplates()]);
 
   return (
     <section className="space-y-6">
@@ -16,7 +18,8 @@ export default async function AuditsPage() {
             View and manage all audits planned for your organisation.
           </p>
         </div>
-        <CreateAuditSheet />
+        {/* Templates are pre-fetched server-side; CreateAuditSheet is pure UI. */}
+        <CreateAuditSheet templates={templates} />
       </div>
 
       <AuditTable audits={audits} />

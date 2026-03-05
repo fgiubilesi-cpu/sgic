@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
@@ -12,31 +12,21 @@ import {
   NC_STATUS_LABELS,
   NC_STATUS_COLORS,
 } from "@/types/database.types";
-import { getCorrectiveActionsByNonConformity } from "@/features/audits/queries/get-corrective-actions";
 import { CorrectiveActionsList } from "./corrective-actions-list";
 
 interface NonConformityDetailProps {
   nonConformity: NonConformity;
+  /** Pre-fetched server-side from the audit page — no useEffect needed. */
+  correctiveActions: CorrectiveAction[];
   onBack: () => void;
 }
 
 export function NonConformityDetail({
   nonConformity,
+  correctiveActions,
   onBack,
 }: NonConformityDetailProps) {
-  const [correctiveActions, setCorrectiveActions] = useState<CorrectiveAction[]>(
-    []
-  );
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const loadCAs = async () => {
-      const cas = await getCorrectiveActionsByNonConformity(nonConformity.id);
-      setCorrectiveActions(cas);
-      setIsLoading(false);
-    };
-    loadCAs();
-  }, [nonConformity.id]);
+  const router = useRouter();
 
   const createdDate = new Intl.DateTimeFormat("en-GB", {
     year: "numeric",
@@ -106,12 +96,11 @@ export function NonConformityDetail({
       <CorrectiveActionsList
         nonConformityId={nonConformity.id}
         correctiveActions={correctiveActions}
-        isLoading={isLoading}
+        isLoading={false}
         onActionsUpdated={async () => {
-          const cas = await getCorrectiveActionsByNonConformity(
-            nonConformity.id
-          );
-          setCorrectiveActions(cas);
+          // Server actions already call revalidatePath; router.refresh() picks
+          // up the fresh server data without unmounting client state.
+          router.refresh();
         }}
         ncTitle={nonConformity.title}
         ncDescription={nonConformity.description || ""}

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { getAudit } from "@/features/audits/queries/get-audit";
 import { getNonConformitiesByAudit } from "@/features/audits/queries/get-non-conformities";
+import { getCorrectiveActionsByAudit } from "@/features/audits/queries/get-corrective-actions";
+import { getAuditSummary } from "@/features/audits/queries/get-audit-summary";
 import { AuditStatusBadge } from "@/features/audits/components/audit-status-badge";
 import { ChecklistManager } from "@/features/audits/components/checklist-manager";
 import { AuditStats } from "@/features/audits/components/audit-stats";
@@ -19,7 +21,12 @@ export default async function AuditDetailPage({
     notFound();
   }
 
-  const nonConformities = await getNonConformitiesByAudit(id);
+  // Fetch NCs, their CAs, and the audit summary in parallel — no N+1, no client fetches.
+  const [nonConformities, correctiveActionsByNC, auditSummary] = await Promise.all([
+    getNonConformitiesByAudit(id),
+    getCorrectiveActionsByAudit(id),
+    getAuditSummary(id),
+  ]);
 
   const formattedDate = audit.scheduled_date
     ? new Intl.DateTimeFormat("en-GB", {
@@ -46,9 +53,16 @@ export default async function AuditDetailPage({
 
       <ChecklistManager audit={audit} />
 
-      <NonConformitiesList audit={audit} nonConformities={nonConformities} />
+      {/* correctiveActionsByNC is pre-fetched here and threaded down — no
+          client-side fetch or useEffect required inside child components. */}
+      <NonConformitiesList
+        audit={audit}
+        nonConformities={nonConformities}
+        correctiveActionsByNC={correctiveActionsByNC}
+      />
 
-      <AuditCompletionSection audit={audit} nonConformitiesCount={nonConformities.length} />
+      {/* summary is pre-fetched server-side — no useEffect or client fetch needed. */}
+      <AuditCompletionSection audit={audit} summary={auditSummary} />
     </div>
   );
 }

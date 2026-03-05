@@ -106,6 +106,11 @@ export async function getNonConformity(
 
   if (!data) return null;
 
+  // Supabase types the FK join as an array; normalise to a single item.
+  const rawItem = Array.isArray(data.checklist_items)
+    ? data.checklist_items[0]
+    : data.checklist_items;
+
   return {
     id: data.id,
     auditId: data.audit_id,
@@ -117,10 +122,10 @@ export async function getNonConformity(
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     closedAt: data.closed_at,
-    checklistItem: data.checklist_items
+    checklistItem: rawItem
       ? {
-          question: data.checklist_items.question,
-          outcome: data.checklist_items.outcome,
+          question: rawItem.question,
+          outcome: rawItem.outcome,
         }
       : undefined,
   };

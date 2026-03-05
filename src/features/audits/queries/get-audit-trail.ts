@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 
 export type AuditTrailEntry = {
   id: string;
@@ -17,32 +17,15 @@ export type AuditTrailHistory = {
 };
 
 /**
- * Fetch audit trail (status change history) for a specific audit
- * Enforces organization_id security check
- * Returns entries in reverse chronological order (newest first)
+ * Fetch audit trail (status change history) for a specific audit.
+ * Enforces organization_id security check.
+ * Returns entries in reverse chronological order (newest first).
  */
 export async function getAuditTrail(auditId: string): Promise<AuditTrailHistory | null> {
-  const supabase = await createClient();
+  const ctx = await getOrganizationContext();
+  if (!ctx) return null;
 
-  // Get current user's organization
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return null;
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || !profile?.organization_id) {
-    return null;
-  }
+  const { supabase, organizationId } = ctx;
 
   // Verify audit belongs to user's organization
   const { data: audit, error: auditError } = await supabase
@@ -51,11 +34,10 @@ export async function getAuditTrail(auditId: string): Promise<AuditTrailHistory 
     .eq("id", auditId)
     .single();
 
-  if (auditError || !audit || audit.organization_id !== profile.organization_id) {
+  if (auditError || !audit || audit.organization_id !== organizationId) {
     return null;
   }
 
-  // Fetch audit trail entries
   const { data: entries, error: entriesError } = await supabase
     .from("audit_trail")
     .select(
@@ -70,7 +52,7 @@ export async function getAuditTrail(auditId: string): Promise<AuditTrailHistory 
     `
     )
     .eq("audit_id", auditId)
-    .eq("organization_id", profile.organization_id)
+    .eq("organization_id", organizationId)
     .order("changed_at", { ascending: false });
 
   if (entriesError) {
@@ -98,32 +80,15 @@ export async function getAuditTrail(auditId: string): Promise<AuditTrailHistory 
 }
 
 /**
- * Get the most recent status change for an audit
+ * Get the most recent status change for an audit.
  */
 export async function getLatestAuditStatusChange(
   auditId: string
 ): Promise<AuditTrailEntry | null> {
-  const supabase = await createClient();
+  const ctx = await getOrganizationContext();
+  if (!ctx) return null;
 
-  // Get current user's organization
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return null;
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || !profile?.organization_id) {
-    return null;
-  }
+  const { supabase, organizationId } = ctx;
 
   // Verify audit belongs to user's organization
   const { data: audit, error: auditError } = await supabase
@@ -132,11 +97,10 @@ export async function getLatestAuditStatusChange(
     .eq("id", auditId)
     .single();
 
-  if (auditError || !audit || audit.organization_id !== profile.organization_id) {
+  if (auditError || !audit || audit.organization_id !== organizationId) {
     return null;
   }
 
-  // Fetch most recent entry
   const { data: entry, error: entryError } = await supabase
     .from("audit_trail")
     .select(
@@ -151,7 +115,7 @@ export async function getLatestAuditStatusChange(
     `
     )
     .eq("audit_id", auditId)
-    .eq("organization_id", profile.organization_id)
+    .eq("organization_id", organizationId)
     .order("changed_at", { ascending: false })
     .limit(1)
     .single();
@@ -168,6 +132,6 @@ export async function getLatestAuditStatusChange(
     newStatus: entry.new_status,
     changedBy: String(entry.changed_by),
     changedAt: entry.changed_at,
-    changedByEmail: authorProfile?.email,
+    changedByEmail: (authorProfile as any)?.email,
   };
 }

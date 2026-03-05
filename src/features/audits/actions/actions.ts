@@ -1,8 +1,8 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { getOrganizationContext } from '@/lib/supabase/get-org-context'
 import { auditOutcomeSchema } from '@/types/database.types'
 
 // --- 1. UPDATE CHECKLIST ITEM ---
@@ -16,7 +16,10 @@ const UpdateItemSchema = z.object({
 })
 
 export async function updateChecklistItem(formData: FormData) {
-  const supabase = await createClient()
+  const ctx = await getOrganizationContext()
+  if (!ctx) return { error: 'Not authenticated.' }
+
+  const { supabase, organizationId } = ctx
 
   const rawData = {
     itemId: formData.get('itemId'),
@@ -27,28 +30,11 @@ export async function updateChecklistItem(formData: FormData) {
   }
 
   const result = UpdateItemSchema.safeParse(rawData)
-
   if (!result.success) {
     return { error: "Invalid data." }
   }
 
   const { itemId, outcome, notes, evidenceUrl, path } = result.data
-
-  // Verify user's organization owns this checklist item (RLS security check)
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-  if (userError || !user) {
-    return { error: "Not authenticated." }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('organization_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.organization_id) {
-    return { error: "No organization found." }
-  }
 
   // Verify checklist item belongs to user's organization
   const { data: item } = await supabase
@@ -57,7 +43,7 @@ export async function updateChecklistItem(formData: FormData) {
     .eq('id', itemId)
     .single()
 
-  if (!item || item.organization_id !== profile.organization_id) {
+  if (!item || item.organization_id !== organizationId) {
     return { error: "Unauthorized." }
   }
 
@@ -91,28 +77,14 @@ const UpdateAuditStatusSchema = z.object({
 })
 
 export async function updateAuditStatus(auditId: string, status: string) {
-  const supabase = await createClient()
+  const ctx = await getOrganizationContext()
+  if (!ctx) return { error: 'Not authenticated.' }
+
+  const { supabase, userId, organizationId } = ctx
 
   const result = UpdateAuditStatusSchema.safeParse({ auditId, status })
-
   if (!result.success) {
     return { error: "Invalid data." }
-  }
-
-  // Verify user's organization owns this audit (RLS security check)
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-  if (userError || !user) {
-    return { error: "Not authenticated." }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('organization_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.organization_id) {
-    return { error: "No organization found." }
   }
 
   // Verify audit belongs to user's organization
@@ -122,7 +94,7 @@ export async function updateAuditStatus(auditId: string, status: string) {
     .eq('id', result.data.auditId)
     .single()
 
-  if (!audit || audit.organization_id !== profile.organization_id) {
+  if (!audit || audit.organization_id !== organizationId) {
     return { error: "Unauthorized." }
   }
 
@@ -142,10 +114,10 @@ export async function updateAuditStatus(auditId: string, status: string) {
     .from('audit_trail')
     .insert({
       audit_id: result.data.auditId,
-      organization_id: profile.organization_id,
+      organization_id: organizationId,
       old_status: audit.status || null,
       new_status: result.data.status,
-      changed_by: user.id,
+      changed_by: userId,
       changed_at: updatedAt,
     })
 
@@ -172,25 +144,11 @@ export async function createAuditFromTemplate(input: {
   scheduled_date?: string
   templateId: string
 }): Promise<{ success: true; auditId: string } | { success: false; error: string }> {
-  const supabase = await createClient()
+  const ctx = await getOrganizationContext()
+  if (!ctx) return { success: false, error: 'Not authenticated.' }
 
-  // 1. Get the user's organization
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-  if (userError || !user) {
-    return { success: false, error: "Not authenticated." }
-  }
+  const { supabase, organizationId } = ctx
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('organization_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.organization_id) {
-    return { success: false, error: "No organization found for your profile." }
-  }
-
-  // 2. Validate input
   const result = CreateAuditFromTemplateSchema.safeParse(input)
   if (!result.success) {
     return { success: false, error: "Missing or invalid data." }
@@ -198,14 +156,13 @@ export async function createAuditFromTemplate(input: {
 
   const { title, scheduled_date, templateId } = result.data
 
-  // 3. Create the audit
   const { data: audit, error: auditError } = await supabase
     .from('audits')
     .insert({
       title,
       status: 'Scheduled',
       scheduled_date: scheduled_date || null,
-      organization_id: profile.organization_id,
+      organization_id: organizationId,
     })
     .select()
     .single()
@@ -215,7 +172,7 @@ export async function createAuditFromTemplate(input: {
     return { success: false, error: "Unable to create audit." }
   }
 
-  // 4. Snapshot: Copy template questions to checklist items (critical for ISO 9001)
+  // Snapshot: Copy template questions to checklist items (critical for ISO 9001)
   // Only copy active (non-soft-deleted) questions
   // Each checklist item gets BOTH a snapshot of the question text AND a reference to the source
   const { data: questions } = await supabase
@@ -230,7 +187,7 @@ export async function createAuditFromTemplate(input: {
       audit_id: audit.id,
       source_question_id: q.id,  // Reference to original template question (audit trail)
       question: q.question,      // Snapshot of question text (what was actually audited)
-      organization_id: profile.organization_id,
+      organization_id: organizationId,
       outcome: 'pending',
       sort_order: q.sort_order,
     }))

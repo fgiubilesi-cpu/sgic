@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 
 export type AuditTemplate = {
   id: string;
@@ -10,14 +10,10 @@ export type AuditTemplate = {
  * Access is enforced by Supabase RLS; server-side only (uses next/headers).
  */
 export async function getAuditTemplates(): Promise<AuditTemplate[]> {
-  const supabase = await createClient();
+  const ctx = await getOrganizationContext();
+  if (!ctx) return [];
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) return [];
+  const { supabase } = ctx;
 
   const { data, error } = await supabase
     .from("checklist_templates")

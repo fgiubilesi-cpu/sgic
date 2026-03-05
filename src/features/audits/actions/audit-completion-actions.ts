@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getOrganizationContext, type OrgContext } from "@/lib/supabase/get-org-context";
 import { z } from "zod";
 
 const completeAuditSchema = z.object({
@@ -26,23 +26,18 @@ type CompletionValidation = {
  */
 async function validateAuditCompletion(
   auditId: string,
-  supabase: Awaited<ReturnType<typeof createClient>>
+  ctx: OrgContext
 ): Promise<CompletionValidation> {
+  const { supabase } = ctx;
   const errors: string[] = [];
 
-  // 1. Check for pending checklist items
   const { data: items, error: itemsError } = await supabase
     .from("checklist_items")
     .select("id, outcome")
     .eq("audit_id", auditId);
 
   if (itemsError) {
-    return {
-      isValid: false,
-      errors: [itemsError.message],
-      pendingItems: 0,
-      nonCompliantWithoutNC: 0,
-    };
+    return { isValid: false, errors: [itemsError.message], pendingItems: 0, nonCompliantWithoutNC: 0 };
   }
 
   const pendingItems = items?.filter((i: any) => i.outcome === "pending").length || 0;
@@ -52,7 +47,6 @@ async function validateAuditCompletion(
     );
   }
 
-  // 2. Check for non_compliant items without non_conformity records
   const { data: nonCompliantItems, error: ncItemsError } = await supabase
     .from("checklist_items")
     .select("id")
@@ -60,12 +54,7 @@ async function validateAuditCompletion(
     .eq("outcome", "non_compliant");
 
   if (ncItemsError) {
-    return {
-      isValid: false,
-      errors: [ncItemsError.message],
-      pendingItems,
-      nonCompliantWithoutNC: 0,
-    };
+    return { isValid: false, errors: [ncItemsError.message], pendingItems, nonCompliantWithoutNC: 0 };
   }
 
   let nonCompliantWithoutNC = 0;
@@ -74,26 +63,14 @@ async function validateAuditCompletion(
       .from("non_conformities")
       .select("checklist_item_id")
       .eq("audit_id", auditId)
-      .in(
-        "checklist_item_id",
-        nonCompliantItems.map((item: any) => item.id)
-      );
+      .in("checklist_item_id", nonCompliantItems.map((item: any) => item.id));
 
     if (ncError) {
-      return {
-        isValid: false,
-        errors: [ncError.message],
-        pendingItems,
-        nonCompliantWithoutNC: 0,
-      };
+      return { isValid: false, errors: [ncError.message], pendingItems, nonCompliantWithoutNC: 0 };
     }
 
-    const ncItemIds = new Set(
-      nonConformities?.map((nc: any) => nc.checklist_item_id) || []
-    );
-    nonCompliantWithoutNC = nonCompliantItems.filter(
-      (item: any) => !ncItemIds.has(item.id)
-    ).length;
+    const ncItemIds = new Set(nonConformities?.map((nc: any) => nc.checklist_item_id) || []);
+    nonCompliantWithoutNC = nonCompliantItems.filter((item: any) => !ncItemIds.has(item.id)).length;
 
     if (nonCompliantWithoutNC > 0) {
       errors.push(
@@ -102,12 +79,7 @@ async function validateAuditCompletion(
     }
   }
 
-  return {
-    isValid: errors.length === 0,
-    errors,
-    pendingItems,
-    nonCompliantWithoutNC,
-  };
+  return { isValid: errors.length === 0, errors, pendingItems, nonCompliantWithoutNC };
 }
 
 export async function completeAudit(
@@ -115,40 +87,24 @@ export async function completeAudit(
 ): Promise<ActionResult<{ completedAt: string; validation: CompletionValidation }>> {
   try {
     const validated = completeAuditSchema.parse(input);
-    const supabase = await createClient();
 
-    // Security: Verify user's organization owns this audit
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return { success: false, error: "Unauthorized" };
-    }
+    const ctx = await getOrganizationContext();
+    if (!ctx) return { success: false, error: "Unauthorized" };
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("organization_id")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile?.organization_id) {
-      return { success: false, error: "Organization not found" };
-    }
+    const { supabase, userId, organizationId } = ctx;
 
     // Verify audit belongs to user's organization
     const { data: audit, error: auditError } = await supabase
       .from("audits")
-      .select("organization_id")
+      .select("organization_id, status")
       .eq("id", validated.auditId)
       .single();
 
-    if (auditError || !audit || audit.organization_id !== profile.organization_id) {
+    if (auditError || !audit || audit.organization_id !== organizationId) {
       return { success: false, error: "Unauthorized" };
     }
 
-    // Validate completion readiness
-    const validation = await validateAuditCompletion(validated.auditId, supabase);
+    const validation = await validateAuditCompletion(validated.auditId, ctx);
 
     if (!validation.isValid) {
       return {
@@ -157,52 +113,36 @@ export async function completeAudit(
       };
     }
 
-    // Get current audit status before change
-    const { data: currentAudit } = await supabase
-      .from("audits")
-      .select("status")
-      .eq("id", validated.auditId)
-      .single();
-
-    // Update audit status to "Review" (new enum value - next step before "Closed")
     const completedAt = new Date().toISOString();
     const { error: updateError } = await supabase
       .from("audits")
-      .update({
-        status: "Review",
-        updated_at: completedAt,
-      })
+      .update({ status: "Review", updated_at: completedAt })
       .eq("id", validated.auditId)
-      .eq("organization_id", profile.organization_id);
+      .eq("organization_id", organizationId);
 
     if (updateError) {
       return { success: false, error: updateError.message };
     }
 
-    // Log status change to audit trail
     const { error: trailError } = await supabase
       .from("audit_trail")
       .insert({
         audit_id: validated.auditId,
-        organization_id: profile.organization_id,
-        old_status: currentAudit?.status || null,
+        organization_id: organizationId,
+        old_status: audit.status || null,
         new_status: "Review",
-        changed_by: user.id,
+        changed_by: userId,
         changed_at: completedAt,
       });
 
     if (trailError) {
       console.error("Failed to log audit trail:", trailError);
-      // Don't fail the operation if trail logging fails
     }
 
     revalidatePath(`/audits/${validated.auditId}`);
     revalidatePath("/audits");
 
-    return {
-      success: true,
-      data: { completedAt, validation },
-    };
+    return { success: true, data: { completedAt, validation } };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return { success: false, error: message };
@@ -210,150 +150,28 @@ export async function completeAudit(
 }
 
 /**
- * Generate audit summary statistics
- */
-export async function getAuditSummary(
-  auditId: string
-): Promise<ActionResult<{
-  totalItems: number;
-  compliant: number;
-  nonCompliant: number;
-  notApplicable: number;
-  pending: number;
-  compliancePercentage: number;
-  nonConformitiesCount: number;
-  openNonConformities: number;
-  completedActions: number;
-  pendingActions: number;
-}>> {
-  try {
-    const supabase = await createClient();
-
-    // Get checklist items summary
-    const { data: items, error: itemsError } = await supabase
-      .from("checklist_items")
-      .select("outcome")
-      .eq("audit_id", auditId);
-
-    if (itemsError) {
-      return { success: false, error: itemsError.message };
-    }
-
-    const itemsSummary = {
-      total: items?.length || 0,
-      compliant: items?.filter((i: any) => i.outcome === "compliant").length || 0,
-      nonCompliant:
-        items?.filter((i: any) => i.outcome === "non_compliant").length || 0,
-      notApplicable:
-        items?.filter((i: any) => i.outcome === "not_applicable").length || 0,
-      pending: items?.filter((i: any) => i.outcome === "pending").length || 0,
-    };
-
-    const compliancePercentage =
-      itemsSummary.total > 0
-        ? Math.round(
-            ((itemsSummary.compliant + itemsSummary.notApplicable) /
-              itemsSummary.total) *
-              100
-          )
-        : 0;
-
-    // Get non-conformities summary
-    const { data: ncs, error: ncsError } = await supabase
-      .from("non_conformities")
-      .select("status")
-      .eq("audit_id", auditId);
-
-    if (ncsError) {
-      return { success: false, error: ncsError.message };
-    }
-
-    const ncsSummary = {
-      total: ncs?.length || 0,
-      open: ncs?.filter((n: any) => n.status === "open").length || 0,
-    };
-
-    // Get corrective actions summary for this audit's NCs
-    const { data: cas, error: casError } = await supabase
-      .from("corrective_actions")
-      .select("status, non_conformity_id")
-      .in(
-        "non_conformity_id",
-        ncs?.map((n: any) => n.id) || []
-      );
-
-    if (casError) {
-      return { success: false, error: casError.message };
-    }
-
-    const casSummary = {
-      completed: cas?.filter((c: any) => c.status === "completed").length || 0,
-      pending: cas?.filter((c: any) => c.status === "pending").length || 0,
-    };
-
-    return {
-      success: true,
-      data: {
-        totalItems: itemsSummary.total,
-        compliant: itemsSummary.compliant,
-        nonCompliant: itemsSummary.nonCompliant,
-        notApplicable: itemsSummary.notApplicable,
-        pending: itemsSummary.pending,
-        compliancePercentage,
-        nonConformitiesCount: ncsSummary.total,
-        openNonConformities: ncsSummary.open,
-        completedActions: casSummary.completed,
-        pendingActions: casSummary.pending,
-      },
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return { success: false, error: message };
-  }
-}
-
-/**
- * Close an audit that is in Review status
- * Moves audit from Review → Closed
- * Requires organization ownership verification
+ * Close an audit that is in Review status.
+ * Moves audit from Review → Closed.
  */
 export async function closeAudit(
   input: { auditId: string }
 ): Promise<ActionResult<{ closedAt: string }>> {
   try {
-    const supabase = await createClient();
+    const ctx = await getOrganizationContext();
+    if (!ctx) return { success: false, error: "Unauthorized" };
 
-    // Security: Verify user's organization owns this audit
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return { success: false, error: "Unauthorized" };
-    }
+    const { supabase, userId, organizationId } = ctx;
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("organization_id")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile?.organization_id) {
-      return { success: false, error: "Organization not found" };
-    }
-
-    // Verify audit belongs to user's organization
     const { data: audit, error: auditError } = await supabase
       .from("audits")
       .select("organization_id, status")
       .eq("id", input.auditId)
       .single();
 
-    if (auditError || !audit || audit.organization_id !== profile.organization_id) {
+    if (auditError || !audit || audit.organization_id !== organizationId) {
       return { success: false, error: "Unauthorized" };
     }
 
-    // Verify audit is in Review status
     if (audit.status !== "Review") {
       return {
         success: false,
@@ -361,36 +179,30 @@ export async function closeAudit(
       };
     }
 
-    // Update audit status to Closed
     const closedAt = new Date().toISOString();
     const { error: updateError } = await supabase
       .from("audits")
-      .update({
-        status: "Closed",
-        updated_at: closedAt,
-      })
+      .update({ status: "Closed", updated_at: closedAt })
       .eq("id", input.auditId)
-      .eq("organization_id", profile.organization_id);
+      .eq("organization_id", organizationId);
 
     if (updateError) {
       return { success: false, error: updateError.message };
     }
 
-    // Log status change to audit trail
     const { error: trailError } = await supabase
       .from("audit_trail")
       .insert({
         audit_id: input.auditId,
-        organization_id: profile.organization_id,
+        organization_id: organizationId,
         old_status: "Review",
         new_status: "Closed",
-        changed_by: user.id,
+        changed_by: userId,
         changed_at: closedAt,
       });
 
     if (trailError) {
       console.error("Failed to log audit trail:", trailError);
-      // Don't fail the operation if trail logging fails
     }
 
     revalidatePath(`/audits/${input.auditId}`);

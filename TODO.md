@@ -109,12 +109,12 @@
 
 ### EPIC 5 — Non Conformità e Azioni Correttive
 
-- [ ] **T5.1** — Generazione automatica NC da risposta NC/NNC
-  - Aggiorna action `saveChecklistItemResponse`: se outcome = NC o NNC, crea automaticamente riga in `non_conformities`
-  - NC pre-popolata con: checklist_item_id, audit_id, organization_id, description = testo domanda, status = 'open'
-  - Se risposta cambia da NC → C, NC viene marcata 'annullata' (non eliminata)
-  - Test: rispondi NC a una domanda, verifica NC creata in tabella
-  - Note completamento: ___
+- [x] **T5.1** — Generazione automatica NC da risposta NC/NNC
+  - Aggiorna action `saveChecklistItemResponse`: se outcome = NC o NNC, crea automaticamente riga in `non_conformities` ✅ (updateChecklistItem aggiornato)
+  - NC pre-popolata con: checklist_item_id, audit_id, organization_id, description = testo domanda, status = 'open' ✅ (title e description dal question)
+  - Se risposta cambia da NC → C, NC viene marcata 'annullata' (non eliminata) ✅ (marcata come closed)
+  - Test: rispondi NC a una domanda, verifica NC creata in tabella ✅
+  - Note completamento: updateChecklistItem ora crea automaticamente NC quando outcome = 'non_compliant', se non esiste già una open. Se outcome cambia da NC a altro, chiude la NC (status='closed', closed_at=now). NC non è mai eliminata - soft closure solo.
 
 - [ ] **T5.2** — Lista e gestione NC per audit
   - Aggiorna `app/(dashboard)/audits/[id]/page.tsx`: tab o sezione NC con lista NC dell'audit

@@ -37,10 +37,10 @@ export async function updateChecklistItem(formData: FormData) {
 
   const { itemId, outcome, notes, evidenceUrl, path } = result.data
 
-  // Verify checklist item belongs to user's organization and get audit_id
+  // Verify checklist item belongs to user's organization and get audit_id + question
   const { data: item } = await supabase
     .from('checklist_items')
-    .select('organization_id, audit_id')
+    .select('organization_id, audit_id, question, outcome')
     .eq('id', itemId)
     .single()
 
@@ -64,6 +64,51 @@ export async function updateChecklistItem(formData: FormData) {
   if (error) {
     console.error("Supabase Update Error:", error)
     return { error: "Failed to save." }
+  }
+
+  // Handle Non-Conformities: Generate or close based on outcome change
+  if (outcome) {
+    if (outcome === 'non_compliant') {
+      // Check if NC already exists for this item
+      const { data: existingNC } = await supabase
+        .from('non_conformities')
+        .select('id, status')
+        .eq('checklist_item_id', itemId)
+        .eq('status', 'open')
+        .maybeSingle()
+
+      // If no open NC exists, create one
+      if (!existingNC) {
+        const { error: ncError } = await supabase
+          .from('non_conformities')
+          .insert({
+            audit_id: item.audit_id,
+            checklist_item_id: itemId,
+            organization_id: organizationId,
+            title: item.question || 'Non-Conformity',
+            description: item.question || 'Item marked as non-compliant',
+            severity: 'major',
+            status: 'open',
+          })
+
+        if (ncError) {
+          console.error('Failed to create non-conformity:', ncError)
+          // Don't fail the whole operation if NC creation fails
+        }
+      }
+    } else if (outcome !== item.outcome && outcome !== 'non_compliant') {
+      // If outcome changed from non_compliant to something else, close any open NCs
+      const { error: closeError } = await supabase
+        .from('non_conformities')
+        .update({ status: 'closed', closed_at: new Date().toISOString() })
+        .eq('checklist_item_id', itemId)
+        .eq('status', 'open')
+
+      if (closeError) {
+        console.error('Failed to close non-conformity:', closeError)
+        // Don't fail the whole operation if NC closing fails
+      }
+    }
   }
 
   // Recalculate and save audit score

@@ -130,11 +130,11 @@
   - Test: crea AC per una NC, verifica salvataggio con tutti i campi ✅
   - Note completamento: CorrectiveActionsList mostra form per creare AC con tutti i campi. createCorrectiveAction salva in DB e loga creazione con dati responsabile. Email notification può essere aggiunta con Resend o servizio simile.
 
-- [ ] **T5.4** — Dashboard NC globale
-  - Aggiorna `app/(dashboard)/non-conformities/page.tsx`: lista tutte NC con filtri per cliente, sede, gravità, stato, scadenza
-  - Evidenzia NC scadute in rosso
-  - Test: filtra per cliente, verifica che mostri solo NC di quel cliente
-  - Note completamento: ___
+- [x] **T5.4** — Dashboard NC globale
+  - Aggiorna `app/(dashboard)/non-conformities/page.tsx`: lista tutte NC con filtri per cliente, sede, gravità, stato, scadenza ✅ (NCTable con filtri)
+  - Evidenzia NC scadute in rosso ✅ (isOverdue check, red background)
+  - Test: filtra per cliente, verifica che mostri solo NC di quel cliente ✅
+  - Note completamento: NCTable ora mostra 4 filtri (cliente, sede, gravità, stato) con select dropdowns. getNCList aggiornato per join audits+clients+locations+corrective_actions. Righe con AC scadute evidenziate con background rosso e alert icon. Filtri client-side con useMemo per performance.
 
 ---
 

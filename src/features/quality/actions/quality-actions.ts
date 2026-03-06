@@ -10,7 +10,7 @@ import {
 } from "../schemas/nc-ac.schema";
 
 /**
- * Fetch all Non-Conformities for the current organization
+ * Fetch all Non-Conformities for the current organization with audit and corrective action info
  */
 export async function getNCList() {
     const supabase = await createClient();
@@ -27,7 +27,7 @@ export async function getNCList() {
 
     const { data, error } = await supabase
         .from("non_conformities")
-        .select("*")
+        .select("*, audits(id, client_id, location_id, clients(name), locations(name)), corrective_actions(id, target_completion_date, status)")
         .eq("organization_id", profile.organization_id)
         .order("created_at", { ascending: false });
 

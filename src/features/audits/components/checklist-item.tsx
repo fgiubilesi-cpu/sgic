@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { updateChecklistItem } from "@/features/audits/actions";
+import { updateChecklistItem, uploadEvidencePhoto } from "@/features/audits/actions";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
+import { compressEvidenceImage } from "@/lib/utils/compress-image";
 import type { AuditOutcome } from "@/types/database.types";
 import { OUTCOME_COLORS } from "@/types/database.types";
 
@@ -155,34 +156,28 @@ export function ChecklistItem({
 
     setIsUploading(true);
     try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${auditId}/${id}-${Date.now()}.${fileExt}`;
+      // Compress image before upload
+      const compressedFile = await compressEvidenceImage(file);
 
-      const { error: uploadError } = await supabase.storage
-        .from("audit-evidence")
-        .upload(fileName, file);
+      // Upload via server action
+      const formData = new FormData();
+      formData.append("file", compressedFile);
+      formData.append("auditId", auditId);
+      formData.append("itemId", id);
 
-      if (uploadError) throw uploadError;
+      const result = await uploadEvidencePhoto(formData);
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("audit-evidence").getPublicUrl(fileName);
+      if ("error" in result) {
+        toast.error(result.error);
+        return;
+      }
 
+      // Update optimistic state
       startTransition(() => {
-        setOptimisticItem({ evidenceUrl: publicUrl });
+        setOptimisticItem({ evidenceUrl: result.url });
       });
 
-      const formData = new FormData();
-      formData.append("itemId", id);
-      formData.append("evidenceUrl", publicUrl);
-      formData.append("path", path);
-
-      const result = await updateChecklistItem(formData);
-      if ("error" in result) {
-        toast.error("Failed to save photo.");
-      } else {
-        toast.success("Photo uploaded.");
-      }
+      toast.success("Photo uploaded.");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error";
       toast.error("Upload failed: " + message);

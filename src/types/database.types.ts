@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       action_evidence: {
@@ -174,9 +149,11 @@ export type Database = {
       audits: {
         Row: {
           auditor_id: string | null
+          client_id: string | null
           created_at: string | null
           description: string | null
           id: string
+          location_id: string | null
           organization_id: string
           scheduled_date: string
           status: string | null
@@ -184,9 +161,11 @@ export type Database = {
         }
         Insert: {
           auditor_id?: string | null
+          client_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
+          location_id?: string | null
           organization_id: string
           scheduled_date: string
           status?: string | null
@@ -194,15 +173,31 @@ export type Database = {
         }
         Update: {
           auditor_id?: string | null
+          client_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
+          location_id?: string | null
           organization_id?: string
           scheduled_date?: string
           status?: string | null
           title?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "audits_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audits_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "audits_organization_id_fkey"
             columns: ["organization_id"]
@@ -336,6 +331,53 @@ export type Database = {
             columns: ["audit_id"]
             isOneToOne: false
             referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          notes: string | null
+          organization_id: string
+          phone: string | null
+          updated_at: string | null
+          vat_number: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          notes?: string | null
+          organization_id: string
+          phone?: string | null
+          updated_at?: string | null
+          vat_number?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          phone?: string | null
+          updated_at?: string | null
+          vat_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -562,6 +604,63 @@ export type Database = {
           },
         ]
       }
+      locations: {
+        Row: {
+          address: string | null
+          city: string | null
+          client_id: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          notes: string | null
+          organization_id: string
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          client_id: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          notes?: string | null
+          organization_id: string
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          client_id?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       non_conformities: {
         Row: {
           audit_id: string | null
@@ -636,6 +735,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          is_platform_owner: boolean | null
           name: string
           slug: string
           updated_at: string | null
@@ -645,6 +745,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          is_platform_owner?: boolean | null
           name: string
           slug: string
           updated_at?: string | null
@@ -654,6 +755,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          is_platform_owner?: boolean | null
           name?: string
           slug?: string
           updated_at?: string | null
@@ -691,6 +793,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          client_id: string | null
           created_at: string | null
           email: string | null
           full_name: string | null
@@ -702,6 +805,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          client_id?: string | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
@@ -713,6 +817,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          client_id?: string | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
@@ -723,6 +828,13 @@ export type Database = {
           version?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_organization_id_fkey"
             columns: ["organization_id"]
@@ -1082,9 +1194,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       audit_outcome_type: [

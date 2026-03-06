@@ -53,6 +53,16 @@ export async function createCorrectiveAction(
       revalidatePath(`/audits/${nc.audit_id}`);
     }
 
+    // Log corrective action creation (email notification can be added with Resend or similar service)
+    console.log(
+      `[CA] Created corrective action ${data.id} for NC ${validated.nonConformityId}`,
+      {
+        responsible: validated.responsiblePersonName,
+        email: validated.responsiblePersonEmail,
+        targetDate: validated.targetCompletionDate,
+      }
+    );
+
     return { success: true, data: { id: data.id } };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

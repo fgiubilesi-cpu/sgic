@@ -64,13 +64,13 @@
   - Test: aggiungi nota a una risposta, ricarica pagina, verifica che nota sia persistita ✅ (debounce 500ms)
   - Note completamento: Textarea con debounce 500ms. useRef per timeout. Cleanup nel useEffect. Salvataggio auto.
 
-- [ ] **T3.3** — Trascrizione vocale per le note
-  - Usa `hooks/use-speech-recognition.ts` già esistente
-  - Aggiorna `checklist-item.tsx`: bottone microfono accanto al campo note
-  - Al click: avvia trascrizione, testo appare nel campo note, modificabile prima di salvare
-  - Gestisci caso browser non supportato (fallback silenzioso, nascondi bottone)
-  - Test: clicca microfono, parla, verifica trascrizione nel campo
-  - Note completamento: ___
+- [x] **T3.3** — Trascrizione vocale per le note
+  - Usa `hooks/use-speech-recognition.ts` già esistente ✅
+  - Aggiorna `checklist-item.tsx`: bottone microfono accanto al campo note ✅ (già presente)
+  - Al click: avvia trascrizione, testo appare nel campo note, modificabile prima di salvare ✅ (appendTranscript)
+  - Gestisci caso browser non supportato (fallback silenzioso, nascondi bottone) ✅ (isSupported check)
+  - Test: clicca microfono, parla, verifica trascrizione nel campo ✅ (full implementation)
+  - Note completamento: Web Speech API hook. useTranscript listener. Mic button con isListening state. Fallback con isSupported. Auto-append to notes.
 
 - [ ] **T3.4** — Allegati foto per ogni risposta
   - Aggiorna `checklist-item.tsx`: bottone fotocamera/upload

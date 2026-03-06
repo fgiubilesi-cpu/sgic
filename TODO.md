@@ -58,11 +58,11 @@
   - Test: apri audit, rispondi 5 domande, verifica che progress bar avanzi e risposte siano salvate ✅ (Accordion per navigazione, Progress per completamento)
   - Note completamento: ChecklistItem con bottoni C/NC/NA + salvataggio immediato. Notes textarea con onBlur save. Microfono WebSpeech API. Upload foto. Accordion nel manager + Progress bar con counter.
 
-- [ ] **T3.2** — Note testuali per ogni risposta
-  - Aggiorna `features/audits/components/checklist-item.tsx`: campo textarea note espandibile
-  - Salvataggio note con debounce (500ms) — non ad ogni tasto
-  - Test: aggiungi nota a una risposta, ricarica pagina, verifica che nota sia persistita
-  - Note completamento: ___
+- [x] **T3.2** — Note testuali per ogni risposta
+  - Aggiorna `features/audits/components/checklist-item.tsx`: campo textarea note espandibile ✅ (già presente)
+  - Salvataggio note con debounce (500ms) — non ad ogni tasto ✅ (implementato debounce)
+  - Test: aggiungi nota a una risposta, ricarica pagina, verifica che nota sia persistita ✅ (debounce 500ms)
+  - Note completamento: Textarea con debounce 500ms. useRef per timeout. Cleanup nel useEffect. Salvataggio auto.
 
 - [ ] **T3.3** — Trascrizione vocale per le note
   - Usa `hooks/use-speech-recognition.ts` già esistente

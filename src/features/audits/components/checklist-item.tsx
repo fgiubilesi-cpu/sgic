@@ -39,6 +39,7 @@ export function ChecklistItem({
 }: ChecklistItemProps) {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { isListening, transcript, startListening, stopListening, isSupported } =
     useSpeechRecognition();
   const [isUploading, setIsUploading] = useState(false);
@@ -85,6 +86,15 @@ export function ChecklistItem({
     // appendTranscript is stable within a transcript value's lifetime
   }, [transcript, appendTranscript]);
 
+  // Cleanup: cancel debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleOutcomeChange = async (newOutcome: AuditOutcome) => {
     startTransition(() => {
       setOptimisticItem({ outcome: newOutcome });
@@ -103,6 +113,24 @@ export function ChecklistItem({
     startTransition(() => {
       setOptimisticItem({ notes: newNotes });
     });
+
+    // Debounce: cancel previous save and schedule a new one
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    debounceTimeoutRef.current = setTimeout(() => {
+      const formData = new FormData();
+      formData.append("itemId", id);
+      formData.append("notes", newNotes);
+      formData.append("path", path);
+
+      updateChecklistItem(formData).then((result) => {
+        if ("error" in result) {
+          toast.error("Failed to save note.");
+        }
+      });
+    }, 500);
   };
 
   const saveNotes = async () => {
@@ -224,7 +252,6 @@ export function ChecklistItem({
             <Textarea
               value={optimisticItem.notes}
               onChange={(e) => handleNotesChange(e.target.value)}
-              onBlur={saveNotes}
               placeholder="Notes or dictate..."
               className="min-h-[50px] bg-white/80 resize-none"
             />

@@ -33,9 +33,12 @@ export async function getAuditSummary(auditId: string): Promise<AuditSummary> {
   const notApplicable = safeItems.filter((i: any) => i.outcome === "not_applicable").length;
   const pending = safeItems.filter((i: any) => i.outcome === "pending").length;
   const totalItems = safeItems.length;
+  // Score formula: compliant / (total - notApplicable) * 100
+  // NA items are not scored (excluded from denominator)
+  const scorableItems = totalItems - notApplicable;
   const compliancePercentage =
-    totalItems > 0
-      ? Math.round(((compliant + notApplicable) / totalItems) * 100)
+    scorableItems > 0
+      ? Math.round((compliant / scorableItems) * 100)
       : 0;
 
   // ── Non-conformities ─────────────────────────────────────────────────────────

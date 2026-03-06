@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { getOrganizationContext } from '@/lib/supabase/get-org-context'
 import { auditOutcomeSchema } from '@/types/database.types'
+import { getAuditSummary } from '@/features/audits/queries/get-audit-summary'
 
 // --- 1. UPDATE CHECKLIST ITEM ---
 
@@ -36,10 +37,10 @@ export async function updateChecklistItem(formData: FormData) {
 
   const { itemId, outcome, notes, evidenceUrl, path } = result.data
 
-  // Verify checklist item belongs to user's organization
+  // Verify checklist item belongs to user's organization and get audit_id
   const { data: item } = await supabase
     .from('checklist_items')
-    .select('organization_id')
+    .select('organization_id, audit_id')
     .eq('id', itemId)
     .single()
 
@@ -63,6 +64,18 @@ export async function updateChecklistItem(formData: FormData) {
   if (error) {
     console.error("Supabase Update Error:", error)
     return { error: "Failed to save." }
+  }
+
+  // Recalculate and save audit score
+  try {
+    const summary = await getAuditSummary(item.audit_id)
+    await supabase
+      .from('audits')
+      .update({ score: summary.compliancePercentage })
+      .eq('id', item.audit_id)
+  } catch (scoreError) {
+    console.error("Failed to update audit score:", scoreError)
+    // Don't fail the whole operation if score calculation fails
   }
 
   revalidatePath(path)

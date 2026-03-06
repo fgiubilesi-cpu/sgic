@@ -21,6 +21,7 @@ export type Checklist = {
 
 export type AuditWithChecklists = Audit & {
   checklists: Checklist[];
+  score?: number | null;
 };
 
 export async function getAudit(id: string): Promise<AuditWithChecklists | null> {
@@ -32,7 +33,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
   const { data: audit, error: auditError } = await supabase
     .from("audits")
     .select(
-      "id, title, status, scheduled_date, organization_id, checklists(id, title, created_at, checklist_items(id, question, outcome, notes, evidence_url, created_at))"
+      "id, title, status, scheduled_date, score, organization_id, checklists(id, title, created_at, checklist_items(id, question, outcome, notes, evidence_url, created_at))"
     )
     .eq("id", id)
     .eq("organization_id", organizationId)
@@ -100,6 +101,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
     title: (audit as { title?: string | null }).title ?? null,
     status,
     scheduled_date: (audit as { scheduled_date?: string | null }).scheduled_date ?? null,
+    score: (audit as { score?: number | null }).score ?? null,
     checklists,
   };
 }

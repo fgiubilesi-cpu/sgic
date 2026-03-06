@@ -8,6 +8,7 @@ export type Audit = {
   title: string | null;
   status: AuditStatus;
   scheduled_date: string | null;
+  score: number | null;
   client_id: string | null;
   location_id: string | null;
   client_name: string | null;
@@ -22,7 +23,7 @@ export async function getAudits(): Promise<Audit[]> {
 
   const { data: audits, error: auditsError } = await supabase
     .from("audits")
-    .select("id, title, status, scheduled_date, client_id, location_id, clients(name), locations(name)")
+    .select("id, title, status, scheduled_date, score, client_id, location_id, clients(name), locations(name)")
     .eq("organization_id", organizationId)
     .order("scheduled_date", { ascending: false });
 
@@ -35,6 +36,7 @@ export async function getAudits(): Promise<Audit[]> {
     title: audit.title ?? null,
     status: audit.status ?? "Scheduled",
     scheduled_date: audit.scheduled_date ?? null,
+    score: audit.score ?? null,
     client_id: audit.client_id ?? null,
     location_id: audit.location_id ?? null,
     client_name: audit.clients?.name ?? null,

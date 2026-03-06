@@ -18,16 +18,21 @@ export function AuditStats({ audit }: AuditStatsProps) {
 
   if (totalItems === 0) return null;
 
+  const compliantItems = allItems.filter((i) => i.outcome === "compliant").length;
+  const nonCompliantItems = allItems.filter((i) => i.outcome === "non_compliant").length;
+  const notApplicableItems = allItems.filter((i) => i.outcome === "not_applicable").length;
   const completedItems = allItems.filter(
     (i) => i.outcome && i.outcome !== "pending"
   ).length;
-  const compliantItems = allItems.filter((i) => i.outcome === "compliant").length;
-  const nonCompliantItems = allItems.filter((i) => i.outcome === "non_compliant").length;
 
   const progressPercentage = Math.round((completedItems / totalItems) * 100);
+
+  // Score formula: compliant / (total - notApplicable) * 100
+  // NA items are not scored (excluded from denominator)
+  const scorableItems = totalItems - notApplicableItems;
   const complianceScore =
-    completedItems > 0
-      ? Math.round((compliantItems / completedItems) * 100)
+    scorableItems > 0
+      ? Math.round((compliantItems / scorableItems) * 100)
       : 0;
 
   const getScoreColor = (score: number) => {

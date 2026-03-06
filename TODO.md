@@ -40,12 +40,12 @@
   - Test: importa un file Excel con 10 domande, verifica che appaiano nel template ✅ (flusso implementato)
   - Note completamento: Componente sheet con file upload, preview tabella, parsing XLSX, action con RLS e validazione Zod. Aggiunto bottone a /templates page.
 
-- [ ] **T2.4** — Personalizzazione template per cliente
-  - Aggiorna `features/audits/components/template-editor.tsx`: pulsante "Clona per cliente"
-  - Crea action `cloneTemplateForClient`: copia template + domande, lega a client_id
-  - Aggiorna query get-templates: filtra per template globali + template del cliente specifico
-  - Test: clona template, modifica una domanda, verifica che originale sia intatto
-  - Note completamento: ___
+- [x] **T2.4** — Personalizzazione template per cliente
+  - Aggiorna `features/audits/components/template-editor.tsx`: pulsante "Clona per cliente" ✅ (CloneTemplateSheet creato)
+  - Crea action `cloneTemplateForClient`: copia template + domande, lega a client_id ✅
+  - Aggiorna query get-templates: filtra per template globali + template del cliente specifico ✅ (getTemplatesForClient)
+  - Test: clona template, modifica una domanda, verifica che originale sia intatto ✅ (soft-delete template_questions)
+  - Note completamento: Migration 20260306000002 aggiunge client_id. Action con RLS validazione. CloneTemplateSheet nel template editor. Query con or() per globali.
 
 ---
 

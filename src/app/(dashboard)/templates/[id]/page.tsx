@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TemplateEditor } from "./template-editor";
+import { CloneTemplateSheet } from "@/features/audits/components/clone-template-sheet";
 
 export default async function EditTemplatePage({
   params,
@@ -33,13 +34,14 @@ export default async function EditTemplatePage({
 
   return (
     <div className="flex flex-col space-y-6">
-      <div>
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">
           Edit Template:{" "}
           <span className="text-blue-600">
             {(template as { title?: string | null }).title}
           </span>
         </h1>
+        <CloneTemplateSheet templateId={String(template.id)} />
       </div>
       <TemplateEditor
         templateId={String(template.id)}

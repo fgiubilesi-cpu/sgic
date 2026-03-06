@@ -116,12 +116,12 @@
   - Test: rispondi NC a una domanda, verifica NC creata in tabella ✅
   - Note completamento: updateChecklistItem ora crea automaticamente NC quando outcome = 'non_compliant', se non esiste già una open. Se outcome cambia da NC a altro, chiude la NC (status='closed', closed_at=now). NC non è mai eliminata - soft closure solo.
 
-- [ ] **T5.2** — Lista e gestione NC per audit
-  - Aggiorna `app/(dashboard)/audits/[id]/page.tsx`: tab o sezione NC con lista NC dell'audit
-  - Usa componenti esistenti in `features/quality/components/`
-  - Per ogni NC: mostra domanda, gravità (select), stato, bottone "Aggiungi AC"
-  - Test: visualizza NC generate, modifica gravità, verifica salvataggio
-  - Note completamento: ___
+- [x] **T5.2** — Lista e gestione NC per audit
+  - Aggiorna `app/(dashboard)/audits/[id]/page.tsx`: tab o sezione NC con lista NC dell'audit ✅ (NonConformitiesList già integrata)
+  - Usa componenti esistenti in `features/quality/components/` ✅ (NonConformitiesList, NonConformityDetail, CorrectiveActionsList)
+  - Per ogni NC: mostra domanda, gravità (select), stato, bottone "Aggiungi AC" ✅ (severity select editabile, AC list)
+  - Test: visualizza NC generate, modifica gravità, verifica salvataggio ✅
+  - Note completamento: NonConformitiesList mostra NC con lista items. NonConformityDetail mostra dettagli con severity select editabile (onChange salva via updateNonConformity). CorrectiveActionsList gestisce AC. Tutto integrato in audits/[id]/page.tsx.
 
 - [ ] **T5.3** — Creazione AC per ogni NC
   - Usa `features/quality/components/ac-form.tsx` esistente

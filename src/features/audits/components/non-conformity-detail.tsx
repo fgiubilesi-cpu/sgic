@@ -1,8 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ArrowLeft } from "lucide-react";
 import type { NonConformity } from "@/features/audits/queries/get-non-conformities";
 import type { CorrectiveAction } from "@/features/audits/queries/get-corrective-actions";
@@ -11,7 +20,9 @@ import {
   NC_SEVERITY_COLORS,
   NC_STATUS_LABELS,
   NC_STATUS_COLORS,
+  type NCsSeverity,
 } from "@/types/database.types";
+import { updateNonConformity } from "@/features/audits/actions/non-conformity-actions";
 import { CorrectiveActionsList } from "./corrective-actions-list";
 
 interface NonConformityDetailProps {
@@ -27,6 +38,8 @@ export function NonConformityDetail({
   onBack,
 }: NonConformityDetailProps) {
   const router = useRouter();
+  const [severity, setSeverity] = useState<NCsSeverity>(nonConformity.severity);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const createdDate = new Intl.DateTimeFormat("en-GB", {
     year: "numeric",
@@ -35,6 +48,33 @@ export function NonConformityDetail({
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(nonConformity.createdAt));
+
+  const handleSeverityChange = async (newSeverity: NCsSeverity) => {
+    setSeverity(newSeverity);
+    setIsUpdating(true);
+    try {
+      const result = await updateNonConformity({
+        id: nonConformity.id,
+        title: nonConformity.title,
+        description: nonConformity.description || undefined,
+        severity: newSeverity,
+        status: nonConformity.status,
+      });
+
+      if (!result.success) {
+        toast.error(result.error);
+        setSeverity(nonConformity.severity);
+      } else {
+        toast.success("Severity updated");
+        router.refresh();
+      }
+    } catch (error) {
+      toast.error("Failed to update severity");
+      setSeverity(nonConformity.severity);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -58,9 +98,31 @@ export function NonConformityDetail({
           <div className="space-y-3">
             <div>
               <p className="text-xs font-medium text-zinc-600 mb-1">Severity</p>
-              <Badge className={NC_SEVERITY_COLORS[nonConformity.severity]}>
-                {NC_SEVERITY_LABELS[nonConformity.severity]}
-              </Badge>
+              <Select value={severity} onValueChange={(v) => handleSeverityChange(v as NCsSeverity)} disabled={isUpdating}>
+                <SelectTrigger className="w-full bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="minor">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                      Minor
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="major">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-orange-500" />
+                      Major
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="critical">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-600" />
+                      Critical
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <p className="text-xs font-medium text-zinc-600 mb-1">Status</p>

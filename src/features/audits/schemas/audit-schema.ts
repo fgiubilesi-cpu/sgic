@@ -12,6 +12,8 @@ export const createAuditSchema = z.object({
     .max(200, "Title is too long."),
   scheduled_date: z.coerce.date(),
   status: z.enum(auditStatusValues).default("Scheduled"),
+  client_id: z.string().uuid("Client is required."),
+  location_id: z.string().uuid("Location is required."),
 });
 
 export type CreateAuditSchema = z.infer<typeof createAuditSchema>;

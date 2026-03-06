@@ -68,6 +68,8 @@ export function AuditTable({ audits }: AuditTableProps) {
         <TableHeader>
           <TableRow>
             <TableHead>Title</TableHead>
+            <TableHead>Client</TableHead>
+            <TableHead>Location</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Scheduled Date</TableHead>
             <TableHead className="w-[50px] text-right">Actions</TableHead>
@@ -87,6 +89,12 @@ export function AuditTable({ audits }: AuditTableProps) {
                   <span className="font-medium text-zinc-900">
                     {audit.title ?? "Untitled Audit"}
                   </span>
+                </TableCell>
+                <TableCell className="text-sm text-zinc-600">
+                  {audit.client_name ?? "—"}
+                </TableCell>
+                <TableCell className="text-sm text-zinc-600">
+                  {audit.location_name ?? "—"}
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className={statusInfo.className}>

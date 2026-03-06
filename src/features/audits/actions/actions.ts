@@ -137,12 +137,16 @@ const CreateAuditFromTemplateSchema = z.object({
   title: z.string().min(3),
   scheduled_date: z.string().optional(),
   templateId: z.string().uuid(),
+  client_id: z.string().uuid(),
+  location_id: z.string().uuid(),
 })
 
 export async function createAuditFromTemplate(input: {
   title: string
   scheduled_date?: string
   templateId: string
+  client_id: string
+  location_id: string
 }): Promise<{ success: true; auditId: string } | { success: false; error: string }> {
   const ctx = await getOrganizationContext()
   if (!ctx) return { success: false, error: 'Not authenticated.' }
@@ -154,7 +158,7 @@ export async function createAuditFromTemplate(input: {
     return { success: false, error: "Missing or invalid data." }
   }
 
-  const { title, scheduled_date, templateId } = result.data
+  const { title, scheduled_date, templateId, client_id, location_id } = result.data
 
   const { data: audit, error: auditError } = await supabase
     .from('audits')
@@ -163,6 +167,8 @@ export async function createAuditFromTemplate(input: {
       status: 'Scheduled',
       scheduled_date: scheduled_date || null,
       organization_id: organizationId,
+      client_id,
+      location_id,
     })
     .select()
     .single()

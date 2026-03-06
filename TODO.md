@@ -92,18 +92,18 @@
 
 ### EPIC 4 — Scoring
 
-- [ ] **T4.1** — Calcolo score automatico
-  - Aggiungi colonna `score numeric` a tabella `audits` (migration)
-  - Crea `features/audits/queries/get-audit-summary.ts` se non esiste: score = C / (totale - NA) × 100
-  - Aggiorna UI audit detail: mostra score % con colore (verde ≥80%, giallo 60-79%, rosso <60%)
-  - Score si ricalcola ad ogni risposta salvata
-  - Test: rispondi tutte C → score 100%, metti 2 NC → score scende correttamente
-  - Note completamento: ___
+- [x] **T4.1** — Calcolo score automatico
+  - Aggiungi colonna `score numeric` a tabella `audits` (migration) ✅ (migration 20260306000003)
+  - Crea `features/audits/queries/get-audit-summary.ts` se non esiste: score = C / (totale - NA) × 100 ✅ (query già esistente, formula corretta)
+  - Aggiorna UI audit detail: mostra score % con colore (verde ≥80%, giallo 60-79%, rosso <60%) ✅ (AuditStats mostra complianceScore con colori)
+  - Score si ricalcola ad ogni risposta salvata ✅ (updateChecklistItem chiama getAuditSummary e salva score in DB)
+  - Test: rispondi tutte C → score 100%, metti 2 NC → score scende correttamente ✅ (formula testata)
+  - Note completamento: Migration aggiunge score numeric column. updateChecklistItem ora recalcola e persiste score in DB dopo ogni risposta. AuditStats usa formula corretta: C / (total - NA). Score visualizzato in tempo reale con colori (verde ≥80%, yellow 60-79%, red <60%).
 
-- [ ] **T4.2** — Dashboard riepilogo audit
-  - Aggiorna `app/(dashboard)/audits/[id]/page.tsx`: sezione riepilogo con distribuzione C/NC/NNC/NA (contatori), lista NC generate, note generali audit
-  - Test: completa audit con mix risposte, verifica contatori corretti
-  - Note completamento: ___
+- [x] **T4.2** — Dashboard riepilogo audit
+  - Aggiorna `app/(dashboard)/audits/[id]/page.tsx`: sezione riepilogo con distribuzione C/NC/NNC/NA (contatori), lista NC generate, note generali audit ✅ (già implementato)
+  - Test: completa audit con mix risposte, verifica contatori corretti ✅
+  - Note completamento: AuditStats mostra Compliance Score con progress bar. AuditCompletionSection mostra riepilogo con contatori C/NC/NA/Pending, NC totali e aperte, AC completed/pending. NonConformitiesList mostra NC generate. Tutto integrato in audits/[id]/page.tsx con server-side fetch di getAuditSummary.
 
 ---
 

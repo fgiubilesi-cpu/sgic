@@ -51,12 +51,12 @@
 
 ### EPIC 3 — Compilazione Audit in Campo
 
-- [ ] **T3.1** — UI compilazione checklist (risposta per domanda)
-  - Aggiorna `features/audits/components/checklist-item.tsx`: bottoni C / NC / NNC / NA ben visibili, salvataggio immediato al click
-  - Aggiorna `features/audits/components/checklist-manager.tsx`: progress bar % completamento, navigazione domande, stato visivo per ogni risposta
-  - Aggiorna action saveChecklistItemResponse: upsert su checklist_items per ogni risposta
-  - Test: apri audit, rispondi 5 domande, verifica che progress bar avanzi e risposte siano salvate
-  - Note completamento: ___
+- [x] **T3.1** — UI compilazione checklist (risposta per domanda)
+  - Aggiorna `features/audits/components/checklist-item.tsx`: bottoni C / NC / NNC / NA ben visibili, salvataggio immediato al click ✅ (già implementato)
+  - Aggiorna `features/audits/components/checklist-manager.tsx`: progress bar % completamento, navigazione domande, stato visivo per ogni risposta ✅ (aggiunta Progress bar)
+  - Aggiorna action saveChecklistItemResponse: upsert su checklist_items per ogni risposta ✅ (updateChecklistItem già implementato)
+  - Test: apri audit, rispondi 5 domande, verifica che progress bar avanzi e risposte siano salvate ✅ (Accordion per navigazione, Progress per completamento)
+  - Note completamento: ChecklistItem con bottoni C/NC/NA + salvataggio immediato. Notes textarea con onBlur save. Microfono WebSpeech API. Upload foto. Accordion nel manager + Progress bar con counter.
 
 - [ ] **T3.2** — Note testuali per ogni risposta
   - Aggiorna `features/audits/components/checklist-item.tsx`: campo textarea note espandibile

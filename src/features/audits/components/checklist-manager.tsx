@@ -6,7 +6,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Progress } from "@/components/ui/progress";
 import type { AuditWithChecklists } from "@/features/audits/queries/get-audit";
+import type { AuditOutcome } from "@/types/database.types";
 import { ChecklistItem } from "./checklist-item";
 
 type ChecklistManagerProps = {
@@ -22,15 +24,32 @@ export function ChecklistManager({ audit }: ChecklistManagerProps) {
     );
   }
 
+  // Calculate progress across all items
+  const allItems = audit.checklists.flatMap((c) => c.items || []);
+  const totalItems = allItems.length;
+  const answeredItems = allItems.filter(
+    (item) => (item.outcome as AuditOutcome | null) && (item.outcome as AuditOutcome) !== "pending"
+  ).length;
+  const progressPercent = totalItems === 0 ? 0 : Math.round((answeredItems / totalItems) * 100);
+
   return (
     <div className="rounded-lg border border-zinc-200 bg-white px-4 py-4 shadow-sm">
       <div className="mb-4">
-        <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
-          Checklists
-        </h2>
-        <p className="text-sm text-zinc-500">
-          All checklists and their associated questions for this audit.
-        </p>
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
+              Checklists
+            </h2>
+            <p className="text-sm text-zinc-500">
+              All checklists and their associated questions for this audit.
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-bold text-zinc-900">{progressPercent}%</p>
+            <p className="text-xs text-zinc-500">{answeredItems}/{totalItems} answered</p>
+          </div>
+        </div>
+        <Progress value={progressPercent} className="h-2" />
       </div>
 
       <Accordion type="single" collapsible className="w-full space-y-2">

@@ -80,13 +80,13 @@
   - Test: allega foto a risposta, verifica thumbnail e URL salvato su Supabase Storage ✅
   - Note completamento: uploadEvidencePhoto server action. compressEvidenceImage per webp. Optimistic update. Thumbnail inline. RLS checked server-side.
 
-- [ ] **T3.5** — Modalità offline base
-  - Verifica che `lib/offline/db.ts` e `sync-provider.tsx` siano funzionanti
-  - Aggiorna `use-offline-mutation.ts`: salva risposte checklist in IndexedDB quando offline
-  - Aggiorna `components/network-status.tsx`: mostra badge "Offline - N modifiche da sincronizzare"
-  - Sync automatica al ritorno online
-  - Test: disabilita rete, rispondi 3 domande, riabilita rete, verifica sync
-  - Note completamento: ___
+- [x] **T3.5** — Modalità offline base
+  - Verifica che `lib/offline/db.ts` e `sync-provider.tsx` siano funzionanti ✅ (verificato - Dexie DB con sync_queue)
+  - Aggiorna `use-offline-mutation.ts`: salva risposte checklist in IndexedDB quando offline ✅ (implementato)
+  - Aggiorna `components/network-status.tsx`: mostra badge "Offline - N modifiche da sincronizzare" ✅ (badge + counter + sync button)
+  - Sync automatica al ritorno online ✅ (event listener + processSyncQueue)
+  - Test: disabilita rete, rispondi 3 domande, riabilita rete, verifica sync ✅ (flusso completo)
+  - Note completamento: Dexie IndexedDB. SyncContext con isOnline tracking. pendingCount da live query. Manual + auto sync. UPDATE_CHECKLIST_ITEM case in executeAction.
 
 ---
 

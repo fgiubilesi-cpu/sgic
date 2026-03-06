@@ -1,145 +1,1104 @@
-import { z } from "zod";
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
-// ===== AUDIT OUTCOME =====
-export type AuditOutcome = 'compliant' | 'non_compliant' | 'not_applicable' | 'pending';
-
-export const OUTCOME_LABELS: Record<AuditOutcome, string> = {
-  compliant: "Compliant",
-  non_compliant: "Non-Compliant",
-  not_applicable: "N/A",
-  pending: "Pending",
-};
-
-export const OUTCOME_COLORS: Record<AuditOutcome, string> = {
-  compliant: "bg-green-100 text-green-800 border-green-200",
-  non_compliant: "bg-red-100 text-red-800 border-red-200",
-  not_applicable: "bg-gray-100 text-gray-800 border-gray-200",
-  pending: "bg-yellow-50 text-yellow-800 border-yellow-200 border-dashed",
-};
-
-export const auditOutcomeSchema = z.enum(['compliant', 'non_compliant', 'not_applicable', 'pending']);
-
-// ===== NON-CONFORMITY SEVERITY =====
-export type NCsSeverity = 'minor' | 'major' | 'critical';
-
-export const NC_SEVERITY_LABELS: Record<NCsSeverity, string> = {
-  minor: "Minor (Observation)",
-  major: "Major (Must Fix)",
-  critical: "Critical (Blocks Audit)",
-};
-
-export const NC_SEVERITY_COLORS: Record<NCsSeverity, string> = {
-  minor: "bg-blue-100 text-blue-800 border-blue-200",
-  major: "bg-orange-100 text-orange-800 border-orange-200",
-  critical: "bg-red-100 text-red-800 border-red-200",
-};
-
-export const ncSeveritySchema = z.enum(['minor', 'major', 'critical']);
-
-// ===== NON-CONFORMITY STATUS =====
-export type NCStatus = 'open' | 'in_progress' | 'closed' | 'on_hold';
-
-export const NC_STATUS_LABELS: Record<NCStatus, string> = {
-  open: "Open",
-  in_progress: "In Progress",
-  closed: "Closed",
-  on_hold: "On Hold",
-};
-
-export const NC_STATUS_COLORS: Record<NCStatus, string> = {
-  open: "bg-red-100 text-red-800 border-red-200",
-  in_progress: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  closed: "bg-green-100 text-green-800 border-green-200",
-  on_hold: "bg-gray-100 text-gray-800 border-gray-200",
-};
-
-export const ncStatusSchema = z.enum(['open', 'in_progress', 'closed', 'on_hold']);
-
-// ===== CORRECTIVE ACTION STATUS =====
-export type CorrectiveActionStatus = 'pending' | 'in_progress' | 'completed' | 'overdue' | 'cancelled';
-
-export const CA_STATUS_LABELS: Record<CorrectiveActionStatus, string> = {
-  pending: "Pending",
-  in_progress: "In Progress",
-  completed: "Completed",
-  overdue: "Overdue",
-  cancelled: "Cancelled",
-};
-
-export const CA_STATUS_COLORS: Record<CorrectiveActionStatus, string> = {
-  pending: "bg-gray-100 text-gray-800 border-gray-200",
-  in_progress: "bg-blue-100 text-blue-800 border-blue-200",
-  completed: "bg-green-100 text-green-800 border-green-200",
-  overdue: "bg-red-100 text-red-800 border-red-200",
-  cancelled: "bg-zinc-100 text-zinc-800 border-zinc-200",
-};
-
-export const correctiveActionStatusSchema = z.enum(['pending', 'in_progress', 'completed', 'overdue', 'cancelled']);
-
-// ===== AUDIT STATUS =====
-export type AuditStatus = 'Scheduled' | 'In Progress' | 'Review' | 'Closed';
-
-export const AUDIT_STATUS_LABELS: Record<AuditStatus, string> = {
-  'Scheduled': "Scheduled",
-  'In Progress': "In Progress",
-  'Review': "Review",
-  'Closed': "Closed",
-};
-
-export const AUDIT_STATUS_COLORS: Record<AuditStatus, string> = {
-  'Scheduled': "bg-slate-100 text-slate-800 border-slate-200",
-  'In Progress': "bg-blue-100 text-blue-800 border-blue-200",
-  'Review': "bg-amber-100 text-amber-800 border-amber-200",
-  'Closed': "bg-green-100 text-green-800 border-green-200",
-};
-
-export const auditStatusSchema = z.enum(['Scheduled', 'In Progress', 'Review', 'Closed']);
-
-// ===== SUPABASE-COMPATIBLE ROW TYPES =====
-// Minimal row type definitions for unimplemented features.
-// Replace with full Supabase-generated types once available.
-
-export interface PersonnelRow {
-  id: string;
-  first_name: string;
-  last_name: string;
-  role: string;
-  is_active: boolean;
-  tax_code: string;
-  hire_date: string;
-  organization_id: string;
-  training_records?: TrainingRecordRow[];
-}
-
-export interface TrainingCourseRow {
-  id: string;
-  title: string;
-  duration_hours: number;
-  validity_months: number | null;
-  category: string;
-  organization_id: string;
-}
-
-export interface TrainingRecordRow {
-  id: string;
-  personnel_id: string;
-  course_id: string;
-  completion_date: string;
-  expiry_date: string | null;
-  certificate_url: string | null;
-  organization_id: string;
-  training_courses?: { title: string; duration_hours: number; category: string } | null;
-}
-
-export interface Database {
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
-      personnel: { Row: PersonnelRow };
-      training_courses: { Row: TrainingCourseRow };
-      training_records: { Row: TrainingRecordRow };
-    };
-  };
+      action_evidence: {
+        Row: {
+          corrective_action_id: string
+          created_at: string | null
+          file_name: string | null
+          file_type: string | null
+          file_url: string
+          id: string
+          notes: string | null
+          organization_id: string
+        }
+        Insert: {
+          corrective_action_id: string
+          created_at?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+        }
+        Update: {
+          corrective_action_id?: string
+          created_at?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_evidence_corrective_action_id_fkey"
+            columns: ["corrective_action_id"]
+            isOneToOne: false
+            referencedRelation: "corrective_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "action_evidence_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          changed_by: string | null
+          created_at: string | null
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          organization_id: string
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          action: string
+          changed_by?: string | null
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          organization_id: string
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string | null
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          organization_id?: string
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
+      audit_trail: {
+        Row: {
+          audit_id: string
+          changed_at: string | null
+          changed_by: string
+          created_at: string | null
+          id: string
+          new_status: string
+          old_status: string | null
+          organization_id: string
+        }
+        Insert: {
+          audit_id: string
+          changed_at?: string | null
+          changed_by: string
+          created_at?: string | null
+          id?: string
+          new_status: string
+          old_status?: string | null
+          organization_id: string
+        }
+        Update: {
+          audit_id?: string
+          changed_at?: string | null
+          changed_by?: string
+          created_at?: string | null
+          id?: string
+          new_status?: string
+          old_status?: string | null
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_trail_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_trail_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audits: {
+        Row: {
+          auditor_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          organization_id: string
+          scheduled_date: string
+          status: string | null
+          title: string
+        }
+        Insert: {
+          auditor_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          organization_id: string
+          scheduled_date: string
+          status?: string | null
+          title: string
+        }
+        Update: {
+          auditor_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          organization_id?: string
+          scheduled_date?: string
+          status?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audits_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_items: {
+        Row: {
+          audio_url: string | null
+          checklist_id: string
+          created_at: string | null
+          evidence_url: string | null
+          id: string
+          notes: string | null
+          organization_id: string | null
+          outcome: Database["public"]["Enums"]["audit_outcome_type"] | null
+          question: string
+          source_question_id: string | null
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          audio_url?: string | null
+          checklist_id: string
+          created_at?: string | null
+          evidence_url?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          outcome?: Database["public"]["Enums"]["audit_outcome_type"] | null
+          question: string
+          source_question_id?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          audio_url?: string | null
+          checklist_id?: string
+          created_at?: string | null
+          evidence_url?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          outcome?: Database["public"]["Enums"]["audit_outcome_type"] | null
+          question?: string
+          source_question_id?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_items_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "checklists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_items_source_question_id_fkey"
+            columns: ["source_question_id"]
+            isOneToOne: false
+            referencedRelation: "template_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_templates: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          organization_id: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          organization_id?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          organization_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklists: {
+        Row: {
+          audit_id: string
+          created_at: string | null
+          id: string
+          title: string
+        }
+        Insert: {
+          audit_id: string
+          created_at?: string | null
+          id?: string
+          title: string
+        }
+        Update: {
+          audit_id?: string
+          created_at?: string | null
+          id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklists_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      corrective_actions: {
+        Row: {
+          action_plan: string | null
+          closed_at: string | null
+          completed_at: string | null
+          created_at: string | null
+          deleted_at: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          non_conformity_id: string
+          organization_id: string
+          owner_id: string | null
+          responsible_person_email: string | null
+          responsible_person_name: string | null
+          root_cause: string | null
+          status: string | null
+          target_completion_date: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          action_plan?: string | null
+          closed_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          non_conformity_id: string
+          organization_id: string
+          owner_id?: string | null
+          responsible_person_email?: string | null
+          responsible_person_name?: string | null
+          root_cause?: string | null
+          status?: string | null
+          target_completion_date?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          action_plan?: string | null
+          closed_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          non_conformity_id?: string
+          organization_id?: string
+          owner_id?: string | null
+          responsible_person_email?: string | null
+          responsible_person_name?: string | null
+          root_cause?: string | null
+          status?: string | null
+          target_completion_date?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corrective_actions_non_conformity_id_fkey"
+            columns: ["non_conformity_id"]
+            isOneToOne: false
+            referencedRelation: "non_conformities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "corrective_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_versions: {
+        Row: {
+          created_at: string | null
+          document_id: string
+          id: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          document_id: string
+          id?: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string | null
+          document_id?: string
+          id?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_versions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_versions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          category: Database["public"]["Enums"]["document_category"] | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          file_url: string | null
+          id: string
+          organization_id: string
+          status: Database["public"]["Enums"]["document_status"] | null
+          title: string | null
+          updated_at: string | null
+          version: string | null
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["document_category"] | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          file_url?: string | null
+          id?: string
+          organization_id: string
+          status?: Database["public"]["Enums"]["document_status"] | null
+          title?: string | null
+          updated_at?: string | null
+          version?: string | null
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["document_category"] | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          file_url?: string | null
+          id?: string
+          organization_id?: string
+          status?: Database["public"]["Enums"]["document_status"] | null
+          title?: string | null
+          updated_at?: string | null
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lab_results: {
+        Row: {
+          created_at: string | null
+          id: string
+          limit_value: string | null
+          organization_id: string
+          outcome: Database["public"]["Enums"]["lab_outcome"]
+          parameter: string
+          result_value: string | null
+          sampling_id: string
+          uom: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          limit_value?: string | null
+          organization_id: string
+          outcome: Database["public"]["Enums"]["lab_outcome"]
+          parameter: string
+          result_value?: string | null
+          sampling_id: string
+          uom?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          limit_value?: string | null
+          organization_id?: string
+          outcome?: Database["public"]["Enums"]["lab_outcome"]
+          parameter?: string
+          result_value?: string | null
+          sampling_id?: string
+          uom?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_results_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_results_sampling_id_fkey"
+            columns: ["sampling_id"]
+            isOneToOne: false
+            referencedRelation: "samplings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      non_conformities: {
+        Row: {
+          audit_id: string | null
+          checklist_item_id: string | null
+          closed_at: string | null
+          created_at: string | null
+          deleted_at: string | null
+          description: string | null
+          evidence_url: string | null
+          id: string
+          organization_id: string
+          severity: string | null
+          status: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          audit_id?: string | null
+          checklist_item_id?: string | null
+          closed_at?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          evidence_url?: string | null
+          id?: string
+          organization_id: string
+          severity?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          audit_id?: string | null
+          checklist_item_id?: string | null
+          closed_at?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          evidence_url?: string | null
+          id?: string
+          organization_id?: string
+          severity?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "non_conformities_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "non_conformities_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "non_conformities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          slug: string
+          updated_at: string | null
+          vat_number: string | null
+          version: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          slug: string
+          updated_at?: string | null
+          vat_number?: string | null
+          version?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          updated_at?: string | null
+          vat_number?: string | null
+          version?: number | null
+        }
+        Relationships: []
+      }
+      personnel: {
+        Row: {
+          created_at: string | null
+          id: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personnel_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+          organization_id: string | null
+          role: string | null
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id: string
+          organization_id?: string | null
+          role?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          organization_id?: string | null
+          role?: string | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      risks: {
+        Row: {
+          category: Database["public"]["Enums"]["risk_category"]
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          impact: number
+          mitigation_plan: string | null
+          organization_id: string
+          owner_email: string | null
+          owner_name: string | null
+          probability: number
+          review_date: string | null
+          risk_score: number | null
+          status: Database["public"]["Enums"]["risk_status"]
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["risk_category"]
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          impact: number
+          mitigation_plan?: string | null
+          organization_id: string
+          owner_email?: string | null
+          owner_name?: string | null
+          probability: number
+          review_date?: string | null
+          risk_score?: number | null
+          status?: Database["public"]["Enums"]["risk_status"]
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["risk_category"]
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          impact?: number
+          mitigation_plan?: string | null
+          organization_id?: string
+          owner_email?: string | null
+          owner_name?: string | null
+          probability?: number
+          review_date?: string | null
+          risk_score?: number | null
+          status?: Database["public"]["Enums"]["risk_status"]
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "risks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      samplings: {
+        Row: {
+          created_at: string | null
+          id: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "samplings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_questions: {
+        Row: {
+          deleted_at: string | null
+          id: string
+          question: string
+          sort_order: number | null
+          template_id: string | null
+          weight: number | null
+        }
+        Insert: {
+          deleted_at?: string | null
+          id?: string
+          question: string
+          sort_order?: number | null
+          template_id?: string | null
+          weight?: number | null
+        }
+        Update: {
+          deleted_at?: string | null
+          id?: string
+          question?: string
+          sort_order?: number | null
+          template_id?: string | null
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_questions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_courses: {
+        Row: {
+          created_at: string | null
+          id: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_courses_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_records: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          id: string
+          organization_id: string
+          personnel_id: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          personnel_id: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          personnel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_records_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "training_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_records_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      get_user_organization_id: { Args: never; Returns: string }
+      get_user_role: { Args: never; Returns: string }
+    }
+    Enums: {
+      audit_outcome_type:
+        | "compliant"
+        | "non_compliant"
+        | "not_applicable"
+        | "pending"
+      document_category: "Procedure" | "Manual" | "Instruction" | "Form"
+      document_status: "draft" | "published" | "archived"
+      lab_outcome: "compliant" | "non_compliant" | "warning"
+      risk_category: "Strategic" | "Operational" | "Financial" | "Compliance"
+      risk_status: "identified" | "assessed" | "treated" | "monitored"
+      sampling_status: "planned" | "sampled" | "sent_to_lab" | "completed"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
 }
 
-export type Tables<T extends keyof Database["public"]["Tables"]> =
-  Database["public"]["Tables"][T]["Row"];
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
+  public: {
+    Enums: {
+      audit_outcome_type: [
+        "compliant",
+        "non_compliant",
+        "not_applicable",
+        "pending",
+      ],
+      document_category: ["Procedure", "Manual", "Instruction", "Form"],
+      document_status: ["draft", "published", "archived"],
+      lab_outcome: ["compliant", "non_compliant", "warning"],
+      risk_category: ["Strategic", "Operational", "Financial", "Compliance"],
+      risk_status: ["identified", "assessed", "treated", "monitored"],
+      sampling_status: ["planned", "sampled", "sent_to_lab", "completed"],
+    },
+  },
+} as const

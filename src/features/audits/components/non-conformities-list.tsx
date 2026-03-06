@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { AuditWithChecklists } from "@/features/audits/queries/get-audit";
 import type { NonConformity } from "@/features/audits/queries/get-non-conformities";
+import type { CorrectiveAction } from "@/features/audits/queries/get-corrective-actions";
 import {
   NC_SEVERITY_LABELS,
   NC_SEVERITY_COLORS,
@@ -20,11 +21,14 @@ import { NonConformityDetail } from "./non-conformity-detail";
 interface NonConformitiesListProps {
   audit: AuditWithChecklists;
   nonConformities: NonConformity[];
+  /** Pre-fetched server-side (bulk, no N+1) — filtered per NC inside this component. */
+  correctiveActions: CorrectiveAction[];
 }
 
 export function NonConformitiesList({
   audit,
   nonConformities,
+  correctiveActions,
 }: NonConformitiesListProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [selectedNC, setSelectedNC] = useState<NonConformity | null>(null);
@@ -62,9 +66,13 @@ export function NonConformitiesList({
   };
 
   if (selectedNC) {
+    const ncCorrectiveActions = correctiveActions.filter(
+      (ca) => ca.nonConformityId === selectedNC.id
+    );
     return (
       <NonConformityDetail
         nonConformity={selectedNC}
+        correctiveActions={ncCorrectiveActions}
         onBack={() => setSelectedNC(null)}
       />
     );

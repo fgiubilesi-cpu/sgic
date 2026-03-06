@@ -1,94 +1,262 @@
-# SGIC — Claude Code Instructions
+# SGIC — Sistema di Gestione Ispezioni e Conformità
+## Documento di contesto per agenti di sviluppo
+> Leggi questo file per intero prima di toccare qualsiasi file del progetto.
 
-## Stack
-- Next.js 16 (App Router), TypeScript 5.x, Supabase (SSR), Sonner, Zod, React Hook Form
-- Dev server: `next dev --webpack` (Turbopack is default in Next.js 16 but incompatible with the webpack() callback in next.config.ts — always use `--webpack`)
-- Build: `next build --webpack` for the same reason
+---
 
-## Architecture Rules (strict)
+## 1. Cos'è SGIC
 
-### Data flow
+Piattaforma SaaS multi-tenant per **Giubilesi Associati** — società di consulenza food safety.
+Giubilesi usa SGIC internamente per gestire audit, non conformità, campionamenti, formazione e documentazione per i propri clienti (ristoranti, GDO, aziende food).
+
+**Fase attuale: Fase 1 — uso interno Giubilesi, nessun accesso cliente ancora attivo.**
+
+---
+
+## 2. Stack Tecnico
+
+| Layer | Tecnologia | Versione |
+|---|---|---|
+| Framework | Next.js App Router | latest |
+| Language | TypeScript | 5.x strict |
+| UI | Tailwind CSS + shadcn/ui | latest |
+| Validazione | Zod | schema-first ovunque |
+| Backend | Supabase (PostgreSQL + Auth + Storage) | latest |
+| Toast | Sonner | unico sistema toast |
+| Offline | Service Worker + IndexedDB | lib/offline/ |
+| Speech | Web Speech API | hooks/use-speech-recognition.ts |
+
+---
+
+## 3. Modello Multi-Tenant — REGOLA FONDAMENTALE
+
+### Gerarchia
 ```
-page.tsx (Server Component)
-  → fetches data via queries/
-  → passes as props to components/ (Client Components)
-```
-**Never the reverse.** Client components receive data as props — they do not fetch it themselves.
-
-### Server-only modules
-`next/headers`, `@/lib/supabase/server` — ONLY allowed in:
-- `src/features/*/actions/*.ts` (must have `'use server'`)
-- `src/features/*/queries/*.ts`
-- `src/app/**/page.tsx` and `src/app/**/layout.tsx`
-
-**Never import these from a `"use client"` component.** Doing so bundles `next/headers` into the client bundle and crashes at runtime with: *"You're importing a component that needs next/headers."*
-
-### Client components (`components/`)
-- No `useEffect` for data fetching
-- No direct imports of query files
-- No `@/lib/supabase/server` imports
-- Receive all data as props from `page.tsx`
-- Use `router.refresh()` after mutations to re-sync server state — do NOT re-call queries
-
-### Mutations (`actions/`)
-- Every action file must have `'use server'` as its **first line**
-- Use Zod for input validation
-- Call `revalidatePath(...)` after DB writes
-- Return `{ success: true }` or `{ success: false, error: string }`
-- Show feedback via Sonner toast in the calling component
-
-### Barrel files (`src/features/*/actions/index.ts`)
-**Do NOT add `'use server'` to barrel files.** Next.js only allows directly-defined `async function` exports in a `'use server'` file — `export { … } from '…'` re-exports cause the build error: *"Only async functions are allowed to be exported in a 'use server' file."*
-
-Each leaf action file (`actions.ts`, `template-actions.ts`, etc.) carries its own `'use server'` directive. Webpack traverses to those files and creates RPC stubs correctly without the barrel needing the directive.
-
-### Feature folder pattern
-```
-src/features/<name>/
-  actions/        ← server mutations ('use server' per file, not barrel)
-  queries/        ← server data fetching (no 'use server', called from page.tsx)
-  components/     ← client components ("use client", receive props only)
-  schemas/        ← Zod schemas shared between actions and components
+organizations          ← Giubilesi (is_platform_owner = true) — vede tutto
+    └── clients        ← I clienti di Giubilesi (ristoranti, GDO, ecc.)
+          └── locations ← Sedi fisiche del cliente
+                └── audits, NC, AC, samplings, ecc.
 ```
 
-## Supabase patterns
+### Ruoli utente
+- `admin` → team Giubilesi, accesso totale a tutto
+- `auditor` → team Giubilesi, accesso operativo (compila audit, gestisce NC/AC)
+- `client` → referente cliente (Fase 2), vede solo i dati della propria `client_id`
 
-### Always use the server client in queries/actions
-```ts
-import { createClient } from "@/lib/supabase/server";
-const supabase = await createClient();
+### Regole RLS
+- Ogni tabella ha `organization_id uuid` che punta all'organization Giubilesi
+- Tabelle legate ai clienti hanno anche `client_id uuid`
+- Gli utenti admin/auditor passano sempre: `auth.uid() IN (SELECT user_id FROM profiles WHERE organization_id = <giubilesi_org_id> AND role IN ('admin','auditor'))`
+- Gli utenti client vedono solo righe dove `client_id = profiles.client_id`
+- **UUID sempre castato esplicitamente**: `= auth.uid()::uuid` — mai senza cast
+- **Mai policy permissive senza WHERE clause**
+
+---
+
+## 4. Struttura Cartelle — REGOLA FONDAMENTALE
+
+```
+src/
+├── app/
+│   └── (dashboard)/
+│       ├── audits/
+│       ├── clients/          ← da creare
+│       ├── non-conformities/
+│       ├── samplings/
+│       ├── templates/
+│       └── ...
+├── features/
+│   ├── audits/
+│   │   ├── actions/          ← Server Actions mutazioni
+│   │   ├── queries/          ← query Supabase (read)
+│   │   ├── schemas/          ← Zod schemas
+│   │   └── components/       ← React components feature-specific
+│   ├── clients/              ← da creare
+│   ├── locations/            ← da creare
+│   ├── quality/              ← NC e AC
+│   ├── samplings/
+│   ├── training/
+│   └── organization/
+├── components/
+│   └── ui/                   ← solo shadcn/ui, non toccare
+├── lib/
+│   ├── supabase/
+│   │   ├── client.ts
+│   │   ├── server.ts
+│   │   ├── middleware.ts
+│   │   └── get-org-context.ts
+│   ├── offline/
+│   │   ├── db.ts
+│   │   ├── sync-provider.tsx
+│   │   └── use-offline-mutation.ts
+│   └── utils/
+├── hooks/
+├── middleware.ts
+└── types/
+    └── database.types.ts     ← generato da Supabase CLI, non editare a mano
 ```
 
-### Browser client is only for Storage uploads
-`@/lib/supabase/client` is acceptable in `checklist-item.tsx` for file uploads — this is intentional. File uploads must stay client-side.
-
-### Avoid N+1 queries
-Fetch related data in bulk from `page.tsx` with `Promise.all`, then filter client-side:
-```ts
-// page.tsx
-const [nonConformities, correctiveActions] = await Promise.all([
-  getNonConformitiesByAudit(id),
-  getCorrectiveActionsByAudit(id),   // bulk, not per-NC
-]);
+### Regola per ogni nuova feature:
+Ogni feature DEVE avere questa struttura interna:
+```
+features/{nome}/
+├── actions/     → Server Actions ('use server'), mutazioni DB
+├── queries/     → funzioni async che leggono da Supabase (no 'use server')
+├── schemas/     → Zod schemas condivisi tra client e server
+└── components/  → React components, 'use client' solo se necessario
 ```
 
-### Organization security
-Every query must verify `organization_id` matches the authenticated user's org before returning data. The pattern is:
-1. `supabase.auth.getUser()` → get user
-2. Query `profiles` for `organization_id`
-3. Filter all data queries with `.eq("organization_id", profile.organization_id)`
+---
 
-## next.config.ts guards
-```ts
-serverExternalPackages: ['@supabase/ssr']
+## 5. Regole Architetturali — NON DEROGABILI
+
+### Server vs Client Components
+- **Default: Server Component** — nessun 'use client' se non strettamente necessario
+- **'use client' SOLO per**: event handlers interattivi, hooks React (useState/useEffect), browser API (microfono, camera, IndexedDB), animazioni
+- **Mai**: fetch dirette al DB in Client Components — usare Server Actions o passare dati come props
+
+### Server Actions
+- Tutte le mutazioni passano per Server Actions (`'use server'`)
+- Ogni action valida input con Zod prima di toccare il DB
+- Ogni action restituisce `{ success: true, data }` oppure `{ success: false, error: string }`
+- Nessuna chiamata REST custom — solo Supabase client + Server Actions
+
+### Query Supabase
+- **Zero N+1**: join lato Supabase, mai loop di chiamate sequenziali
+- Esempio corretto: `supabase.from('audits').select('*, client:clients(*), location:locations(*)')`
+- Esempio sbagliato: `audits.forEach(a => supabase.from('clients').select().eq('id', a.client_id))`
+- Ogni query in `features/{nome}/queries/` come funzione esportata
+
+### Zod
+- Schema definito in `features/{nome}/schemas/` — unica source of truth
+- Stesso schema usato per validazione form (client) e Server Action (server)
+- Tipi TypeScript inferiti da Zod: `type AuditForm = z.infer<typeof auditSchema>`
+
+### TypeScript
+- `strict: true` — nessun `any` implicito
+- Nessun cast non giustificato con commento
+- Tipi DB generati da Supabase CLI in `types/database.types.ts` — non editare a mano
+
+### Toast / Feedback
+- **Solo Sonner** — nessun `alert()`, nessun altro sistema di notifica
+- Pattern: `toast.success('...')` / `toast.error('...')` dopo ogni action
+- Errori mostrati sempre all'utente — mai silenti
+
+### Offline
+- Logica offline in `lib/offline/`
+- Mutazioni offline tramite `use-offline-mutation.ts`
+- Sync automatica al ritorno della connessione
+- `network-status.tsx` per indicatore visivo
+
+---
+
+## 6. Schema DB Attuale (tabelle esistenti)
+
 ```
-This forces `@supabase/ssr` to remain server-only and prevents accidental client bundling.
+organizations       — Giubilesi (is_platform_owner = true)
+profiles            — utenti con ruolo e org
+clients             — ⚠️ DA CREARE — clienti di Giubilesi
+locations           — ⚠️ DA CREARE — sedi dei clienti
+audits              — audit/ispezioni (aggiungere client_id, location_id)
+checklists          — checklist collegata a un audit
+checklist_items     — singola risposta/domanda della checklist
+checklist_templates — template riutilizzabili
+template_questions  — domande del template
+non_conformities    — NC generate da risposta NC/NNC
+corrective_actions  — AC collegata a una NC
+action_evidence     — prove allegate a un'AC
+audit_trail         — storico stati di un audit
+audit_logs          — log generico di tutte le modifiche
+documents           — manuali e procedure
+document_versions   — versioning documenti
+samplings           — campionamenti
+lab_results         — risultati analitici
+personnel           — personale del cliente
+training_courses    — corsi di formazione
+training_records    — partecipazioni ai corsi
+risks               — gestione rischi
+```
 
-## Common mistakes to avoid
-| Mistake | Correct approach |
-|---------|-----------------|
-| Calling a query function inside `useEffect` | Fetch in `page.tsx`, pass as prop |
-| Calling a Server Action inside `useEffect` for data | Create a query file instead, fetch in `page.tsx` |
-| Adding `'use server'` to a barrel with re-exports | Remove it; each leaf file has its own |
-| Importing from `queries/` inside a `"use client"` component | Pass data as props from `page.tsx` |
-| Re-fetching after mutation in a client component | Call `router.refresh()` instead |
+### Colonne di sistema presenti su ogni tabella
+- `id uuid DEFAULT gen_random_uuid()`
+- `organization_id uuid NOT NULL` — FK a organizations
+- `created_at timestamptz DEFAULT now()`
+- `updated_at timestamptz` — dove applicabile
+
+---
+
+## 7. Stato Sviluppo — Modulo Audit
+
+### ✅ Fatto
+- Auth (login/logout) funzionante
+- Struttura feature-based implementata
+- Schema DB audit/checklist/NC/AC/evidence presente
+- Hook speech recognition
+- Offline layer (struttura base)
+- UI components (shadcn/ui configurato)
+- RLS uuid cast fix applicato (migration 20260305000001)
+
+### 🔴 Prossima priorità (da fare ora)
+1. **Migration**: aggiungere `clients`, `locations`, aggiornare `audits` con `client_id`/`location_id`, aggiungere `is_platform_owner` a `organizations`
+2. **Feature clients**: CRUD clienti e sedi
+3. **Collegare audit a cliente/sede**: aggiornare form creazione audit
+
+### ⏳ Backlog ordinato
+- Scoring automatico audit (colonna `score` su `audits`)
+- Dashboard confronto audit precedente
+- Generazione report PDF
+- Invio email report
+- Portale cliente (Fase 2)
+
+---
+
+## 8. Convenzioni di Naming
+
+| Cosa | Convenzione | Esempio |
+|---|---|---|
+| Tabelle DB | snake_case plurale | `corrective_actions` |
+| Colonne DB | snake_case | `client_id`, `organization_id` |
+| Componenti React | PascalCase | `AuditTable.tsx` |
+| Server Actions | kebab-case file, camelCase funzione | `audit-actions.ts` → `createAudit()` |
+| Queries | `get-{cosa}.ts` | `get-audit.ts` → `getAudit()` |
+| Zod schemas | `{nome}-schema.ts` | `audit-schema.ts` → `auditSchema` |
+| RLS policies | `{tabella}_{ruolo}_{operazione}` | `audits_admin_select` |
+
+---
+
+## 9. Errori Noti e Soluzioni
+
+### UUID casting in RLS
+**Problema**: `operator does not exist: uuid = text`
+**Soluzione**: sempre `auth.uid()::uuid` nelle policy RLS, mai `auth.uid()` nudo
+
+### Supabase client in Server Component
+**Problema**: usare il client browser in un Server Component
+**Soluzione**: importare sempre da `lib/supabase/server.ts` nei Server Components e Server Actions; `lib/supabase/client.ts` solo in Client Components
+
+### organization_id context
+**Soluzione**: usare `lib/supabase/get-org-context.ts` per recuperare l'org dell'utente corrente in ogni Server Action — non passarlo mai dal client come parametro fidato
+
+---
+
+## 10. Come lavorare con questo progetto
+
+### Prima di ogni sessione
+1. Leggi questo file
+2. Leggi `ERRORS.md` se esiste
+3. Controlla `ROADMAP.md` per il task corrente
+
+### Per ogni task
+1. Identifica i file coinvolti dalla struttura in §4
+2. Scrivi/aggiorna lo Zod schema per prima cosa
+3. Scrivi la query o la migration
+4. Scrivi la Server Action
+5. Scrivi il componente UI per ultimo
+6. Testa il flusso end-to-end
+
+### Mai fare
+- Modificare `types/database.types.ts` a mano
+- Scrivere SQL inline nelle Server Actions (usare Supabase client)
+- Aggiungere dipendenze npm senza verificare che non siano già disponibili
+- Creare componenti UI custom se esiste già in shadcn/ui
+- Fare `console.log` in produzione — usare error handling strutturato

@@ -48,6 +48,52 @@ export async function getCorrectiveActionsByNonConformity(
   }));
 }
 
+/**
+ * Bulk-fetch all corrective actions for every NC in an audit.
+ * Avoids N+1: one query per audit instead of one per NC.
+ */
+export async function getCorrectiveActionsByAudit(
+  auditId: string
+): Promise<CorrectiveAction[]> {
+  const supabase = await createClient();
+
+  // First get all NC ids for this audit
+  const { data: ncs, error: ncError } = await supabase
+    .from("non_conformities")
+    .select("id")
+    .eq("audit_id", auditId);
+
+  if (ncError || !ncs || ncs.length === 0) return [];
+
+  const ncIds = ncs.map((nc: any) => nc.id as string);
+
+  const { data, error } = await supabase
+    .from("corrective_actions")
+    .select("*")
+    .in("non_conformity_id", ncIds)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching corrective actions by audit:", error);
+    return [];
+  }
+
+  return (data || []).map((ca: any) => ({
+    id: ca.id,
+    nonConformityId: ca.non_conformity_id,
+    description: ca.description,
+    rootCause: ca.root_cause,
+    actionPlan: ca.action_plan,
+    responsiblePersonName: ca.responsible_person_name,
+    responsiblePersonEmail: ca.responsible_person_email,
+    targetCompletionDate: ca.target_completion_date,
+    status: ca.status,
+    createdAt: ca.created_at,
+    updatedAt: ca.updated_at,
+    completedAt: ca.completed_at,
+  }));
+}
+
 export async function getCorrectiveAction(
   caId: string
 ): Promise<CorrectiveAction | null> {

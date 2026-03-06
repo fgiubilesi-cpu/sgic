@@ -234,6 +234,25 @@ risks               — gestione rischi
 **Problema**: usare il client browser in un Server Component
 **Soluzione**: importare sempre da `lib/supabase/server.ts` nei Server Components e Server Actions; `lib/supabase/client.ts` solo in Client Components
 
+### getOrganizationContext — destructuring corretto
+**Problema**: ritorna `{ organizationId, userId }` (camelCase), NON `organization_id`
+**Soluzione**: `const { organizationId } = await getOrganizationContext()`
+**Attenzione**: ritorna `null` se utente non autenticato — gestire sempre il caso null
+
+### Conflitto nome createClient in actions
+**Problema**: se il file action importa `createClient` da supabase/server.ts 
+e la funzione si chiama anche `createClient`, si crea un loop ricorsivo
+**Soluzione**: rinominare l'import — es. `import { createClient as createSupabaseClient }`
+
+### Middleware — routes protette
+**Problema**: ogni nuova route dashboard va aggiunta manualmente a isDashboardRoute in middleware.ts
+**Soluzione**: cambiare il check con `pathname.startsWith('/') && !pathname.startsWith('/login') && !pathname.startsWith('/api')`
+oppure aggiungere la route all'elenco ogni volta
+
+### Colonna ID in profiles
+**Problema**: la tabella `profiles` usa `id` come chiave utente, NON `user_id`
+**Soluzione**: nelle RLS usare `SELECT id FROM profiles WHERE id = auth.uid()::uuid`
+
 ### organization_id context
 **Soluzione**: usare `lib/supabase/get-org-context.ts` per recuperare l'org dell'utente corrente in ogni Server Action — non passarlo mai dal client come parametro fidato
 

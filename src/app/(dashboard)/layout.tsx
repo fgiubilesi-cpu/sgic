@@ -42,6 +42,7 @@ const NAV_ITEMS: Array<{
   icon: React.ElementType;
 }> = [
   { label: "Dashboard", href: "/dashboard", icon: HomeIcon },
+  { label: "Clienti", href: "/clients", icon: Building2 },
   { label: "Audits", href: "/audits", icon: ClipboardCheck },
   { label: "Templates", href: "/templates", icon: Layout },
   { label: "Organisation", href: "/organization", icon: Building2 },

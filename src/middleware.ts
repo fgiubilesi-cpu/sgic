@@ -18,6 +18,7 @@ export async function middleware(request: NextRequest) {
     const isDashboardRoute =
       pathname.startsWith("/dashboard") ||
       pathname.startsWith("/audits") ||
+      pathname.startsWith("/clients") ||
       pathname.startsWith("/templates") ||
       pathname.startsWith("/organization") ||
       pathname.startsWith("/impostazioni");

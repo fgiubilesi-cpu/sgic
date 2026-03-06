@@ -24,15 +24,19 @@ export async function getOrganizationContext(): Promise<OrgContext | null> {
     error: userError,
   } = await supabase.auth.getUser();
 
-  if (userError || !user) return null;
+  if (userError || !user) {
+    return null;
+  }
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("organization_id")
+    .select("organization_id, id, role, client_id")
     .eq("id", user.id)
     .single();
 
-  if (profileError || !profile?.organization_id) return null;
+  if (profileError || !profile?.organization_id) {
+    return null;
+  }
 
   return {
     supabase,

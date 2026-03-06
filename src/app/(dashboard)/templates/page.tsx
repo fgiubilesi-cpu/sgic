@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Plus, Layout } from "lucide-react";
 import Link from "next/link";
+import { ImportTemplateSheet } from "@/features/audits/components/import-template-sheet";
 
 export default async function TemplatesPage() {
   const supabase = await createClient();
@@ -27,11 +28,14 @@ export default async function TemplatesPage() {
             Manage reusable templates to use when creating new audits.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/templates/new">
-            <Plus className="mr-2 h-4 w-4" /> New Template
-          </Link>
-        </Button>
+        <div className="flex gap-3">
+          <ImportTemplateSheet />
+          <Button asChild>
+            <Link href="/templates/new">
+              <Plus className="mr-2 h-4 w-4" /> New Template
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

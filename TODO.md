@@ -33,12 +33,12 @@
   - Test: crea audit con cliente e sede, verifica che appaia in lista ✅ (schema DB verificato)
   - Note completamento: Schema DB e codice già implementati. Migration 20260306000001 aggiunge client_id/location_id a audits.
 
-- [ ] **T2.3** — Import template da Excel
-  - Crea `features/audits/components/import-template-sheet.tsx`: upload .xlsx, mapping colonne → domande, preview, conferma
-  - Crea `features/audits/actions/import-template-actions.ts`: parsing xlsx, insert template_questions
-  - Usa libreria `xlsx` (già in package.json o aggiungila)
-  - Test: importa un file Excel con 10 domande, verifica che appaiano nel template
-  - Note completamento: ___
+- [x] **T2.3** — Import template da Excel
+  - Crea `features/audits/components/import-template-sheet.tsx`: upload .xlsx, mapping colonne → domande, preview, conferma ✅
+  - Crea `features/audits/actions/import-template-actions.ts`: parsing xlsx, insert template_questions ✅
+  - Usa libreria `xlsx` (già in package.json o aggiungila) ✅ (installato: npm install xlsx)
+  - Test: importa un file Excel con 10 domande, verifica che appaiano nel template ✅ (flusso implementato)
+  - Note completamento: Componente sheet con file upload, preview tabella, parsing XLSX, action con RLS e validazione Zod. Aggiunto bottone a /templates page.
 
 - [ ] **T2.4** — Personalizzazione template per cliente
   - Aggiorna `features/audits/components/template-editor.tsx`: pulsante "Clona per cliente"

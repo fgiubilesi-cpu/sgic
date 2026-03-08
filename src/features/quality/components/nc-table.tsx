@@ -32,8 +32,8 @@ export function NCTable({ ncs }: { ncs: any[] }) {
     const clients = useMemo(() => {
         const seen = new Set<string>();
         return ncs
-            .filter(nc => nc.audits?.clients?.name)
-            .map(nc => nc.audits.clients.name)
+            .filter(nc => nc.audit?.client?.name)
+            .map(nc => nc.audit.client.name)
             .filter(name => {
                 if (seen.has(name)) return false;
                 seen.add(name);
@@ -45,8 +45,8 @@ export function NCTable({ ncs }: { ncs: any[] }) {
     const locations = useMemo(() => {
         const seen = new Set<string>();
         return ncs
-            .filter(nc => nc.audits?.locations?.name)
-            .map(nc => nc.audits.locations.name)
+            .filter(nc => nc.audit?.location?.name)
+            .map(nc => nc.audit.location.name)
             .filter(name => {
                 if (seen.has(name)) return false;
                 seen.add(name);
@@ -58,8 +58,8 @@ export function NCTable({ ncs }: { ncs: any[] }) {
     // Filter NCs based on selected filters
     const filteredNCs = useMemo(() => {
         return (ncs || []).filter(nc => {
-            if (filterClient && nc.audits?.clients?.name !== filterClient) return false;
-            if (filterLocation && nc.audits?.locations?.name !== filterLocation) return false;
+            if (filterClient && nc.audit?.client?.name !== filterClient) return false;
+            if (filterLocation && nc.audit?.location?.name !== filterLocation) return false;
             if (filterSeverity && nc.severity !== filterSeverity) return false;
             if (filterStatus && nc.status !== filterStatus) return false;
             return true;
@@ -183,7 +183,7 @@ export function NCTable({ ncs }: { ncs: any[] }) {
                                             {isOverdue && <AlertTriangle className="h-4 w-4 text-red-600 inline mr-2" />}
                                             {nc.title}
                                         </TableCell>
-                                        <TableCell className="text-sm">{nc.audits?.clients?.name || "-"}</TableCell>
+                                        <TableCell className="text-sm">{nc.audit?.client?.name || "-"}</TableCell>
                                         <TableCell>
                                             <SeverityBadge severity={nc.severity} />
                                         </TableCell>

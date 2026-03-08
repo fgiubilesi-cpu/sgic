@@ -146,7 +146,7 @@ export function CorrectiveActionDetail({
               Edit
             </Button>
             {correctiveAction.status !== "completed" &&
-              correctiveAction.status !== "cancelled" && (
+              correctiveAction.status !== "verified" && (
                 <Button onClick={onCompleted} className="bg-green-600 hover:bg-green-700">
                   Mark as Complete
                 </Button>

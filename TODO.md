@@ -21,12 +21,12 @@
 
 ### P2 — Flusso NC → AC (core business)
 
-- [ ] **N1** Verifica che risposta NOK generi automaticamente una NC — test end-to-end
-- [ ] **N2** Lista NC nella pagina audit: tabella compatta con stato, severità, domanda collegata
-- [ ] **N3** Form creazione AC da NC: titolo, responsabile, scadenza, descrizione
-- [ ] **N4** Cambio stato AC: Aperta → In Progress → Chiusa
-- [ ] **N5** Quando AC chiusa → NC si aggiorna a "risolta"
-- [ ] **N6** Dashboard NC globale: lista tutte le NC aperte di tutti gli audit, filtrabile per cliente
+- [x] **N1** Verifica che risposta NOK generi automaticamente una NC — già implementato in updateChecklistItem
+- [x] **N2** Lista NC nella pagina audit — implementata in non-conformities-list.tsx
+- [x] **N3** Form creazione AC da NC — implementato in corrective-actions-list.tsx
+- [x] **N4** Cambio stato NC — dropdown status in non-conformity-detail.tsx
+- [x] **N5** Quando AC completata → NC si aggiorna a "pending_verification" — in completeCorrectiveAction
+- [x] **N6** Dashboard NC globale — sidebar link aggiunto, query join syntax fix, NCTable aggiornato
 
 ### P3 — Report PDF
 

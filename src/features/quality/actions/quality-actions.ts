@@ -27,7 +27,7 @@ export async function getNCList() {
 
     const { data, error } = await supabase
         .from("non_conformities")
-        .select("*, audits(id, client_id, location_id, clients(name), locations(name)), corrective_actions(id, target_completion_date, status)")
+        .select("*, audit:audit_id(id, client_id, location_id, client:client_id(name), location:location_id(name)), corrective_actions(id, target_completion_date, status)")
         .eq("organization_id", profile.organization_id)
         .order("created_at", { ascending: false });
 

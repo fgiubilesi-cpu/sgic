@@ -21,6 +21,7 @@ import {
   NC_STATUS_LABELS,
   NC_STATUS_COLORS,
   type NCsSeverity,
+  type NCsStatus,
 } from "@/features/quality/constants";
 import { updateNonConformity } from "@/features/audits/actions/non-conformity-actions";
 import { CorrectiveActionsList } from "./corrective-actions-list";
@@ -39,6 +40,7 @@ export function NonConformityDetail({
 }: NonConformityDetailProps) {
   const router = useRouter();
   const [severity, setSeverity] = useState<NCsSeverity>(nonConformity.severity);
+  const [ncStatus, setNcStatus] = useState<"open" | "pending_verification" | "closed">(nonConformity.status as "open" | "pending_verification" | "closed");
   const [isUpdating, setIsUpdating] = useState(false);
 
   const createdDate = new Intl.DateTimeFormat("en-GB", {
@@ -48,6 +50,33 @@ export function NonConformityDetail({
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(nonConformity.createdAt));
+
+  const handleStatusChange = async (newStatus: NCsStatus) => {
+    setNcStatus(newStatus);
+    setIsUpdating(true);
+    try {
+      const result = await updateNonConformity({
+        id: nonConformity.id,
+        title: nonConformity.title,
+        description: nonConformity.description || undefined,
+        severity: nonConformity.severity,
+        status: newStatus,
+      });
+
+      if (!result.success) {
+        toast.error(result.error);
+        setNcStatus(nonConformity.status as NCsStatus);
+      } else {
+        toast.success("Status updated");
+        router.refresh();
+      }
+    } catch {
+      toast.error("Failed to update status");
+      setNcStatus(nonConformity.status as NCsStatus);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const handleSeverityChange = async (newSeverity: NCsSeverity) => {
     setSeverity(newSeverity);
@@ -126,9 +155,16 @@ export function NonConformityDetail({
             </div>
             <div>
               <p className="text-xs font-medium text-zinc-600 mb-1">Status</p>
-              <Badge className={NC_STATUS_COLORS[nonConformity.status]}>
-                {NC_STATUS_LABELS[nonConformity.status]}
-              </Badge>
+              <Select value={ncStatus} onValueChange={(v) => handleStatusChange(v as NCsStatus)} disabled={isUpdating}>
+                <SelectTrigger className="w-full bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="pending_verification">Pending Verification</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {nonConformity.checklistItem && (
               <div>

@@ -158,6 +158,13 @@ export async function completeCorrectiveAction(
       .single();
 
     if (ca?.non_conformity_id) {
+      // N5: When CA is completed, move NC to "pending_verification"
+      await supabase
+        .from("non_conformities")
+        .update({ status: "pending_verification" })
+        .eq("id", ca.non_conformity_id)
+        .eq("status", "open");
+
       const { data: nc } = await supabase
         .from("non_conformities")
         .select("audit_id")

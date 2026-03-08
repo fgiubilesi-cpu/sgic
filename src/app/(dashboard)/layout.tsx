@@ -24,6 +24,7 @@ import {
   Menu,
   Settings,
   Layout,
+  ShieldAlert,
 } from "lucide-react";
 
 type DashboardLayoutProps = {
@@ -44,6 +45,7 @@ const NAV_ITEMS: Array<{
   { label: "Dashboard", href: "/dashboard", icon: HomeIcon },
   { label: "Clienti", href: "/clients", icon: Building2 },
   { label: "Audits", href: "/audits", icon: ClipboardCheck },
+  { label: "Non-Conformità", href: "/non-conformities", icon: ShieldAlert },
   { label: "Templates", href: "/templates", icon: Layout },
   { label: "Organisation", href: "/organization", icon: Building2 },
   { label: "Settings", href: "/settings", icon: Settings },

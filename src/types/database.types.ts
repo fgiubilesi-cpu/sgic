@@ -156,6 +156,7 @@ export type Database = {
           location_id: string | null
           organization_id: string
           scheduled_date: string
+          score: number | null
           status: string | null
           title: string
         }
@@ -168,6 +169,7 @@ export type Database = {
           location_id?: string | null
           organization_id: string
           scheduled_date: string
+          score?: number | null
           status?: string | null
           title: string
         }
@@ -180,6 +182,7 @@ export type Database = {
           location_id?: string | null
           organization_id?: string
           scheduled_date?: string
+          score?: number | null
           status?: string | null
           title?: string
         }
@@ -210,6 +213,7 @@ export type Database = {
       checklist_items: {
         Row: {
           audio_url: string | null
+          audit_id: string | null
           checklist_id: string
           created_at: string | null
           evidence_url: string | null
@@ -218,12 +222,14 @@ export type Database = {
           organization_id: string | null
           outcome: Database["public"]["Enums"]["audit_outcome_type"] | null
           question: string
+          sort_order: number | null
           source_question_id: string | null
           updated_at: string | null
           version: number | null
         }
         Insert: {
           audio_url?: string | null
+          audit_id?: string | null
           checklist_id: string
           created_at?: string | null
           evidence_url?: string | null
@@ -232,12 +238,14 @@ export type Database = {
           organization_id?: string | null
           outcome?: Database["public"]["Enums"]["audit_outcome_type"] | null
           question: string
+          sort_order?: number | null
           source_question_id?: string | null
           updated_at?: string | null
           version?: number | null
         }
         Update: {
           audio_url?: string | null
+          audit_id?: string | null
           checklist_id?: string
           created_at?: string | null
           evidence_url?: string | null
@@ -246,11 +254,19 @@ export type Database = {
           organization_id?: string | null
           outcome?: Database["public"]["Enums"]["audit_outcome_type"] | null
           question?: string
+          sort_order?: number | null
           source_question_id?: string | null
           updated_at?: string | null
           version?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "checklist_items_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "checklist_items_checklist_id_fkey"
             columns: ["checklist_id"]
@@ -311,18 +327,21 @@ export type Database = {
           audit_id: string
           created_at: string | null
           id: string
+          organization_id: string
           title: string
         }
         Insert: {
           audit_id: string
           created_at?: string | null
           id?: string
+          organization_id: string
           title: string
         }
         Update: {
           audit_id?: string
           created_at?: string | null
           id?: string
+          organization_id?: string
           title?: string
         }
         Relationships: [
@@ -331,6 +350,13 @@ export type Database = {
             columns: ["audit_id"]
             isOneToOne: false
             referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklists_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]

@@ -1,3 +1,3 @@
-export { updateChecklistItem, updateAuditStatus, createAuditFromTemplate } from './actions'
+export { updateChecklistItem, updateAuditStatus, createAuditFromTemplate, cloneTemplateForClient } from './actions'
 export { addTemplateQuestion, softDeleteTemplateQuestion } from './template-actions'
 export { uploadEvidencePhoto } from './upload-evidence'

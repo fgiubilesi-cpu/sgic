@@ -1,5 +1,16 @@
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
-import type { TrainingRecordRow } from "@/types/database.types";
+
+type TrainingRecordRow = {
+  id: string;
+  personnel_id: string;
+  course_id: string;
+  organization_id: string;
+  completion_date: string;
+  expiry_date: string | null;
+  certificate_url: string | null;
+  created_at: string | null;
+  training_courses?: { title: string; duration_hours: number | null; category: string | null } | null;
+};
 
 export interface PersonnelDetail {
   id: string;

@@ -12,11 +12,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { TrainingRecordForm } from "./training-record-form";
-import type { Tables } from "@/types/database.types";
+type PersonnelItem = { id: string; first_name: string; last_name: string };
+type CourseItem = { id: string; title: string };
 
 type RegisterTrainingSheetProps = {
-    personnel: Tables<"personnel">[];
-    courses: Tables<"training_courses">[];
+    personnel: PersonnelItem[];
+    courses: CourseItem[];
 };
 
 export function RegisterTrainingSheet({ personnel, courses }: RegisterTrainingSheetProps) {

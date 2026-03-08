@@ -1,6 +1,13 @@
 "use client";
 
-import type { TrainingRecordRow } from "@/types/database.types";
+type TrainingRecordRow = {
+  id: string;
+  course_id: string;
+  completion_date: string;
+  expiry_date: string | null;
+  certificate_url: string | null;
+  training_courses?: { title: string } | null;
+};
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";

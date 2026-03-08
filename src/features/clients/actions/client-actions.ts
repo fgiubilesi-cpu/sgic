@@ -3,10 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseClient } from '@/lib/supabase/server';
 import { getOrganizationContext } from '@/lib/supabase/get-org-context';
-import { clientSchema, locationSchema } from '../schemas/client-schema';
-
-type ClientFormInput = typeof clientSchema._type;
-type LocationFormInput = typeof locationSchema._type;
+import { clientSchema, locationSchema, type ClientFormInput, type LocationFormInput } from '../schemas/client-schema';
 
 export async function createClient(input: ClientFormInput) {
   try {

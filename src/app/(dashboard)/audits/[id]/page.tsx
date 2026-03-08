@@ -12,6 +12,7 @@ import { NcAcTab } from "@/features/audits/components/nc-ac-tab";
 import { TemplateTab } from "@/features/audits/components/template-tab";
 import { AuditCompletionSection } from "@/features/audits/components/audit-completion-section";
 import { ExportExcelButton } from "@/features/audits/components/export-excel-button";
+import { EmailDraftModal } from "@/features/audits/components/email-draft-modal";
 
 const TABS = [
   { id: "checklist", label: "Checklist" },
@@ -75,7 +76,13 @@ export default async function AuditDetailPage({
               )}
             </div>
           </div>
-          <ExportExcelButton auditId={audit.id} auditTitle={audit.title} />
+          <div className="flex items-center gap-2">
+            <EmailDraftModal
+              auditId={audit.id}
+              hasNonConformities={nonConformities.length > 0}
+            />
+            <ExportExcelButton auditId={audit.id} auditTitle={audit.title} />
+          </div>
         </div>
       </div>
 

@@ -15,14 +15,9 @@
 
 ### P1 — UX Checklist (in corso)
 
-- [ ] **U1** Layout checklist compatto stile tabella — ogni domanda su una riga ~44px
-  - Colonne: # | Domanda | OK | NOK | N/A | Note inline | 📎
-  - Righe zebrate, bordo sinistro colorato per stato
-  - Note: input inline, non espanso
-  - Foto/allegati: icona 📎 nella riga, non bottone visibile sempre
-  - Microfono: icona piccola dentro il campo note
-- [ ] **U2** Progress bar checklist visibile in cima alla pagina audit (% completamento)
-- [ ] **U3** Indicatore visivo NC generate nella riga (es. badge rosso se NOK)
+- [x] **U1** Layout checklist compatto stile tabella — implementato in checklist-row.tsx
+- [x] **U2** Progress bar checklist visibile in cima alla pagina audit — implementata in checklist-manager.tsx
+- [x] **U3** Indicatore visivo NC generate nella riga — badge "NC" rosso con AlertTriangle
 
 ### P2 — Flusso NC → AC (core business)
 

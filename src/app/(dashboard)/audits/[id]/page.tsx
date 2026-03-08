@@ -50,7 +50,7 @@ export default async function AuditDetailPage({
 
       <AuditStats audit={audit} />
 
-      <ChecklistManager audit={audit} />
+      <ChecklistManager audit={audit} nonConformities={nonConformities} />
 
       <NonConformitiesList audit={audit} nonConformities={nonConformities} correctiveActions={correctiveActions} />
 

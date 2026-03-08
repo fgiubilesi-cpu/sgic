@@ -2,7 +2,7 @@
 
 import { useState, useRef, useOptimistic, startTransition, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { Check, X, Minus, Paperclip, Mic, Loader2 } from "lucide-react";
+import { Check, X, Minus, Paperclip, Mic, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ interface ChecklistRowProps {
   initialEvidenceUrl: string | null;
   auditId: string;
   isSelected: boolean;
+  hasNc?: boolean;
   onSelect: () => void;
   onPhotoClick: () => void;
   path: string;
@@ -39,6 +40,7 @@ export function ChecklistRow({
   initialEvidenceUrl,
   auditId,
   isSelected,
+  hasNc = false,
   onSelect,
   onPhotoClick,
   path,
@@ -152,7 +154,18 @@ export function ChecklistRow({
 
       {/* Question */}
       <td className="px-3 py-0">
-        <div className="text-xs text-zinc-900 truncate max-w-xs">{question}</div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-zinc-900 truncate max-w-xs">{question}</span>
+          {hasNc && (
+            <span
+              className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold bg-red-100 text-red-700 shrink-0"
+              title="Non-conformità registrata"
+            >
+              <AlertTriangle className="w-2.5 h-2.5" />
+              NC
+            </span>
+          )}
+        </div>
       </td>
 
       {/* OK button */}

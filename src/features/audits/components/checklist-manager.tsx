@@ -4,16 +4,21 @@ import { useState } from "react";
 import { Progress } from "@/components/ui/progress";
 import type { AuditWithChecklists } from "@/features/audits/queries/get-audit";
 import type { AuditOutcome } from "@/types/database.types";
+import type { NonConformity } from "@/features/audits/queries/get-non-conformities";
 import { ChecklistRow } from "./checklist-row";
 import { PhotoPanel } from "./photo-panel";
 
 type ChecklistManagerProps = {
   audit: AuditWithChecklists;
+  nonConformities?: NonConformity[];
 };
 
-export function ChecklistManager({ audit }: ChecklistManagerProps) {
+export function ChecklistManager({ audit, nonConformities = [] }: ChecklistManagerProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [photoPanelItemId, setPhotoPanelItemId] = useState<string | null>(null);
+
+  // Build a set of checklist_item_ids that have non-conformities
+  const ncItemIds = new Set(nonConformities.map((nc) => nc.checklistItemId));
 
   if (!audit.checklists || !audit.checklists.length) {
     return (
@@ -84,10 +89,11 @@ export function ChecklistManager({ audit }: ChecklistManagerProps) {
                   itemNumber={idx + 1}
                   question={item.question}
                   initialOutcome={(item.outcome as AuditOutcome) ?? "pending"}
-                  initialNotes={item.notes}
-                  initialEvidenceUrl={item.evidence_url}
+                  initialNotes={item.notes ?? null}
+                  initialEvidenceUrl={item.evidence_url ?? null}
                   auditId={audit.id}
                   isSelected={selectedItemId === item.id}
+                  hasNc={ncItemIds.has(item.id)}
                   onSelect={() => setSelectedItemId(item.id)}
                   onPhotoClick={() => setPhotoPanelItemId(item.id)}
                   path={`/audits/${audit.id}`}

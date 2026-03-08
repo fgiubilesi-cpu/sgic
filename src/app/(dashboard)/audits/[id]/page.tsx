@@ -11,6 +11,7 @@ import { AuditStats } from "@/features/audits/components/audit-stats";
 import { NcAcTab } from "@/features/audits/components/nc-ac-tab";
 import { TemplateTab } from "@/features/audits/components/template-tab";
 import { AuditCompletionSection } from "@/features/audits/components/audit-completion-section";
+import { ExportExcelButton } from "@/features/audits/components/export-excel-button";
 
 const TABS = [
   { id: "checklist", label: "Checklist" },
@@ -74,6 +75,7 @@ export default async function AuditDetailPage({
               )}
             </div>
           </div>
+          <ExportExcelButton auditId={audit.id} auditTitle={audit.title} />
         </div>
       </div>
 

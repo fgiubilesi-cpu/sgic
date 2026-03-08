@@ -62,7 +62,7 @@
 
 ### C — UI Audio (in pipe con B)
 
-- [ ] **C1 — Componente AudioRecorder**
+- [x] **C1 — Componente AudioRecorder**
   - File: `src/features/audits/components/audio-recorder.tsx`
   - Props: `itemId`, `auditId`, `currentUrl?: string`
   - Usa MediaRecorder API (webm/opus)
@@ -73,7 +73,7 @@
   - Bottone elimina se registrazione già presente
   - Gestisci permesso microfono negato con messaggio utente
 
-- [ ] **C2 — Integrazione in ChecklistManager**
+- [x] **C2 — Integrazione in ChecklistManager**
   - Aggiungi `<AudioRecorder>` su ogni checklist item row
   - Posizione: accanto a MediaCapture, icona microfono
   - Commit: `"feat(ui): audio recording on checklist items"`

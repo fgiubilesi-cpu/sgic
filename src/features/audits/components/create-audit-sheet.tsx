@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,6 +63,9 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+// BUG-3 FIX: singleton supabase client — stable reference, won't re-trigger effects
+const supabase = createClient();
+
 export function CreateAuditSheet() {
   const [open, setOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -71,7 +74,6 @@ export function CreateAuditSheet() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const router = useRouter();
-  const supabase = createClient();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -90,7 +92,6 @@ export function CreateAuditSheet() {
     async function fetchData() {
       setIsLoading(true);
       try {
-        // Fetch templates
         const { data: templatesData, error: templatesError } = await supabase
           .from("checklist_templates")
           .select("id, title")
@@ -99,7 +100,6 @@ export function CreateAuditSheet() {
         if (templatesData) setTemplates(templatesData);
         if (templatesError) toast.error("Failed to load templates.");
 
-        // Fetch clients
         const { data: clientsData, error: clientsError } = await supabase
           .from("clients")
           .select("id, name")
@@ -113,7 +113,8 @@ export function CreateAuditSheet() {
     }
 
     fetchData();
-  }, [open, supabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // When client is selected, fetch its locations
   useEffect(() => {
@@ -135,7 +136,8 @@ export function CreateAuditSheet() {
     }
 
     fetchLocations();
-  }, [selectedClientId, supabase, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClientId]);
 
   async function onSubmit(values: FormValues) {
     setIsLoading(true);
@@ -151,6 +153,7 @@ export function CreateAuditSheet() {
       if (result.success) {
         toast.success("Audit created successfully.");
         setOpen(false);
+        setSelectedClientId("");
         form.reset();
         router.push(`/audits/${result.auditId}`);
       } else {
@@ -215,19 +218,20 @@ export function CreateAuditSheet() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Client</FormLabel>
+                  {/* BUG-3 FIX: use value= (controlled) instead of defaultValue= */}
                   <Select
                     onValueChange={(value) => {
                       field.onChange(value);
                       setSelectedClientId(value);
                     }}
-                    defaultValue={field.value}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger className="w-full bg-white border-zinc-200">
                         <SelectValue placeholder={isLoading ? "Loading..." : "Select a client..."} />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent position="popper" className="z-[100] max-h-[200px]">
+                    <SelectContent className="z-[200] max-h-[200px]">
                       {clients.map((c) => (
                         <SelectItem key={c.id} value={c.id} className="cursor-pointer">
                           {c.name}
@@ -253,7 +257,7 @@ export function CreateAuditSheet() {
                   <FormLabel>Location</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                     disabled={!selectedClientId}
                   >
                     <FormControl>
@@ -261,7 +265,7 @@ export function CreateAuditSheet() {
                         <SelectValue placeholder={!selectedClientId ? "Select client first" : "Select a location..."} />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent position="popper" className="z-[100] max-h-[200px]">
+                    <SelectContent className="z-[200] max-h-[200px]">
                       {locations.map((loc) => (
                         <SelectItem key={loc.id} value={loc.id} className="cursor-pointer">
                           {loc.name}
@@ -287,14 +291,14 @@ export function CreateAuditSheet() {
                   <FormLabel>Checklist Template</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger className="w-full bg-white border-zinc-200">
                         <SelectValue placeholder={isLoading ? "Loading..." : "Select a template..."} />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent position="popper" className="z-[100] max-h-[200px]">
+                    <SelectContent className="z-[200] max-h-[200px]">
                       {templates.map((t) => (
                         <SelectItem key={t.id} value={t.id} className="cursor-pointer">
                           {t.title}

@@ -46,7 +46,7 @@ export function useSpeechRecognition() {
 
     const instance = new SpeechRecognitionConstructor();
     instance.continuous = false;
-    instance.lang = "en-US";
+    instance.lang = "it-IT";
     instance.interimResults = false;
 
     instance.onresult = (event: SpeechRecognitionEvent) => {

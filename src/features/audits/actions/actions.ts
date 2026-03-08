@@ -79,10 +79,13 @@ export async function updateChecklistItem(formData: FormData) {
     return { error: "Failed to save." }
   }
 
-  // Handle Non-Conformities: Generate or close based on outcome change
+  // Handle Non-Conformities: create or cancel based on outcome change
+  let ncCreated = false
+  let ncCancelled = false
+
   if (outcome) {
     if (outcome === 'non_compliant') {
-      // Check if NC already exists for this item
+      // Check if NC already exists for this item (open or cancelled)
       const { data: existingNC } = await supabase
         .from('non_conformities')
         .select('id, status')
@@ -100,26 +103,37 @@ export async function updateChecklistItem(formData: FormData) {
             organization_id: organizationId,
             title: item.question || 'Non-Conformity',
             description: item.question || 'Item marked as non-compliant',
-            severity: 'major',
+            severity: 'medium',
             status: 'open',
           })
 
         if (ncError) {
           console.error('Failed to create non-conformity:', ncError)
-          // Don't fail the whole operation if NC creation fails
+        } else {
+          ncCreated = true
         }
       }
     } else if (outcome !== item.outcome) {
-      // If outcome changed from non_compliant to something else, close any open NCs
-      const { error: closeError } = await supabase
+      // Outcome changed away from non_compliant — cancel any open NCs
+      const { data: openNC } = await supabase
         .from('non_conformities')
-        .update({ status: 'closed', closed_at: new Date().toISOString() })
+        .select('id')
         .eq('checklist_item_id', itemId)
         .eq('status', 'open')
+        .maybeSingle()
 
-      if (closeError) {
-        console.error('Failed to close non-conformity:', closeError)
-        // Don't fail the whole operation if NC closing fails
+      if (openNC) {
+        const { error: cancelError } = await supabase
+          .from('non_conformities')
+          .update({ status: 'cancelled', closed_at: new Date().toISOString() })
+          .eq('checklist_item_id', itemId)
+          .eq('status', 'open')
+
+        if (cancelError) {
+          console.error('Failed to cancel non-conformity:', cancelError)
+        } else {
+          ncCancelled = true
+        }
       }
     }
   }
@@ -137,7 +151,7 @@ export async function updateChecklistItem(formData: FormData) {
   }
 
   revalidatePath(path)
-  return { success: true }
+  return { success: true, ncCreated, ncCancelled }
 }
 
 // --- 2. UPDATE AUDIT STATUS ---

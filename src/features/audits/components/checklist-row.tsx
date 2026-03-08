@@ -26,9 +26,8 @@ interface ChecklistRowProps {
   path: string;
 }
 
-type ChecklistRowState = {
+type OptimisticState = {
   outcome: AuditOutcome;
-  notes: string;
   evidenceUrl: string | null;
   audioUrl: string | null;
 };
@@ -51,37 +50,48 @@ export function ChecklistRow({
   const { isListening, transcript, startListening, stopListening, isSupported } =
     useSpeechRecognition();
 
+  // BUG-1 FIX: local state for notes — never reset by useOptimistic transitions
+  const [localNotes, setLocalNotes] = useState(initialNotes ?? "");
+
   const [optimisticItem, setOptimisticItem] = useOptimistic<
-    ChecklistRowState,
-    Partial<ChecklistRowState>
+    OptimisticState,
+    Partial<OptimisticState>
   >(
     {
       outcome: initialOutcome,
-      notes: initialNotes ?? "",
       evidenceUrl: initialEvidenceUrl,
       audioUrl: initialAudioUrl,
     },
     (state, newValues) => ({ ...state, ...newValues })
   );
 
-  // Append transcript to notes
-  const appendTranscript = useCallback(
-    (text: string) => {
-      const newNotes = optimisticItem.notes
-        ? `${optimisticItem.notes} ${text}`
-        : text;
-      startTransition(() => {
-        setOptimisticItem({ notes: newNotes });
-      });
+  // BUG-2 FIX: appendTranscript uses localNotes ref to avoid stale closure
+  const localNotesRef = useRef(localNotes);
+  useEffect(() => {
+    localNotesRef.current = localNotes;
+  }, [localNotes]);
+
+  const saveNotes = useCallback(
+    (notes: string) => {
       const formData = new FormData();
       formData.append("itemId", id);
-      formData.append("notes", newNotes);
+      formData.append("notes", notes);
       formData.append("path", path);
       updateChecklistItem(formData).then((result) => {
         if ("error" in result) toast.error("Failed to save note.");
       });
     },
-    [id, path, optimisticItem.notes]
+    [id, path]
+  );
+
+  const appendTranscript = useCallback(
+    (text: string) => {
+      const current = localNotesRef.current;
+      const newNotes = current ? `${current} ${text}` : text;
+      setLocalNotes(newNotes);
+      saveNotes(newNotes);
+    },
+    [saveNotes]
   );
 
   useEffect(() => {
@@ -109,29 +119,25 @@ export function ChecklistRow({
     formData.append("path", path);
 
     const result = await updateChecklistItem(formData);
-    if ("error" in result) toast.error("Failed to save outcome.");
+    if ("error" in result) {
+      toast.error("Failed to save outcome.");
+    } else if (result.ncCreated) {
+      toast.info("Non conformità registrata automaticamente.");
+    } else if (result.ncCancelled) {
+      toast.info("Non conformità annullata.");
+    }
   };
 
   const handleNotesChange = (newNotes: string) => {
-    startTransition(() => {
-      setOptimisticItem({ notes: newNotes });
-    });
+    // BUG-1 FIX: update local state directly — no useOptimistic for notes
+    setLocalNotes(newNotes);
 
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
 
     debounceTimeoutRef.current = setTimeout(() => {
-      const formData = new FormData();
-      formData.append("itemId", id);
-      formData.append("notes", newNotes);
-      formData.append("path", path);
-
-      updateChecklistItem(formData).then((result) => {
-        if ("error" in result) {
-          toast.error("Failed to save note.");
-        }
-      });
+      saveNotes(newNotes);
     }, 500);
   };
 
@@ -229,7 +235,7 @@ export function ChecklistRow({
         <div className="flex items-center gap-1">
           <Input
             type="text"
-            value={optimisticItem.notes}
+            value={localNotes}
             onChange={(e) => {
               e.stopPropagation();
               handleNotesChange(e.target.value);
@@ -250,9 +256,8 @@ export function ChecklistRow({
                   ? "bg-red-100 text-red-600"
                   : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
               )}
-              title={isListening ? "Stop dettatura" : "Dettatura voce"}
+              title={isListening ? "Ferma dettatura" : "Dettatura voce"}
             >
-              {/* Reuse Mic icon but this is speech-to-text, not audio recording */}
               <svg className={cn("w-3.5 h-3.5", isListening && "animate-pulse")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>

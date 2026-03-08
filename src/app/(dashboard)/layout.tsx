@@ -16,15 +16,14 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  Building2,
   ClipboardCheck,
   Home as HomeIcon,
   Menu,
-  Settings,
-  Layout,
-  ShieldAlert,
+  FlaskConical,
+  GraduationCap,
 } from "lucide-react";
 
 type DashboardLayoutProps = {
@@ -37,18 +36,15 @@ type DashboardUser = {
   avatarUrl?: string | null;
 };
 
-const NAV_ITEMS: Array<{
-  label: string;
-  href: string;
-  icon: React.ElementType;
-}> = [
+type NavItem =
+  | { label: string; href: string; icon: React.ElementType; disabled?: false }
+  | { label: string; href: null; icon: React.ElementType; disabled: true };
+
+const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: HomeIcon },
-  { label: "Clienti", href: "/clients", icon: Building2 },
-  { label: "Audits", href: "/audits", icon: ClipboardCheck },
-  { label: "Non-Conformità", href: "/non-conformities", icon: ShieldAlert },
-  { label: "Templates", href: "/templates", icon: Layout },
-  { label: "Organisation", href: "/organization", icon: Building2 },
-  { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Audit", href: "/audits", icon: ClipboardCheck },
+  { label: "Campionamenti", href: null, icon: FlaskConical, disabled: true },
+  { label: "Formazione", href: null, icon: GraduationCap, disabled: true },
 ];
 
 function NavLinks() {
@@ -56,6 +52,26 @@ function NavLinks() {
     <nav className="flex-1 space-y-1 px-3 py-4">
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
+
+        if (item.disabled) {
+          return (
+            <div
+              key={item.label}
+              className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-400 cursor-not-allowed select-none"
+              title="Coming soon"
+            >
+              <Icon className="h-4 w-4 text-zinc-300" />
+              <span className="flex-1">{item.label}</span>
+              <Badge
+                variant="secondary"
+                className="text-[10px] px-1.5 py-0 h-4 bg-zinc-100 text-zinc-400 border-zinc-200"
+              >
+                coming soon
+              </Badge>
+            </div>
+          );
+        }
+
         return (
           <Link
             key={item.href}

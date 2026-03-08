@@ -10,6 +10,28 @@ Client: Giubilesi Associati (consulenza agri-food, ISO 9001)
 Stack: Next.js 16 App Router + TypeScript strict + Supabase + Tailwind + shadcn/ui + Zod + Sonner  
 Porta dev: 3000 (o 3010 se avviato da Claude Code)
 
+### Ruoli utente
+- `inspector` — Giubilesi (is_platform_owner=true): crea audit, compila checklist, gestisce NC/AC
+- `client` — cliente finale: oggi riceve solo report via mail, in futuro accede al portale
+
+### Struttura navigazione (menu laterale sinistro)
+```
+Dashboard     ← centro di controllo con filtri (cliente, sede, modulo, periodo)
+Audit         ← modulo operativo padre
+  [tab] Checklist
+  [tab] Non Conformità / AC
+  [tab] Template
+Campionamenti ← futuro
+Formazione    ← futuro
+```
+⚠️ NON esiste più "Qualità" come voce separata — le NC/AC globali vivono nella Dashboard con filtri.
+
+### Report audit (deliverable core)
+- Formato primario: **Excel** — checklist completa con domande, outcome, note, allegati media
+- Formato secondario: PDF (nice-to-have futuro)
+- Sintesi mail: testo bozza auto-generato post-audit con lista NC trovate (helper per ispettore)
+- Il report viene ancora revisionato e inviato manualmente dall'ispettore
+
 ---
 
 ## 2. Architettura Multi-Tenant
@@ -35,37 +57,83 @@ Seed: organization id `4ed14a8b-a5b5-4933-b83f-a940b4993707`, admin id `c6cc8a13
 id, title, status, scheduled_date, organization_id, client_id, location_id, **score numeric(5,2)**
 
 ### `checklists`
-id, audit_id, title, created_at, **organization_id uuid NOT NULL**
+id, audit_id, title, created_at, updated_at  
+⚠️ NON ha organization_id — non inserirla mai
 
 ### `checklist_items`
-id, checklist_id, question, outcome, notes, evidence_url, audio_url, organization_id, source_question_id, version, created_at, updated_at, **sort_order integer**, **audit_id uuid** (denormalizzato)
+id, checklist_id, question, outcome, notes, evidence_url, audio_url, organization_id, source_question_id, version, created_at, updated_at, sort_order integer, audit_id uuid (denormalizzato)  
+⚠️ NON ha audit_id come FK reale — è denormalizzato, non usare per join
 
 ### `non_conformities`
 id, audit_id, checklist_item_id, organization_id, title, description, severity, status, closed_at, created_at
 
 ### `corrective_actions`
-id, non_conformity_id, organization_id, title, description, assigned_to, due_date, status, closed_at
+id, non_conformity_id, organization_id, title, description, assigned_to, due_date, status, closed_at  
+- Una NC può avere più AC (1:N), di solito 1:1 nella pratica  
+- due_date: opzionale, con reminder visivo UI quando scaduta  
+- status: open → in_progress → closed → verified (verifica avviene al prossimo audit)
 
 ---
 
-## 4. Struttura Cartelle
+## 4. Infrastruttura Media (evidence_url / audio_url)
+
+`checklist_items` ha già due colonne dedicate ai media:
+- `evidence_url` → foto/video (una URL Supabase Storage)
+- `audio_url` → nota audio (una URL Supabase Storage)
+
+### Bucket Supabase Storage
+- Nome bucket: `checklist-media`
+- Path convention: `{organizationId}/{auditId}/{itemId}/evidence.{ext}`
+- Path convention: `{organizationId}/{auditId}/{itemId}/audio.webm`
+- Accesso: bucket privato, URL firmati con scadenza 1h
+
+### Pattern upload
+```typescript
+// Upload file su Supabase Storage
+const { data, error } = await supabase.storage
+  .from('checklist-media')
+  .upload(path, file, { upsert: true })
+
+// Ottieni URL firmato
+const { data: { signedUrl } } = await supabase.storage
+  .from('checklist-media')
+  .createSignedUrl(path, 3600)
+```
+
+### Aggiornamento item dopo upload
+```typescript
+await supabase
+  .from('checklist_items')
+  .update({ evidence_url: signedUrl }) // o audio_url
+  .eq('id', itemId)
+```
+
+---
+
+## 5. Struttura Cartelle
 
 ```
 src/
   app/(dashboard)/
+    dashboard/          ← centro di controllo con filtri
     audits/[id]/
+      page.tsx          ← tab: checklist (default)
+      non-conformities/ ← tab: NC/AC
+      templates/        ← tab: template checklist
     clients/[id]/
-    templates/
-    quality/
   features/
     audits/
-      actions/    → createAuditFromTemplate, updateChecklistItem, updateAuditStatus
+      actions/    → createAuditFromTemplate, updateChecklistItem, updateAuditStatus, autoCreateNC
       queries/    → getAudit, getAudits, getAuditSummary, getNonConformities, getCorrectiveActions
       schemas/    → audit-schema.ts, non-conformity-schema.ts
-      components/ → ChecklistManager, AuditStats, NonConformitiesList, AuditStatusBadge
+      components/ → ChecklistManager, AuditStats, NonConformitiesList, AuditStatusBadge,
+                    MediaCapture, AudioRecorder, NCAutoCreate
       constants.ts
     clients/
-    quality/
+    dashboard/          ← nuovo modulo
+      queries/    → getDashboardStats, getNCGlobal, getACAudit
+      components/ → DashboardFilters, NCGlobalTable, AuditTrendChart
+    quality/            ← mantenuto solo per nc-ac.schema.ts
       schemas/    → nc-ac.schema.ts (ncSeverityEnum, ncStatusEnum)
       constants.ts
   lib/supabase/
@@ -76,7 +144,7 @@ src/
 
 ---
 
-## 5. Pattern Obbligatori
+## 6. Pattern Obbligatori
 
 ### Server Actions
 ```typescript
@@ -99,7 +167,7 @@ NON importare da database.types.ts. Schemas Zod → `features/{nome}/schemas/`
 
 ---
 
-## 6. Errori Noti e Soluzioni
+## 7. Errori Noti e Soluzioni
 
 | Errore | Causa | Fix |
 |--------|-------|-----|
@@ -111,6 +179,7 @@ NON importare da database.types.ts. Schemas Zod → `features/{nome}/schemas/`
 | INSERT bloccato da RLS | Manca WITH CHECK | aggiungere `WITH CHECK (...)` alla policy |
 | `ncSeveritySchema is not defined` | Nome sbagliato | usare `ncSeverityEnum` da nc-ac.schema |
 | checklist_items non ha audit_id come FK | Struttura DB | FK è checklist_id; audit_id è denormalizzato |
+| organization_id su checklists | Colonna non esiste | non inserire mai organization_id in checklists |
 
 ### RLS policy corretta per INSERT/ALL
 ```sql
@@ -121,7 +190,7 @@ CREATE POLICY "nome" ON tabella FOR ALL
 
 ---
 
-## 7. Regole per Agenti
+## 8. Regole per Agenti
 
 1. Leggi CLAUDE.md e TODO.md prima di iniziare
 2. Un task alla volta — esegui → testa → marca [x] → fermati
@@ -136,7 +205,7 @@ CREATE POLICY "nome" ON tabella FOR ALL
 
 ---
 
-## 8. Workflow Agenti
+## 9. Workflow Agenti
 
 ### Un task
 ```
@@ -155,7 +224,7 @@ Fermati solo se trovi un errore bloccante.
 
 ---
 
-## 9. Comandi Utili
+## 10. Comandi Utili
 
 ```bash
 # Rigenera tipi TypeScript
@@ -179,3 +248,12 @@ WHERE table_name = 'nome' AND table_schema = 'public' ORDER BY ordinal_position;
 -- Reload schema cache
 NOTIFY pgrst, 'reload schema';
 ```
+
+---
+
+## 11. Backlog Tecnico
+
+- [ ] Rigenera database.types.ts dopo ogni migrazione DB significativa (`supabase gen types typescript --linked --schema public > src/types/database.types.ts`)
+- [ ] Portale cliente (fase 2): accesso dashboard filtrata per il proprio client_id
+- [ ] PDF report audit (nice-to-have, dopo Excel)
+- [ ] Multi-sito avanzato: dashboard aggregata cross-location per gruppo

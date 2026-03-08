@@ -29,7 +29,7 @@ export function ACForm({ ncId, onSuccess }: { ncId: string, onSuccess?: () => vo
     const [isAskingAI, setIsAskingAI] = useState(false);
     const router = useRouter();
 
-    const form = useForm<z.input<typeof correctiveActionSchema>>({
+    const form = useForm<z.input<typeof correctiveActionSchema>, unknown, z.infer<typeof correctiveActionSchema>>({
         resolver: zodResolver(correctiveActionSchema),
         defaultValues: {
             nc_id: ncId,
@@ -59,10 +59,10 @@ export function ACForm({ ncId, onSuccess }: { ncId: string, onSuccess?: () => vo
         }
     };
 
-    async function onSubmit(data: z.input<typeof correctiveActionSchema>) {
+    async function onSubmit(data: z.infer<typeof correctiveActionSchema>) {
         setIsPending(true);
         try {
-            await createAC(data as any);
+            await createAC(data);
             toast.success("Azione Correttiva aggiunta");
             form.reset();
             onSuccess?.();

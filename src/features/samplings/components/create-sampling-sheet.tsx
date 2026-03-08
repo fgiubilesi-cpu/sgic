@@ -42,7 +42,7 @@ export function CreateSamplingSheet() {
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
 
-    const form = useForm<z.input<typeof samplingSchema>>({
+    const form = useForm<z.input<typeof samplingSchema>, unknown, z.infer<typeof samplingSchema>>({
         resolver: zodResolver(samplingSchema),
         defaultValues: {
             title: "",
@@ -54,7 +54,7 @@ export function CreateSamplingSheet() {
         } as any,
     });
 
-    async function onSubmit(values: z.input<typeof samplingSchema>) {
+    async function onSubmit(values: z.infer<typeof samplingSchema>) {
         setIsLoading(true);
         try {
             const result = await createSampling(values);

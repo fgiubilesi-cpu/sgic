@@ -37,7 +37,7 @@ export function NCForm({ onSuccess }: { onSuccess?: () => void }) {
     const [isAiPending, startAiTransition] = useTransition();
     const router = useRouter();
 
-    const form = useForm<z.input<typeof nonConformitySchema>, unknown, z.infer<typeof nonConformitySchema>>({
+    const form = useForm<z.input<typeof nonConformitySchema>>({
         resolver: zodResolver(nonConformitySchema),
         defaultValues: {
             title: "",
@@ -80,7 +80,7 @@ export function NCForm({ onSuccess }: { onSuccess?: () => void }) {
         });
     };
 
-    async function onSubmit(data: z.infer<typeof nonConformitySchema>) {
+    async function onSubmit(data: z.input<typeof nonConformitySchema>) {
         setIsPending(true);
         try {
             await createOfflineNC(data);

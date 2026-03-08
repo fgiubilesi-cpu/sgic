@@ -18,5 +18,7 @@ export const locationSchema = z.object({
   is_active: z.boolean().default(true),
 });
 
+export type ClientFormInput = z.input<typeof clientSchema>;
 export type ClientForm = z.infer<typeof clientSchema>;
+export type LocationFormInput = z.input<typeof locationSchema>;
 export type LocationForm = z.infer<typeof locationSchema>;

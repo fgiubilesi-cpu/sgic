@@ -24,12 +24,11 @@ import { createTrainingRecord } from "../actions/training-actions";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-type PersonnelItem = { id: string; first_name: string; last_name: string };
-type CourseItem = { id: string; title: string };
+import type { Tables } from "@/types/database.types";
 
 type TrainingRecordFormProps = {
-    personnel: PersonnelItem[];
-    courses: CourseItem[];
+    personnel: Tables<"personnel">[];
+    courses: Tables<"training_courses">[];
     onSuccess?: () => void;
     defaultPersonnelId?: string;
 };

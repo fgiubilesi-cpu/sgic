@@ -1,13 +1,6 @@
 "use client";
 
-type TrainingRecordRow = {
-  id: string;
-  course_id: string;
-  completion_date: string;
-  expiry_date: string | null;
-  certificate_url: string | null;
-  training_courses?: { title: string } | null;
-};
+import type { Tables } from "@/types/database.types";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+type TrainingRecordRow = Tables<"training_records"> & {
+  training_courses?: Pick<Tables<"training_courses">, "title"> | null;
+};
 
 interface TrainingRecordTableProps {
   records: TrainingRecordRow[];

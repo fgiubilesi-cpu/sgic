@@ -793,18 +793,36 @@ export type Database = {
       personnel: {
         Row: {
           created_at: string | null
+          first_name: string
+          hire_date: string | null
           id: string
+          is_active: boolean
+          last_name: string
           organization_id: string
+          role: string | null
+          tax_code: string | null
         }
         Insert: {
           created_at?: string | null
+          first_name?: string
+          hire_date?: string | null
           id?: string
+          is_active?: boolean
+          last_name?: string
           organization_id: string
+          role?: string | null
+          tax_code?: string | null
         }
         Update: {
           created_at?: string | null
+          first_name?: string
+          hire_date?: string | null
           id?: string
+          is_active?: boolean
+          last_name?: string
           organization_id?: string
+          role?: string | null
+          tax_code?: string | null
         }
         Relationships: [
           {
@@ -1005,19 +1023,31 @@ export type Database = {
       }
       training_courses: {
         Row: {
+          category: string
           created_at: string | null
+          duration_hours: number
           id: string
           organization_id: string
+          title: string
+          validity_months: number | null
         }
         Insert: {
+          category?: string
           created_at?: string | null
+          duration_hours?: number
           id?: string
           organization_id: string
+          title?: string
+          validity_months?: number | null
         }
         Update: {
+          category?: string
           created_at?: string | null
+          duration_hours?: number
           id?: string
           organization_id?: string
+          title?: string
+          validity_months?: number | null
         }
         Relationships: [
           {
@@ -1031,22 +1061,31 @@ export type Database = {
       }
       training_records: {
         Row: {
+          certificate_url: string | null
+          completion_date: string
           course_id: string
           created_at: string | null
+          expiry_date: string | null
           id: string
           organization_id: string
           personnel_id: string
         }
         Insert: {
+          certificate_url?: string | null
+          completion_date?: string
           course_id: string
           created_at?: string | null
+          expiry_date?: string | null
           id?: string
           organization_id: string
           personnel_id: string
         }
         Update: {
+          certificate_url?: string | null
+          completion_date?: string
           course_id?: string
           created_at?: string | null
+          expiry_date?: string | null
           id?: string
           organization_id?: string
           personnel_id?: string

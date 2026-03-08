@@ -9,6 +9,7 @@ export type ChecklistItem = {
   outcome: AuditOutcome | null;
   notes?: string | null;
   evidence_url?: string | null;
+  audio_url?: string | null;
   created_at: string | null;
 };
 
@@ -56,7 +57,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
 
   const { data: rawChecklists, error: checklistError } = await supabase
     .from("checklists")
-    .select("id, title, created_at, checklist_items(id, question, outcome, notes, evidence_url, created_at)")
+    .select("id, title, created_at, checklist_items(id, question, outcome, notes, evidence_url, audio_url, created_at)")
     .eq("audit_id", id);
 
   if (!checklistError && rawChecklists) {
@@ -76,6 +77,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
           outcome?: string | null;
           notes?: string | null;
           evidence_url?: string | null;
+          audio_url?: string | null;
           created_at?: string | null;
         };
 
@@ -91,6 +93,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
           outcome,
           notes: item.notes ?? null,
           evidence_url: item.evidence_url ?? null,
+          audio_url: item.audio_url ?? null,
           created_at: item.created_at ?? null,
         };
       });

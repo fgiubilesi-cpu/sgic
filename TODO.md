@@ -43,7 +43,7 @@
 
 ### B — UI Foto e Video
 
-- [ ] **B1 — Componente MediaCapture**
+- [x] **B1 — Componente MediaCapture**
   - File: `src/features/audits/components/media-capture.tsx`
   - Props: `itemId`, `auditId`, `currentUrl?: string`, `type: 'evidence'`
   - Comportamento mobile: apre camera nativa (`<input type="file" accept="image/*,video/*" capture="environment">`)
@@ -52,7 +52,7 @@
   - Bottone elimina se URL già presente
   - Stato loading durante upload con spinner
 
-- [ ] **B2 — Integrazione in ChecklistManager**
+- [x] **B2 — Integrazione in ChecklistManager**
   - Aggiungi `<MediaCapture>` su ogni checklist item row
   - Posizione: accanto al campo notes, icona camera
   - Non bloccare il salvataggio dell'item se upload fallisce

@@ -6,7 +6,6 @@ import type { AuditWithChecklists } from "@/features/audits/queries/get-audit";
 import type { AuditOutcome } from "@/types/database.types";
 import type { NonConformity } from "@/features/audits/queries/get-non-conformities";
 import { ChecklistRow } from "./checklist-row";
-import { PhotoPanel } from "./photo-panel";
 
 type ChecklistManagerProps = {
   audit: AuditWithChecklists;
@@ -15,9 +14,7 @@ type ChecklistManagerProps = {
 
 export function ChecklistManager({ audit, nonConformities = [] }: ChecklistManagerProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [photoPanelItemId, setPhotoPanelItemId] = useState<string | null>(null);
 
-  // Build a set of checklist_item_ids that have non-conformities
   const ncItemIds = new Set(nonConformities.map((nc) => nc.checklistItemId));
 
   if (!audit.checklists || !audit.checklists.length) {
@@ -28,7 +25,6 @@ export function ChecklistManager({ audit, nonConformities = [] }: ChecklistManag
     );
   }
 
-  // Calculate progress across all items
   const allItems = audit.checklists.flatMap((c) => c.items || []);
   const totalItems = allItems.length;
   const answeredItems = allItems.filter(
@@ -36,7 +32,6 @@ export function ChecklistManager({ audit, nonConformities = [] }: ChecklistManag
   ).length;
   const progressPercent = totalItems === 0 ? 0 : Math.round((answeredItems / totalItems) * 100);
 
-  // Flatten all items with checklist context for table rendering
   const allItemsWithChecklist = audit.checklists.flatMap((checklist) =>
     (checklist.items || []).map((item, idx) => ({
       ...item,
@@ -77,7 +72,7 @@ export function ChecklistManager({ audit, nonConformities = [] }: ChecklistManag
               <th className="px-3 py-3 text-center font-semibold text-zinc-700 w-16">NOK</th>
               <th className="px-3 py-3 text-center font-semibold text-zinc-700 w-16">N/A</th>
               <th className="px-3 py-3 text-left font-semibold text-zinc-700 flex-1">Notes</th>
-              <th className="px-3 py-3 text-center font-semibold text-zinc-700 w-8"></th>
+              <th className="px-3 py-3 text-center font-semibold text-zinc-700 w-16">Media</th>
             </tr>
           </thead>
           <tbody>
@@ -91,11 +86,11 @@ export function ChecklistManager({ audit, nonConformities = [] }: ChecklistManag
                   initialOutcome={(item.outcome as AuditOutcome) ?? "pending"}
                   initialNotes={item.notes ?? null}
                   initialEvidenceUrl={item.evidence_url ?? null}
+                  initialAudioUrl={item.audio_url ?? null}
                   auditId={audit.id}
                   isSelected={selectedItemId === item.id}
                   hasNc={ncItemIds.has(item.id)}
                   onSelect={() => setSelectedItemId(item.id)}
-                  onPhotoClick={() => setPhotoPanelItemId(item.id)}
                   path={`/audits/${audit.id}`}
                 />
               ))
@@ -109,15 +104,6 @@ export function ChecklistManager({ audit, nonConformities = [] }: ChecklistManag
           </tbody>
         </table>
       </div>
-
-      {/* Photo Panel */}
-      {photoPanelItemId && (
-        <PhotoPanel
-          itemId={photoPanelItemId}
-          auditId={audit.id}
-          onClose={() => setPhotoPanelItemId(null)}
-        />
-      )}
     </div>
   );
 }

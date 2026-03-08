@@ -2,12 +2,13 @@
 
 import { useState, useRef, useOptimistic, startTransition, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { Check, X, Minus, Paperclip, Mic, AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Check, X, Minus, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { updateChecklistItem } from "@/features/audits/actions";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
+import { MediaCapture } from "./media-capture";
+import { AudioRecorder } from "./audio-recorder";
 import type { AuditOutcome } from "@/types/database.types";
 
 interface ChecklistRowProps {
@@ -17,11 +18,11 @@ interface ChecklistRowProps {
   initialOutcome: AuditOutcome;
   initialNotes: string | null;
   initialEvidenceUrl: string | null;
+  initialAudioUrl: string | null;
   auditId: string;
   isSelected: boolean;
   hasNc?: boolean;
   onSelect: () => void;
-  onPhotoClick: () => void;
   path: string;
 }
 
@@ -29,6 +30,7 @@ type ChecklistRowState = {
   outcome: AuditOutcome;
   notes: string;
   evidenceUrl: string | null;
+  audioUrl: string | null;
 };
 
 export function ChecklistRow({
@@ -38,11 +40,11 @@ export function ChecklistRow({
   initialOutcome,
   initialNotes,
   initialEvidenceUrl,
+  initialAudioUrl,
   auditId,
   isSelected,
   hasNc = false,
   onSelect,
-  onPhotoClick,
   path,
 }: ChecklistRowProps) {
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -57,6 +59,7 @@ export function ChecklistRow({
       outcome: initialOutcome,
       notes: initialNotes ?? "",
       evidenceUrl: initialEvidenceUrl,
+      audioUrl: initialAudioUrl,
     },
     (state, newValues) => ({ ...state, ...newValues })
   );
@@ -70,7 +73,6 @@ export function ChecklistRow({
       startTransition(() => {
         setOptimisticItem({ notes: newNotes });
       });
-      // Persist immediately
       const formData = new FormData();
       formData.append("itemId", id);
       formData.append("notes", newNotes);
@@ -88,7 +90,6 @@ export function ChecklistRow({
     }
   }, [transcript, appendTranscript]);
 
-  // Cleanup debounce on unmount
   useEffect(() => {
     return () => {
       if (debounceTimeoutRef.current) {
@@ -116,7 +117,6 @@ export function ChecklistRow({
       setOptimisticItem({ notes: newNotes });
     });
 
-    // Debounce save
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
@@ -135,7 +135,6 @@ export function ChecklistRow({
     }, 500);
   };
 
-  // Row background: zebra striping and selection
   const isEvenRow = itemNumber % 2 === 0;
   const rowBgClass = isEvenRow ? "bg-white" : "bg-zinc-50";
   const selectionClass = isSelected ? "border-l-4 border-l-blue-600" : "border-l-4 border-l-transparent";
@@ -225,7 +224,7 @@ export function ChecklistRow({
         </button>
       </td>
 
-      {/* Notes input */}
+      {/* Notes + speech-to-text mic */}
       <td className="px-3 py-0">
         <div className="flex items-center gap-1">
           <Input
@@ -246,36 +245,50 @@ export function ChecklistRow({
                 isListening ? stopListening() : startListening();
               }}
               className={cn(
-                "inline-flex items-center justify-center w-6 h-6 rounded transition-colors",
+                "inline-flex items-center justify-center w-6 h-6 rounded transition-colors shrink-0",
                 isListening
                   ? "bg-red-100 text-red-600"
                   : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
               )}
-              title={isListening ? "Stop recording" : "Start dictation"}
+              title={isListening ? "Stop dettatura" : "Dettatura voce"}
             >
-              <Mic className={cn("w-3.5 h-3.5", isListening && "animate-pulse")} />
+              {/* Reuse Mic icon but this is speech-to-text, not audio recording */}
+              <svg className={cn("w-3.5 h-3.5", isListening && "animate-pulse")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
             </button>
           )}
         </div>
       </td>
 
-      {/* Photo icon */}
-      <td className="px-3 py-0 text-center">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onPhotoClick();
-          }}
-          className={cn(
-            "inline-flex items-center justify-center w-6 h-6 rounded transition-colors",
-            optimisticItem.evidenceUrl
-              ? "bg-blue-100 text-blue-600"
-              : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-          )}
-          title={optimisticItem.evidenceUrl ? "Manage photo" : "Add photo"}
+      {/* Media actions: camera + audio recorder */}
+      <td className="px-3 py-0">
+        <div
+          className="flex items-center gap-1"
+          onClick={(e) => e.stopPropagation()}
         >
-          <Paperclip className="w-4 h-4" />
-        </button>
+          <MediaCapture
+            itemId={id}
+            auditId={auditId}
+            currentUrl={optimisticItem.evidenceUrl}
+            path={path}
+            onUrlChange={(newUrl) =>
+              startTransition(() => setOptimisticItem({ evidenceUrl: newUrl }))
+            }
+          />
+          <AudioRecorder
+            itemId={id}
+            auditId={auditId}
+            currentUrl={optimisticItem.audioUrl}
+            path={path}
+            onUrlChange={(newUrl) =>
+              startTransition(() => setOptimisticItem({ audioUrl: newUrl }))
+            }
+          />
+        </div>
       </td>
     </tr>
   );

@@ -1,85 +1,103 @@
-# SGIC — TODO.md
-> Aggiornato: 2026-03-06 | Sprint 3
+# TODO.md — SGIC
+
+> Leggi sempre CLAUDE.md prima di iniziare.  
+> Un task alla volta: esegui → testa → marca [x] → commit → fermati.
 
 ---
 
-## CURRENT SPRINT — Stabilità + UX Core
+## CURRENT SPRINT: Sprint Media — Foto, Video, Audio su Checklist
 
-### P0 — Stabilità critica (fare subito)
+**Obiettivo:** Permettere all'ispettore di allegare foto/video come evidence e registrare note audio direttamente su ogni checklist item durante un audit.
 
-- [x] **S1** Rimuovere tutti i `console.error` di debug aggiunti in get-audit.ts
-- [x] **S2** Cleanup audit di test nel DB (titoli "111", "1111", ecc.) — query SQL — 13 audit eliminati
-- [x] **S3** Commit stabile su git con tag `v0.2-stable` dopo P0 completato
-- [x] **S4** Verificare che RLS sia riabilitata su `checklists` e `checklist_items` — abilitata
-- [x] **S5** Aggiungere a CLAUDE.md tutte le colonne mancanti scoperte oggi — già presenti
-
-### P1 — UX Checklist (in corso)
-
-- [x] **U1** Layout checklist compatto stile tabella — implementato in checklist-row.tsx
-- [x] **U2** Progress bar checklist visibile in cima alla pagina audit — implementata in checklist-manager.tsx
-- [x] **U3** Indicatore visivo NC generate nella riga — badge "NC" rosso con AlertTriangle
-
-### P2 — Flusso NC → AC (core business)
-
-- [x] **N1** Verifica che risposta NOK generi automaticamente una NC — già implementato in updateChecklistItem
-- [x] **N2** Lista NC nella pagina audit — implementata in non-conformities-list.tsx
-- [x] **N3** Form creazione AC da NC — implementato in corrective-actions-list.tsx
-- [x] **N4** Cambio stato NC — dropdown status in non-conformity-detail.tsx
-- [x] **N5** Quando AC completata → NC si aggiorna a "pending_verification" — in completeCorrectiveAction
-- [x] **N6** Dashboard NC globale — sidebar link aggiunto, query join syntax fix, NCTable aggiornato
-
-### P3 — Report PDF
-
-- [ ] **R1** Setup `@react-pdf/renderer`
-- [ ] **R2** Template report audit: copertina (logo, cliente, sede, data), dati audit, tabella checklist con esiti, sezione NC e AC
-- [ ] **R3** Bottone "Scarica PDF" nella pagina dettaglio audit
-- [ ] **R4** Possibilità di includere/escludere sezioni nel report (checklist, NC, AC)
-
-### P4 — Dashboard Homepage
-
-- [ ] **D1** KPI reali: audit questo mese, NC aperte totali, % compliance media ultimi 30 giorni
-- [ ] **D2** Lista ultimi 5 audit con link diretto
-- [ ] **D3** Audit in scadenza nei prossimi 7 giorni (widget alert)
-
-### P5 — Test automatici con Playwright
-
-- [ ] **T1** Setup Playwright (`npm install -D @playwright/test`)
-- [ ] **T2** Test login/logout
-- [ ] **T3** Test flusso completo: crea audit → apri → compila domande → verifica score e NC
-- [ ] **T4** Test CRUD clienti e sedi
-- [ ] **T5** Script `npm run test:e2e` configurato in package.json
+**Contesto DB:** `checklist_items` ha già `evidence_url` (foto/video) e `audio_url` (audio). Le colonne esistono — non crearle di nuovo.
 
 ---
 
-## BACKLOG — Sprint Futuri
+### A — Infrastruttura Storage
 
-- [ ] Notifiche email NC aperte da più di X giorni (Resend)
-- [ ] Storico audit per cliente: vista timeline
-- [ ] Accesso client read-only (Fase 2 — ruolo `client`)
-- [ ] Import checklist da Excel (già sviluppato, da testare)
-- [ ] Personalizzazione template per cliente (già sviluppato, da testare)
-- [ ] Trascrizione vocale note (Web Speech API — da testare)
-- [ ] Upload foto allegati (da testare con Supabase Storage)
-- [ ] Modalità offline base (da testare)
-- [ ] Ricerca globale
-- [ ] Filtri avanzati lista audit
-- [ ] CI/CD con GitHub Actions (lint + typecheck + test e2e su PR)
-- [ ] Environment staging separato
+- [x] **A1 — Crea bucket Supabase Storage**
+  - Nome: `checklist-media`
+  - Tipo: privato (non public)
+  - Verifica che non esista già prima di crearlo
+  - Path convention: `{organizationId}/{auditId}/{itemId}/evidence.{ext}` per foto/video
+  - Path convention: `{organizationId}/{auditId}/{itemId}/audio.webm` per audio
+
+- [x] **A2 — RLS policy su Storage**
+  - Utenti autenticati possono upload/download solo su path che inizia con il loro organizationId
+  - Policy nome: `checklist_media_org_isolation`
+
+- [x] **A3 — Server action: uploadChecklistMedia**
+  - File: `src/features/audits/actions/media-actions.ts`
+  - Firma: `uploadChecklistMedia(itemId, file, type: 'evidence' | 'audio')`
+  - Logica: upload su Storage → ottieni URL firmato (1h) → aggiorna checklist_items
+  - Usa pattern getOrganizationContext()
+  - Gestisci errori con { success, error, url }
+  - Dopo upload: `NOTIFY pgrst, 'reload schema';` non necessario (non è DDL)
+
+- [x] **A4 — Server action: deleteChecklistMedia**
+  - Firma: `deleteChecklistMedia(itemId, type: 'evidence' | 'audio')`
+  - Logica: elimina da Storage → setta colonna a null su checklist_items
+  - Commit: `"feat(storage): checklist-media bucket, RLS, upload/delete actions"`
 
 ---
 
-## COMPLETATO ✅
+### B — UI Foto e Video
 
-- [x] Auth login/logout
-- [x] Struttura feature-based Next.js
-- [x] Multi-tenant organizations + is_platform_owner
-- [x] CRUD Clienti e Sedi
-- [x] Sidebar navigazione + middleware
-- [x] Schema DB: clients, locations, checklists, checklist_items
-- [x] createAuditFromTemplate (audits → checklists → checklist_items)
-- [x] Lista audit con join cliente/sede
-- [x] Pagina dettaglio audit con checklist compilabile
-- [x] Score automatico audit
-- [x] Generazione NC automatica da risposta NOK
-- [x] Fix RLS policies
-- [x] Colonne DB: score, organization_id su checklists, sort_order e audit_id su checklist_items
+- [ ] **B1 — Componente MediaCapture**
+  - File: `src/features/audits/components/media-capture.tsx`
+  - Props: `itemId`, `auditId`, `currentUrl?: string`, `type: 'evidence'`
+  - Comportamento mobile: apre camera nativa (`<input type="file" accept="image/*,video/*" capture="environment">`)
+  - Comportamento desktop: file picker standard
+  - Mostra preview inline dopo upload (img o video tag)
+  - Bottone elimina se URL già presente
+  - Stato loading durante upload con spinner
+
+- [ ] **B2 — Integrazione in ChecklistManager**
+  - Aggiungi `<MediaCapture>` su ogni checklist item row
+  - Posizione: accanto al campo notes, icona camera
+  - Non bloccare il salvataggio dell'item se upload fallisce
+  - Commit: `"feat(ui): photo/video capture on checklist items"`
+
+---
+
+### C — UI Audio (in pipe con B)
+
+- [ ] **C1 — Componente AudioRecorder**
+  - File: `src/features/audits/components/audio-recorder.tsx`
+  - Props: `itemId`, `auditId`, `currentUrl?: string`
+  - Usa MediaRecorder API (webm/opus)
+  - Stati: idle → recording → stopped → uploading → saved
+  - UI: bottone microfono → registra → stop → preview playback → salva
+  - Mostra durata registrazione in tempo reale
+  - Playback inline con `<audio>` tag se URL già presente
+  - Bottone elimina se registrazione già presente
+  - Gestisci permesso microfono negato con messaggio utente
+
+- [ ] **C2 — Integrazione in ChecklistManager**
+  - Aggiungi `<AudioRecorder>` su ogni checklist item row
+  - Posizione: accanto a MediaCapture, icona microfono
+  - Commit: `"feat(ui): audio recording on checklist items"`
+
+---
+
+### D — Verifica finale
+
+- [ ] **D1 — Test manuale flusso completo**
+  - Apri un audit esistente
+  - Su un item: carica una foto → verifica preview → verifica URL salvato su DB
+  - Su un item: registra audio → verifica playback → verifica URL salvato su DB
+  - Elimina entrambi → verifica che le colonne tornino null
+  - Verifica che `tsc --noEmit` sia zero errori
+
+- [ ] **D2 — Commit finale sprint**
+  - `"feat(media): complete photo/video/audio capture on checklist items"`
+
+---
+
+## BACKLOG (prossimi sprint)
+
+- [ ] **Sprint PDF** — Report audit completo scaricabile con NC, AC e allegati media
+- [ ] **Sprint AC Scadenze** — due_date opzionale su corrective_actions con reminder visivo
+- [ ] **Sprint Demo Data** — Seed dati realistici per demo (clienti, locations, audit completi)
+- [ ] **Sprint Dashboard** — Overview NC aperte, AC scadute, trend audit per proprietario
+- [ ] **Tecnico** — Rigenera database.types.ts dopo ogni migrazione DB significativa

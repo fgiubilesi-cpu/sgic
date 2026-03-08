@@ -13,7 +13,7 @@ import {
   NC_SEVERITY_COLORS,
   NC_STATUS_LABELS,
   NC_STATUS_COLORS,
-} from "@/types/database.types";
+} from "@/features/quality/constants";
 import { createNonConformity } from "@/features/audits/actions/non-conformity-actions";
 import { NonConformityForm } from "./non-conformity-form";
 import { NonConformityDetail } from "./non-conformity-detail";

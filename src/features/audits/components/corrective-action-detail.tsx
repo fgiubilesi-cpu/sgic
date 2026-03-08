@@ -10,7 +10,7 @@ import type { CorrectiveAction } from "@/features/audits/queries/get-corrective-
 import {
   CA_STATUS_LABELS,
   CA_STATUS_COLORS,
-} from "@/types/database.types";
+} from "@/features/quality/constants";
 import { updateCorrectiveAction } from "@/features/audits/actions/corrective-action-actions";
 
 interface CorrectiveActionDetailProps {

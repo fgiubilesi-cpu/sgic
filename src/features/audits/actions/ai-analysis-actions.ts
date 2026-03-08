@@ -1,7 +1,7 @@
 "use server";
 
-import { NC_SEVERITY_LABELS } from "@/types/database.types";
-import type { NCsSeverity } from "@/types/database.types";
+import { NC_SEVERITY_LABELS } from "@/features/quality/constants";
+import type { NCsSeverity } from "@/features/quality/constants";
 
 interface NCAnalysisResponse {
   root_cause_analysis: string;

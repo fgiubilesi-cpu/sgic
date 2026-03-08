@@ -7,9 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { updateChecklistItem, uploadEvidencePhoto } from "@/features/audits/actions";
+import { updateChecklistItem } from "@/features/audits/actions";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
-import { compressEvidenceImage } from "@/lib/utils/compress-image";
 import type { AuditOutcome } from "@/types/database.types";
 import { OUTCOME_COLORS } from "@/types/database.types";
 
@@ -40,7 +39,6 @@ export function ChecklistItem({
 }: ChecklistItemProps) {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { isListening, transcript, startListening, stopListening, isSupported } =
     useSpeechRecognition();
   const [isUploading, setIsUploading] = useState(false);
@@ -87,15 +85,6 @@ export function ChecklistItem({
     // appendTranscript is stable within a transcript value's lifetime
   }, [transcript, appendTranscript]);
 
-  // Cleanup: cancel debounce on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
-  }, []);
-
   const handleOutcomeChange = async (newOutcome: AuditOutcome) => {
     startTransition(() => {
       setOptimisticItem({ outcome: newOutcome });
@@ -114,24 +103,6 @@ export function ChecklistItem({
     startTransition(() => {
       setOptimisticItem({ notes: newNotes });
     });
-
-    // Debounce: cancel previous save and schedule a new one
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
-    debounceTimeoutRef.current = setTimeout(() => {
-      const formData = new FormData();
-      formData.append("itemId", id);
-      formData.append("notes", newNotes);
-      formData.append("path", path);
-
-      updateChecklistItem(formData).then((result) => {
-        if ("error" in result) {
-          toast.error("Failed to save note.");
-        }
-      });
-    }, 500);
   };
 
   const saveNotes = async () => {
@@ -156,28 +127,34 @@ export function ChecklistItem({
 
     setIsUploading(true);
     try {
-      // Compress image before upload
-      const compressedFile = await compressEvidenceImage(file);
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${auditId}/${id}-${Date.now()}.${fileExt}`;
 
-      // Upload via server action
-      const formData = new FormData();
-      formData.append("file", compressedFile);
-      formData.append("auditId", auditId);
-      formData.append("itemId", id);
+      const { error: uploadError } = await supabase.storage
+        .from("audit-evidence")
+        .upload(fileName, file);
 
-      const result = await uploadEvidencePhoto(formData);
+      if (uploadError) throw uploadError;
 
-      if ("error" in result) {
-        toast.error(result.error);
-        return;
-      }
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("audit-evidence").getPublicUrl(fileName);
 
-      // Update optimistic state
       startTransition(() => {
-        setOptimisticItem({ evidenceUrl: result.url });
+        setOptimisticItem({ evidenceUrl: publicUrl });
       });
 
-      toast.success("Photo uploaded.");
+      const formData = new FormData();
+      formData.append("itemId", id);
+      formData.append("evidenceUrl", publicUrl);
+      formData.append("path", path);
+
+      const result = await updateChecklistItem(formData);
+      if ("error" in result) {
+        toast.error("Failed to save photo.");
+      } else {
+        toast.success("Photo uploaded.");
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error";
       toast.error("Upload failed: " + message);
@@ -247,6 +224,7 @@ export function ChecklistItem({
             <Textarea
               value={optimisticItem.notes}
               onChange={(e) => handleNotesChange(e.target.value)}
+              onBlur={saveNotes}
               placeholder="Notes or dictate..."
               className="min-h-[50px] bg-white/80 resize-none"
             />

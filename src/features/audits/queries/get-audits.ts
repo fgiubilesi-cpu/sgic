@@ -23,7 +23,7 @@ export async function getAudits(): Promise<Audit[]> {
 
   const { data: audits, error: auditsError } = await supabase
     .from("audits")
-    .select("id, title, status, scheduled_date, score, client_id, location_id, clients(name), locations(name)")
+    .select("id, title, status, scheduled_date, score, client_id, location_id, client:client_id(name), location:location_id(name)")
     .eq("organization_id", organizationId)
     .order("scheduled_date", { ascending: false });
 
@@ -39,7 +39,7 @@ export async function getAudits(): Promise<Audit[]> {
     score: audit.score ?? null,
     client_id: audit.client_id ?? null,
     location_id: audit.location_id ?? null,
-    client_name: audit.clients?.name ?? null,
-    location_name: audit.locations?.name ?? null,
+    client_name: audit.client?.name ?? null,
+    location_name: audit.location?.name ?? null,
   }));
 }

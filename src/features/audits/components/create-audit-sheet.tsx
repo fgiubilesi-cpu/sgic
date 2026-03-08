@@ -154,7 +154,7 @@ export function CreateAuditSheet() {
         form.reset();
         router.push(`/audits/${result.auditId}`);
       } else {
-        toast.error(result.error);
+        toast.error(result.error || "Failed to create audit.");
       }
     } catch {
       toast.error("An unexpected error occurred.");

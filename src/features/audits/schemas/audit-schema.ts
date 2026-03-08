@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export const auditOutcomeValues = ["compliant", "non_compliant", "not_applicable", "pending"] as const;
+export const auditOutcomeSchema = z.enum(auditOutcomeValues);
+
 export const auditStatusValues = ["Scheduled", "In Progress", "Review", "Closed"] as const;
 
 export type AuditStatus = (typeof auditStatusValues)[number];

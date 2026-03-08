@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { getOrganizationContext } from '@/lib/supabase/get-org-context'
-import { auditOutcomeSchema } from '@/types/database.types'
+import { auditOutcomeSchema } from '@/features/audits/schemas/audit-schema'
 import { getAuditSummary } from '@/features/audits/queries/get-audit-summary'
 
 // --- 1. UPDATE CHECKLIST ITEM ---
@@ -37,16 +37,29 @@ export async function updateChecklistItem(formData: FormData) {
 
   const { itemId, outcome, notes, evidenceUrl, path } = result.data
 
-  // Verify checklist item belongs to user's organization and get audit_id + question
+  // Verify checklist item belongs to user's organization and get checklist_id + question
   const { data: item } = await supabase
     .from('checklist_items')
-    .select('organization_id, audit_id, question, outcome')
+    .select('organization_id, checklist_id, question, outcome')
     .eq('id', itemId)
     .single()
 
   if (!item || item.organization_id !== organizationId) {
     return { error: "Unauthorized." }
   }
+
+  // Get audit_id from checklists table (checklist_items only has checklist_id FK)
+  const { data: checklist } = await supabase
+    .from('checklists')
+    .select('audit_id')
+    .eq('id', item.checklist_id)
+    .single()
+
+  if (!checklist) {
+    return { error: "Checklist not found." }
+  }
+
+  const auditId = checklist.audit_id
 
   const updateData: Record<string, string> = {
     updated_at: new Date().toISOString()
@@ -82,7 +95,7 @@ export async function updateChecklistItem(formData: FormData) {
         const { error: ncError } = await supabase
           .from('non_conformities')
           .insert({
-            audit_id: item.audit_id,
+            audit_id: auditId,
             checklist_item_id: itemId,
             organization_id: organizationId,
             title: item.question || 'Non-Conformity',
@@ -113,11 +126,11 @@ export async function updateChecklistItem(formData: FormData) {
 
   // Recalculate and save audit score
   try {
-    const summary = await getAuditSummary(item.audit_id)
+    const summary = await getAuditSummary(auditId)
     await supabase
       .from('audits')
       .update({ score: summary.compliancePercentage })
-      .eq('id', item.audit_id)
+      .eq('id', auditId)
   } catch (scoreError) {
     console.error("Failed to update audit score:", scoreError)
     // Don't fail the whole operation if score calculation fails
@@ -206,67 +219,97 @@ export async function createAuditFromTemplate(input: {
   client_id: string
   location_id: string
 }): Promise<{ success: true; auditId: string } | { success: false; error: string }> {
-  const ctx = await getOrganizationContext()
-  if (!ctx) return { success: false, error: 'Not authenticated.' }
+  try {
+    const ctx = await getOrganizationContext()
+    if (!ctx) return { success: false, error: 'Not authenticated.' }
 
-  const { supabase, organizationId } = ctx
+    const { supabase, organizationId } = ctx
 
-  const result = CreateAuditFromTemplateSchema.safeParse(input)
-  if (!result.success) {
-    return { success: false, error: "Missing or invalid data." }
-  }
+    const result = CreateAuditFromTemplateSchema.safeParse(input)
+    if (!result.success) {
+      console.error('ZOD VALIDATION ERROR:', JSON.stringify(result.error.flatten(), null, 2))
+      return { success: false, error: JSON.stringify(result.error.flatten()) }
+    }
 
-  const { title, scheduled_date, templateId, client_id, location_id } = result.data
+    const { title, scheduled_date, templateId, client_id, location_id } = result.data
 
-  const { data: audit, error: auditError } = await supabase
-    .from('audits')
-    .insert({
-      title,
-      status: 'Scheduled',
-      scheduled_date: scheduled_date || null,
-      organization_id: organizationId,
-      client_id,
-      location_id,
-    })
-    .select()
-    .single()
+    const { data: audit, error: auditError } = await supabase
+      .from('audits')
+      .insert({
+        title,
+        status: 'Scheduled',
+        scheduled_date: scheduled_date || null,
+        organization_id: organizationId,
+        client_id,
+        location_id,
+      })
+      .select()
+      .single()
 
-  if (auditError || !audit) {
-    console.error("Error creating audit:", auditError)
-    return { success: false, error: "Unable to create audit." }
-  }
+    if (auditError || !audit) {
+      console.error("Error creating audit:", auditError)
+      return { success: false, error: "Unable to create audit." }
+    }
 
-  // Snapshot: Copy template questions to checklist items (critical for ISO 9001)
-  // Only copy active (non-soft-deleted) questions
-  // Each checklist item gets BOTH a snapshot of the question text AND a reference to the source
-  const { data: questions } = await supabase
-    .from('template_questions')
-    .select('*')
-    .eq('template_id', templateId)
-    .is('deleted_at', null)
-    .order('sort_order', { ascending: true })
+    // Step 2: Create checklists record (intermediate table: audits → checklists → checklist_items)
+    const { data: checklist, error: checklistError } = await supabase
+      .from('checklists')
+      .insert({
+        audit_id: audit.id,
+        title: title,
+        organization_id: organizationId,
+      })
+      .select()
+      .single()
 
-  if (questions && questions.length > 0) {
-    const checklistItems = questions.map(q => ({
-      audit_id: audit.id,
-      source_question_id: q.id,  // Reference to original template question (audit trail)
-      question: q.question,      // Snapshot of question text (what was actually audited)
-      organization_id: organizationId,
-      outcome: 'pending',
-      sort_order: q.sort_order,
-    }))
+    if (checklistError || !checklist) {
+      console.error('CHECKLIST ERROR:', JSON.stringify(checklistError, null, 2))
+      console.error('Checklist data:', checklist)
+      throw checklistError || new Error('No checklist data returned')
+    }
 
-    const { error: itemsError } = await supabase
-      .from('checklist_items')
-      .insert(checklistItems)
+    // Step 3: Copy template questions to checklist items (critical for ISO 9001)
+    // Only copy active (non-soft-deleted) questions
+    // Each checklist item gets BOTH a snapshot of the question text AND a reference to the source
+    const { data: questions } = await supabase
+      .from('template_questions')
+      .select('*')
+      .eq('template_id', templateId)
+      .is('deleted_at', null)
+      .order('sort_order', { ascending: true })
 
-    if (itemsError) {
-      console.error("Error copying questions:", itemsError)
+    if (questions && questions.length > 0) {
+      const checklistItems = questions.map(q => ({
+        checklist_id: checklist.id,  // FK to checklists (not audit_id)
+        
+        source_question_id: q.id,    // Reference to original template question (audit trail)
+        question: q.question,        // Snapshot of question text (what was actually audited)
+        organization_id: organizationId,
+        outcome: 'pending',
+        sort_order: q.sort_order,
+      }))
+
+      const { error: itemsError } = await supabase
+        .from('checklist_items')
+        .insert(checklistItems)
+
+      if (itemsError) {
+        console.error("Error copying questions:", itemsError)
+      }
+    }
+
+    revalidatePath('/audits')
+    revalidatePath(`/audits/${audit.id}`)
+    return { success: true, auditId: audit.id }
+  } catch (error) {
+    console.error('CREATE AUDIT ERROR:', JSON.stringify(error, null, 2))
+    console.error('[createAuditFromTemplate] Unexpected error:', error)
+    console.error('[createAuditFromTemplate] Error stack:', error instanceof Error ? error.stack : 'N/A')
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : JSON.stringify(error)
     }
   }
-
-  revalidatePath('/audits')
-  return { success: true, auditId: audit.id }
 }
 
 // --- 4. CLONE TEMPLATE FOR CLIENT ---

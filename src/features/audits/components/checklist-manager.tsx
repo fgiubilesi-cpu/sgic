@@ -1,21 +1,20 @@
 "use client";
 
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { useState } from "react";
 import { Progress } from "@/components/ui/progress";
 import type { AuditWithChecklists } from "@/features/audits/queries/get-audit";
 import type { AuditOutcome } from "@/types/database.types";
-import { ChecklistItem } from "./checklist-item";
+import { ChecklistRow } from "./checklist-row";
+import { PhotoPanel } from "./photo-panel";
 
 type ChecklistManagerProps = {
   audit: AuditWithChecklists;
 };
 
 export function ChecklistManager({ audit }: ChecklistManagerProps) {
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [photoPanelItemId, setPhotoPanelItemId] = useState<string | null>(null);
+
   if (!audit.checklists || !audit.checklists.length) {
     return (
       <div className="rounded-lg border border-dashed border-zinc-200 bg-white px-6 py-8 text-sm text-zinc-500 shadow-sm text-center">
@@ -32,63 +31,87 @@ export function ChecklistManager({ audit }: ChecklistManagerProps) {
   ).length;
   const progressPercent = totalItems === 0 ? 0 : Math.round((answeredItems / totalItems) * 100);
 
+  // Flatten all items with checklist context for table rendering
+  const allItemsWithChecklist = audit.checklists.flatMap((checklist) =>
+    (checklist.items || []).map((item, idx) => ({
+      ...item,
+      checklistId: checklist.id,
+      checklistTitle: checklist.title,
+      itemIndex: idx + 1,
+    }))
+  );
+
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white px-4 py-4 shadow-sm">
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-2">
+    <div className="rounded-lg border border-zinc-200 bg-white overflow-hidden shadow-sm">
+      {/* Header */}
+      <div className="px-4 py-4 border-b border-zinc-200">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
               Checklists
             </h2>
             <p className="text-sm text-zinc-500">
-              All checklists and their associated questions for this audit.
+              {totalItems} questions • {answeredItems} answered
             </p>
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-zinc-900">{progressPercent}%</p>
-            <p className="text-xs text-zinc-500">{answeredItems}/{totalItems} answered</p>
           </div>
         </div>
         <Progress value={progressPercent} className="h-2" />
       </div>
 
-      <Accordion type="single" collapsible className="w-full space-y-2">
-        {audit.checklists.map((checklist) => (
-          <AccordionItem
-            key={checklist.id}
-            value={checklist.id}
-            className="border rounded-md px-2"
-          >
-            <AccordionTrigger className="hover:no-underline py-3">
-              <span className="text-sm font-medium text-zinc-900">
-                {checklist.title ?? "Untitled Checklist"}
-              </span>
-            </AccordionTrigger>
-            <AccordionContent className="pb-3 pt-1 px-1">
-              {checklist.items && checklist.items.length > 0 ? (
-                <div className="space-y-0">
-                  {checklist.items.map((item) => (
-                    <ChecklistItem
-                      key={item.id}
-                      id={item.id}
-                      question={item.question ?? ""}
-                      initialOutcome={(item.outcome as import("@/types/database.types").AuditOutcome) ?? "pending"}
-                      initialNotes={item.notes ?? null}
-                      initialEvidenceUrl={item.evidence_url ?? null}
-                      auditId={audit.id}
-                      path={`/audits/${audit.id}`}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="py-2 text-xs text-zinc-500 italic">
-                  No items in this checklist.
-                </p>
-              )}
-            </AccordionContent>
-          </AccordionItem>
-        ))}
-      </Accordion>
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-zinc-50 border-b border-zinc-200">
+            <tr>
+              <th className="px-3 py-3 text-left font-semibold text-zinc-700 w-8">#</th>
+              <th className="px-3 py-3 text-left font-semibold text-zinc-700">Question</th>
+              <th className="px-3 py-3 text-center font-semibold text-zinc-700 w-16">OK</th>
+              <th className="px-3 py-3 text-center font-semibold text-zinc-700 w-16">NOK</th>
+              <th className="px-3 py-3 text-center font-semibold text-zinc-700 w-16">N/A</th>
+              <th className="px-3 py-3 text-left font-semibold text-zinc-700 flex-1">Notes</th>
+              <th className="px-3 py-3 text-center font-semibold text-zinc-700 w-8"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {allItemsWithChecklist.length > 0 ? (
+              allItemsWithChecklist.map((item, idx) => (
+                <ChecklistRow
+                  key={item.id}
+                  id={item.id}
+                  itemNumber={idx + 1}
+                  question={item.question}
+                  initialOutcome={(item.outcome as AuditOutcome) ?? "pending"}
+                  initialNotes={item.notes}
+                  initialEvidenceUrl={item.evidence_url}
+                  auditId={audit.id}
+                  isSelected={selectedItemId === item.id}
+                  onSelect={() => setSelectedItemId(item.id)}
+                  onPhotoClick={() => setPhotoPanelItemId(item.id)}
+                  path={`/audits/${audit.id}`}
+                />
+              ))
+            ) : (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-zinc-500 italic">
+                  No items to display.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Photo Panel */}
+      {photoPanelItemId && (
+        <PhotoPanel
+          itemId={photoPanelItemId}
+          auditId={audit.id}
+          onClose={() => setPhotoPanelItemId(null)}
+        />
+      )}
     </div>
   );
 }

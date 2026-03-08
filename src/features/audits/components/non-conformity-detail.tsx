@@ -21,7 +21,7 @@ import {
   NC_STATUS_LABELS,
   NC_STATUS_COLORS,
   type NCsSeverity,
-} from "@/types/database.types";
+} from "@/features/quality/constants";
 import { updateNonConformity } from "@/features/audits/actions/non-conformity-actions";
 import { CorrectiveActionsList } from "./corrective-actions-list";
 

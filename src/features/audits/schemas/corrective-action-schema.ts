@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { correctiveActionStatusSchema } from "@/types/database.types";
+import { acStatusEnum } from "@/features/quality/schemas/nc-ac.schema";
 
 export const createCorrectiveActionSchema = z.object({
   nonConformityId: z.string().uuid("Invalid non-conformity ID"),
@@ -19,7 +19,7 @@ export const updateCorrectiveActionSchema = z.object({
   responsiblePersonName: z.string().optional(),
   responsiblePersonEmail: z.string().email().optional(),
   targetCompletionDate: z.string().date().optional(),
-  status: correctiveActionStatusSchema.optional(),
+  status: acStatusEnum.optional(),
 });
 
 export const completeCorrectiveActionSchema = z.object({

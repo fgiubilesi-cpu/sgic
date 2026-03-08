@@ -1,27 +1,145 @@
-import { getOrganizationContext } from "@/lib/organization-context";
-import { getAudits } from "@/features/audits/queries/get-audits";
+import { Suspense } from "react";
+import { SlidersHorizontal, BarChart2, AlertTriangle } from "lucide-react";
+import { getDashboardFilterOptions, getDashboardMetrics, getGlobalNCs, getAuditScoreTrend } from "@/features/dashboard/queries/get-dashboard-data";
+import { DashboardFilters } from "@/features/dashboard/components/dashboard-filters";
+import { DashboardMetricsGrid } from "@/features/dashboard/components/dashboard-metrics";
+import { GlobalNCTable } from "@/features/dashboard/components/global-nc-table";
+import { AuditTrendChart } from "@/features/dashboard/components/audit-trend-chart";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const context = await getOrganizationContext();
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
 
-  // Se il contesto è nullo o manca l'ID, mostriamo un errore sicuro
-  if (!context || !context.organizationId) {
-    return (
-      <div className="p-10 text-red-600">
-        Errore: Sessione o Organizzazione non valida. Per favore effettua di nuovo il login.
-      </div>
-    );
-  }
+  const clientId = typeof params.clientId === "string" ? params.clientId : "";
+  const locationId = typeof params.locationId === "string" ? params.locationId : "";
+  const dateFrom = typeof params.dateFrom === "string" ? params.dateFrom : "";
+  const dateTo = typeof params.dateTo === "string" ? params.dateTo : "";
 
-  // Ora context.organizationId è sicuramente una stringa
-  const audits = await getAudits();
+  const filters = { clientId, locationId, dateFrom, dateTo };
+
+  const [filterOptions, metrics, globalNCs, trendData] = await Promise.all([
+    getDashboardFilterOptions(),
+    getDashboardMetrics(filters),
+    getGlobalNCs(filters),
+    getAuditScoreTrend(filters),
+  ]);
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">Dashboard SGIC</h1>
-      <p className="text-zinc-500">Audit attivi: {audits?.length || 0}</p>
+    <div className="space-y-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Dashboard</h1>
+        <p className="text-sm text-zinc-500 mt-1">
+          Centro di controllo — filtri attivi: {[clientId, locationId, dateFrom, dateTo].filter(Boolean).length} / 4
+        </p>
+      </div>
+
+      {/* Filters */}
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <SlidersHorizontal className="w-4 h-4 text-zinc-400" />
+          <h2 className="text-sm font-semibold text-zinc-700">Filtri</h2>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <Suspense>
+            <DashboardFilters
+              clients={filterOptions.clients}
+              locations={filterOptions.locations}
+              activeClientId={clientId}
+              activeLocationId={locationId}
+              activeDateFrom={dateFrom}
+              activeDateTo={dateTo}
+            />
+          </Suspense>
+        </div>
+      </section>
+
+      {/* Metrics */}
+      <section>
+        <DashboardMetricsGrid metrics={metrics} />
+      </section>
+
+      {/* Trend chart + NC table */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Trend chart */}
+        <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart2 className="w-4 h-4 text-zinc-400" />
+            <h2 className="text-sm font-semibold text-zinc-700">Trend score audit</h2>
+          </div>
+          <p className="text-xs text-zinc-400 mb-4">
+            Score medio per audit nel periodo — verde ≥ 85%, giallo ≥ 70%, rosso &lt; 70%
+          </p>
+          <AuditTrendChart data={trendData} />
+        </section>
+
+        {/* NC Summary (compact) */}
+        <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-4 h-4 text-zinc-400" />
+            <h2 className="text-sm font-semibold text-zinc-700">
+              Riepilogo NC
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {globalNCs.length === 0 ? (
+              <p className="text-sm text-zinc-400">
+                Nessuna NC per i filtri selezionati.
+              </p>
+            ) : (
+              globalNCs.slice(0, 6).map((nc) => (
+                <div
+                  key={nc.id}
+                  className="flex items-start justify-between gap-2 text-sm border-b border-zinc-50 pb-2 last:border-0"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-zinc-800 truncate">{nc.title}</p>
+                    <p className="text-xs text-zinc-400 truncate">
+                      {nc.clientName} · {nc.auditTitle}
+                    </p>
+                  </div>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded font-semibold whitespace-nowrap ${
+                      nc.severity === "critical"
+                        ? "bg-red-100 text-red-700"
+                        : nc.severity === "major"
+                          ? "bg-orange-100 text-orange-700"
+                          : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
+                    {nc.severity === "critical"
+                      ? "Critica"
+                      : nc.severity === "major"
+                        ? "Maggiore"
+                        : "Minore"}
+                  </span>
+                </div>
+              ))
+            )}
+            {globalNCs.length > 6 && (
+              <p className="text-xs text-zinc-400 pt-1">
+                + {globalNCs.length - 6} altre NC nella tabella sotto
+              </p>
+            )}
+          </div>
+        </section>
+      </div>
+
+      {/* Global NC Table */}
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle className="w-4 h-4 text-zinc-400" />
+          <h2 className="text-sm font-semibold text-zinc-700">
+            Non conformità — vista globale
+          </h2>
+        </div>
+        <GlobalNCTable nonConformities={globalNCs} />
+      </section>
     </div>
   );
 }

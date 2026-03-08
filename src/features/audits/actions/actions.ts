@@ -109,7 +109,7 @@ export async function updateChecklistItem(formData: FormData) {
           // Don't fail the whole operation if NC creation fails
         }
       }
-    } else if (outcome !== item.outcome && outcome !== 'non_compliant') {
+    } else if (outcome !== item.outcome) {
       // If outcome changed from non_compliant to something else, close any open NCs
       const { error: closeError } = await supabase
         .from('non_conformities')

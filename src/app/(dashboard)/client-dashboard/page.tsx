@@ -200,3 +200,8 @@ export default function ClientDashboard() {
     </div>
   );
 }
+
+// Note: Timeline component can be added to this page by importing:
+// import { AuditTimeline } from "@/features/audits/components/audit-timeline";
+// And using: <AuditTimeline events={timelineEvents} />
+// after fetching with: const timelineEvents = await getAuditTimeline();

@@ -35,6 +35,26 @@ export interface TrendPoint {
   clientName: string;
 }
 
+export interface RecentAudit {
+  id: string;
+  title: string;
+  clientName: string;
+  locationName: string;
+  scheduledDate: string | null;
+  status: string;
+  score: number | null;
+}
+
+export interface UpcomingAudit {
+  id: string;
+  title: string;
+  clientName: string;
+  locationName: string;
+  scheduledDate: string;
+  daysUntil: number;
+  isOverdue: boolean;
+}
+
 export interface ClientOption {
   id: string;
   name: string;
@@ -262,4 +282,78 @@ export async function getAuditScoreTrend(
       auditTitle: a.title ?? "",
       clientName: a.client?.name ?? "",
     }));
+}
+
+// ─── D2: Recent Audits (last 5) ────────────────────────────────────────────
+export async function getRecentAudits(): Promise<RecentAudit[]> {
+  const ctx = await getOrganizationContext();
+  if (!ctx) return [];
+  const { supabase, organizationId } = ctx;
+
+  const { data: audits } = await supabase
+    .from("audits")
+    .select(
+      "id, title, scheduled_date, status, score, client:client_id(name), location:location_id(name)"
+    )
+    .eq("organization_id", organizationId)
+    .order("scheduled_date", { ascending: false })
+    .limit(5);
+
+  return (audits ?? []).map((a: any) => ({
+    id: a.id,
+    title: a.title ?? "",
+    clientName: a.client?.name ?? "",
+    locationName: a.location?.name ?? "",
+    scheduledDate: a.scheduled_date,
+    status: a.status ?? "planned",
+    score: a.score ?? null,
+  }));
+}
+
+// ─── D3: Upcoming Audits (next 7 days) ─────────────────────────────────────
+export async function getUpcomingAudits(): Promise<UpcomingAudit[]> {
+  const ctx = await getOrganizationContext();
+  if (!ctx) return [];
+  const { supabase, organizationId } = ctx;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const nextWeek = new Date(today);
+  nextWeek.setDate(nextWeek.getDate() + 7);
+
+  const todayIso = today.toISOString().split("T")[0];
+  const nextWeekIso = nextWeek.toISOString().split("T")[0];
+
+  const { data: audits } = await supabase
+    .from("audits")
+    .select(
+      "id, title, scheduled_date, status, client:client_id(name), location:location_id(name)"
+    )
+    .eq("organization_id", organizationId)
+    .gte("scheduled_date", todayIso)
+    .lte("scheduled_date", nextWeekIso)
+    .neq("status", "completed")
+    .neq("status", "cancelled")
+    .order("scheduled_date", { ascending: true });
+
+  return (audits ?? []).map((a: any) => {
+    const auditDate = new Date(a.scheduled_date);
+    const diff = Math.ceil(
+      (auditDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    return {
+      id: a.id,
+      title: a.title ?? "",
+      clientName: a.client?.name ?? "",
+      locationName: a.location?.name ?? "",
+      scheduledDate: new Intl.DateTimeFormat("it-IT", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(auditDate),
+      daysUntil: Math.max(0, diff),
+      isOverdue: diff < 0,
+    };
+  });
 }

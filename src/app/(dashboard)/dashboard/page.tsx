@@ -1,10 +1,12 @@
 import { Suspense } from "react";
 import { SlidersHorizontal, BarChart2, AlertTriangle } from "lucide-react";
-import { getDashboardFilterOptions, getDashboardMetrics, getGlobalNCs, getAuditScoreTrend } from "@/features/dashboard/queries/get-dashboard-data";
+import { getDashboardFilterOptions, getDashboardMetrics, getGlobalNCs, getAuditScoreTrend, getRecentAudits, getUpcomingAudits } from "@/features/dashboard/queries/get-dashboard-data";
 import { DashboardFilters } from "@/features/dashboard/components/dashboard-filters";
 import { DashboardMetricsGrid } from "@/features/dashboard/components/dashboard-metrics";
 import { GlobalNCTable } from "@/features/dashboard/components/global-nc-table";
 import { AuditTrendChart } from "@/features/dashboard/components/audit-trend-chart";
+import { RecentAudits } from "@/features/dashboard/components/recent-audits";
+import { UpcomingAuditsWidget } from "@/features/dashboard/components/upcoming-audits-widget";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +24,13 @@ export default async function DashboardPage({
 
   const filters = { clientId, locationId, dateFrom, dateTo };
 
-  const [filterOptions, metrics, globalNCs, trendData] = await Promise.all([
+  const [filterOptions, metrics, globalNCs, trendData, recentAudits, upcomingAudits] = await Promise.all([
     getDashboardFilterOptions(),
     getDashboardMetrics(filters),
     getGlobalNCs(filters),
     getAuditScoreTrend(filters),
+    getRecentAudits(),
+    getUpcomingAudits(),
   ]);
 
   return (
@@ -130,7 +134,30 @@ export default async function DashboardPage({
         </section>
       </div>
 
-      {/* Global NC Table */}
+
+      {/* D2: Recent Audits */}
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <BarChart2 className="w-4 h-4 text-zinc-400" />
+          <h2 className="text-sm font-semibold text-zinc-700">Ultimi 5 audit</h2>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <RecentAudits audits={recentAudits} />
+        </div>
+      </section>
+
+      {/* D3: Upcoming Audits Alert */}
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle className="w-4 h-4 text-zinc-400" />
+          <h2 className="text-sm font-semibold text-zinc-700">Audit in scadenza (7 giorni)</h2>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <UpcomingAuditsWidget audits={upcomingAudits} />
+        </div>
+      </section>
+
+            {/* Global NC Table */}
       <section>
         <div className="flex items-center gap-2 mb-3">
           <AlertTriangle className="w-4 h-4 text-zinc-400" />

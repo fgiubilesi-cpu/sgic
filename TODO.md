@@ -131,11 +131,38 @@
     - Status 200 con Content-Type application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
   - ✅ **TypeScript**: Zero errori dopo fix getClientsList
 
-### P4 — Dashboard Homepage
+### P4 — Dashboard Homepage ✅ COMPLETATO
 
-- [ ] **D1** KPI reali: audit questo mese, NC aperte totali, % compliance media ultimi 30 giorni
-- [ ] **D2** Lista ultimi 5 audit con link diretto
-- [ ] **D3** Audit in scadenza nei prossimi 7 giorni (widget alert)
+- [x] **D1** KPI reali: audit questo mese, NC aperte totali, % compliance media ultimi 30 giorni
+  - ✅ **Query getMonthlyKPIs()**: Calcola metriche fisse
+    - Audit scheduled this month (1° giorno a oggi)
+    - NC aperte totali (globale, no filtri)
+    - Compliance % (score media ultimi 30 giorni)
+  - ✅ **Componente MonthlyKPIs**: Grid 3 card responsive
+    - Colori: rosso=scarso, giallo=warning, default=buono
+    - Icons: Calendar, AlertTriangle, TrendingUp
+    - Responsive: 1 col mobile, 3 cols desktop
+  - ✅ **Integrazione**: Sezione D1 prima dei filtri DashboardMetricsGrid
+- [x] **D2** Lista ultimi 5 audit con link diretto
+  - ✅ **Query getRecentAudits()**: Fetch ultimi 5 audit ordinati per scheduled_date DESC
+  - ✅ **Componente RecentAudits**:
+    - Mostra: titolo, client/location, score badge (colore per livello)
+    - Link clickable a pagina audit detail
+    - Hover state per miglior UX
+    - Empty state se nessun audit
+  - ✅ **Sezione D2** nella dashboard sotto KPI filtrati
+- [x] **D3** Audit in scadenza nei prossimi 7 giorni (widget alert)
+  - ✅ **Query getUpcomingAudits()**:
+    - Filtra audits con scheduled_date in [oggi, +7 giorni]
+    - Esclude status completed/cancelled
+    - Calcola daysUntil e isOverdue flags
+  - ✅ **Componente UpcomingAuditsWidget**:
+    - Alert banner rosso se overdue, giallo se ≤2 giorni
+    - List di audit con color coding
+    - Calendar icon e days counter
+    - Link a audit detail
+  - ✅ **Sezione D3** nella dashboard
+- ✅ **TypeScript**: Zero errori dopo implementazione D1-D3
 
 ### P5 — Test automatici con Playwright
 

@@ -76,6 +76,15 @@ export default function ClientDashboard() {
             Audit Dashboard {clientName && `— ${clientName}`}
           </h1>
           <p className="text-slate-600">
+          <div className="mt-4">
+            <Link
+              href="/audit-history"
+              className="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
+            >
+              View Complete History →
+            </Link>
+          </div>
+
             Visualizza e scarica i risultati degli audit della tua organizzazione
           </p>
         </div>

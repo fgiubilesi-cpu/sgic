@@ -2,3 +2,4 @@ export { updateChecklistItem, updateAuditStatus, createAuditFromTemplate, cloneT
 export { addTemplateQuestion, softDeleteTemplateQuestion } from './template-actions'
 export { uploadEvidencePhoto } from './upload-evidence'
 export { uploadChecklistMedia, deleteChecklistMedia } from './media-actions'
+export { generateAuditExcel } from './export-actions'

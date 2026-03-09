@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getOpenNCList } from "@/features/quality/actions/quality-actions";
+import { getOpenNCList, getClientsList } from "@/features/quality/actions/quality-actions";
 import { getClients } from "@/features/clients/queries/get-clients";
 import { NCTable } from "@/features/quality/components/nc-table";
 import { NCForm } from "@/features/quality/components/nc-form";
@@ -35,7 +35,7 @@ export default function NonConformitiesPage() {
             try {
                 const [openNCs, clientsList] = await Promise.all([
                     getOpenNCList(selectedClientId || undefined),
-                    getClients(),
+                    getClientsList(),
                 ]);
                 setNcs(openNCs || []);
                 setClients(clientsList || []);

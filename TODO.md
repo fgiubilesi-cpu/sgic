@@ -97,12 +97,39 @@
   - ✅ **Compilazione**: Zero errori TypeScript
   - ✅ **State management**: useState hooks per ncs, clients, selectedClientId, isLoading
 
-### P3 — Report Excel
+### P3 — Report Excel ✅ COMPLETATO
 
-- [ ] **R1** Setup `exceljs` (`npm install exceljs`)
-- [ ] **R2** Server Action `exportAuditToExcel`: colonne domanda, esito, note, evidence_url
-- [ ] **R3** Bottone "Scarica Excel" nella pagina dettaglio audit
-- [ ] **R4** Sezione NC e AC nel report (foglio separato)
+- [x] **R1** Setup `exceljs` (`npm install exceljs`)
+  - ✅ **Installato**: npm install exceljs completato con successo
+- [x] **R2** Server Action `exportAuditToExcel`: colonne domanda, esito, note, evidence_url
+  - ✅ **Funzione già implementata**: generateAuditExcel in export-actions.ts
+  - ✅ **Funzionalità**:
+    - Fetch audit con client e location
+    - Fetch checklist items con evidence_url e audio_url
+    - Fetch non conformities e corrective actions
+    - Genera Excel con 3 fogli: Checklist | Non Conformità | Azioni Correttive
+    - Styling: header nero, colori outcome per status, dates formattate it-IT
+    - Export a base64, ready per API download
+  - ✅ **Esportazione index.ts**: Aggiunto export di generateAuditExcel
+- [x] **R3** Bottone "Scarica Excel" nella pagina dettaglio audit
+  - ✅ **Bottone già implementato**: ExportExcelButton in audit-detail page
+  - ✅ **Ubicazione**: Header audit, accanto a EmailDraftModal
+  - ✅ **Funzionalità**:
+    - Icon: FileSpreadsheet (verde emerald)
+    - Fetch da /api/audits/{id}/export
+    - Download file con filename corretto
+    - Toast notifications (loading, success, error)
+    - Loading state durante generazione
+- [x] **R4** Sezione NC e AC nel report (foglio separato)
+  - ✅ **Già implementato**: 3 fogli nel workbook:
+    - Foglio 1: Checklist (domanda, esito, note, allegati foto/audio)
+    - Foglio 2: Non Conformità (titolo, gravità, stato, item, descrizione)
+    - Foglio 3: Azioni Correttive (NC, descrizione, assegnata a, scadenza, stato)
+  - ✅ **Route API**: GET /api/audits/[id]/export/route.ts
+    - Converte buffer a base64
+    - Ritorna file con header Content-Disposition corretto
+    - Status 200 con Content-Type application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+  - ✅ **TypeScript**: Zero errori dopo fix getClientsList
 
 ### P4 — Dashboard Homepage
 

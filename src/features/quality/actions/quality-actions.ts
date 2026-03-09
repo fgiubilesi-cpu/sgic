@@ -69,6 +69,33 @@ export async function getOpenNCList(clientId?: string) {
 }
 
 /**
+ * N6: Fetch all clients for the organization (for NC dashboard filtering)
+ */
+export async function getClientsList() {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .single();
+
+    if (!profile?.organization_id) throw new Error("Organization not found");
+
+    const { data, error } = await supabase
+        .from("clients")
+        .select("id, name")
+        .eq("organization_id", profile.organization_id)
+        .eq("is_active", true)
+        .order("name");
+
+    if (error) throw error;
+    return data || [];
+}
+
+/**
  * Fetch a single Non-Conformity by ID
  */
 export async function getNCDetail(id: string) {

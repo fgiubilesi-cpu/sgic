@@ -7,13 +7,14 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { ChevronUp, ChevronDown, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { getTemplateWithQuestions } from '@/features/audits/queries/get-template-with-questions'
 import {
+  getTemplateWithQuestionsAction,
   updateTemplate,
   updateTemplateQuestion,
   addTemplateQuestion,
   softDeleteTemplateQuestion,
   reorderTemplateQuestions,
+  type TemplateQuestion,
 } from '@/features/audits/actions/template-actions'
 
 interface FormQuestion {
@@ -44,7 +45,9 @@ export function EditTemplateSheet({ templateId, open, onOpenChange, onSaved }: E
     const loadTemplate = async () => {
       setLoading(true)
       try {
-        const data = await getTemplateWithQuestions(templateId)
+        const res = await getTemplateWithQuestionsAction(templateId)
+        if (!res.success) throw new Error(res.error)
+        const data = res.data
         if (data) {
           setTitle(data.title)
           setDescription(data.description || '')

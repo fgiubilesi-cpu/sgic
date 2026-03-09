@@ -8,6 +8,57 @@ import { z } from 'zod'
 type ActionResult = { success: true } | { success: false; error: string }
 type TemplateResult = { success: true; id: string } | { success: false; error: string }
 
+// ============================================
+// GET TEMPLATE WITH QUESTIONS (Server Action — chiamabile da client)
+// ============================================
+
+export interface TemplateQuestion {
+  id: string
+  question: string
+  sort_order: number | null
+  weight: number | null
+  deleted_at: string | null
+}
+
+export interface TemplateWithQuestions {
+  id: string
+  title: string
+  description: string | null
+  organization_id: string | null
+  client_id: string | null
+  questions: TemplateQuestion[]
+}
+
+export async function getTemplateWithQuestionsAction(
+  templateId: string
+): Promise<{ success: true; data: TemplateWithQuestions } | { success: false; error: string }> {
+  const ctx = await getOrganizationContext()
+  if (!ctx) return { success: false, error: 'Not authenticated.' }
+
+  const { supabase } = ctx
+
+  const { data: template, error } = await supabase
+    .from('checklist_templates')
+    .select(`
+      id, title, description, organization_id, client_id,
+      template_questions!template_questions_template_id_fkey(
+        id, question, sort_order, weight, deleted_at
+      )
+    `)
+    .eq('id', templateId)
+    .single()
+
+  if (error || !template) {
+    return { success: false, error: error?.message ?? 'Template not found.' }
+  }
+
+  const questions = (template.template_questions as TemplateQuestion[])
+    .filter(q => !q.deleted_at)
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+
+  return { success: true, data: { ...template, questions } }
+}
+
 const AddQuestionSchema = z.object({
   templateId: z.string().uuid(),
   question: z.string().min(1, 'Question cannot be empty').max(1000),

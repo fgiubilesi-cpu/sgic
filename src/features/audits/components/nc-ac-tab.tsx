@@ -233,7 +233,7 @@ function NcRow({ nc, cas, auditId, readOnly = false }: NcRowProps) {
         <td className="px-3 py-0 flex-1 min-w-0">
           <div className="flex items-center gap-1.5 h-full">
             <span className="text-xs text-zinc-900 truncate">
-              {nc.checklistItem?.question || nc.title}
+              {nc.title ? `${nc.title} - ` : ""}{nc.checklistItem?.question || "N/A"}
             </span>
             {cas.length > 0 && (
               <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded shrink-0 font-medium">
@@ -287,11 +287,11 @@ function NcRow({ nc, cas, auditId, readOnly = false }: NcRowProps) {
                       const caStatus = ca.status as keyof typeof CA_STATUS_LABELS;
 
                       const canAdvanceStatus =
-                        (caStatus === "open") || (caStatus === "completed");
+                        (caStatus === "pending") || (caStatus === "in_progress");
 
                       const nextStatus =
-                        caStatus === "open" ? "completed" :
-                        caStatus === "completed" ? "verified" :
+                        caStatus === "pending" ? "in_progress" :
+                        caStatus === "in_progress" ? "completed" :
                         undefined;
 
                       const handleStatusChange = async () => {
@@ -764,6 +764,26 @@ function EditCaForm({ ca, onSuccess, onCancel }: EditCaFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="rounded-lg border border-zinc-200 bg-white p-4 space-y-3">
+      <div className="flex gap-2 justify-end pb-2 border-b border-zinc-200 mb-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onCancel}
+          disabled={isLoading}
+        >
+          Annulla
+        </Button>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={isLoading}
+          className="bg-zinc-900 text-white"
+        >
+          {isLoading ? "Salvataggio..." : "Salva AC"}
+        </Button>
+      </div>
+
       <h4 className="text-xs font-semibold text-zinc-700 uppercase tracking-wide mb-2">
         Modifica Azione Correttiva
       </h4>
@@ -855,27 +875,6 @@ function EditCaForm({ ca, onSuccess, onCancel }: EditCaFormProps) {
             disabled={isLoading}
           />
         </div>
-      </div>
-
-      {/* Bottoni */}
-      <div className="flex gap-2 justify-end pt-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onCancel}
-          disabled={isLoading}
-        >
-          Annulla
-        </Button>
-        <Button
-          type="submit"
-          size="sm"
-          disabled={isLoading}
-          className="bg-zinc-900 text-white"
-        >
-          {isLoading ? "Salvataggio..." : "Salva"}
-        </Button>
       </div>
     </form>
   );

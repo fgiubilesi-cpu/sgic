@@ -170,7 +170,7 @@ export function CorrectiveActionsList({
                   <Badge className={CA_STATUS_COLORS[ca.status]}>
                     {CA_STATUS_LABELS[ca.status]}
                   </Badge>
-                  {ca.status !== "completed" && ca.status !== "verified" && (
+                  {ca.status !== "completed" && (
                     <Button
                       size="sm"
                       variant="outline"

@@ -35,7 +35,7 @@ export function ACForm({ ncId, onSuccess }: { ncId: string, onSuccess?: () => vo
             nc_id: ncId,
             description: "",
             due_date: "",
-            status: "open",
+            status: "pending",
         },
     });
 

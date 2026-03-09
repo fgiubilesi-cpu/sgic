@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Progress } from "@/components/ui/progress";
 import type { AuditWithChecklists } from "@/features/audits/queries/get-audit";
-import type { AuditOutcome } from "@/types/database.types";
+import type { AuditOutcome } from "@/features/audits/schemas/audit-schema";
 import type { NonConformity } from "@/features/audits/queries/get-non-conformities";
 import { ChecklistRow } from "./checklist-row";
 
@@ -41,6 +40,17 @@ export function ChecklistManager({ audit, nonConformities = [] }: ChecklistManag
     }))
   );
 
+  // U2: Progress bar color and feedback based on completion %
+  const progressBarColor =
+    progressPercent < 50 ? "bg-red-500" :
+    progressPercent < 80 ? "bg-amber-500" :
+    "bg-green-500";
+
+  const progressFeedback =
+    progressPercent < 50 ? "Appena iniziato" :
+    progressPercent < 80 ? "A metà strada" :
+    "Quasi finito!";
+
   return (
     <div className="rounded-lg border border-zinc-200 bg-white overflow-hidden shadow-sm">
       {/* Header */}
@@ -56,9 +66,15 @@ export function ChecklistManager({ audit, nonConformities = [] }: ChecklistManag
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-zinc-900">{progressPercent}%</p>
+            <p className="text-xs text-zinc-600 mt-1">{progressFeedback}</p>
           </div>
         </div>
-        <Progress value={progressPercent} className="h-2" />
+        <div className="w-full bg-zinc-200 rounded-full h-3 overflow-hidden">
+          <div
+            className={`h-full transition-all duration-500 ease-out ${progressBarColor}`}
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
       </div>
 
       {/* Table */}

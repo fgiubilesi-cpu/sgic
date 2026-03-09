@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import type { AuditOutcome } from "@/types/database.types";
+import type { AuditOutcome } from "@/features/audits/schemas/audit-schema";
 
 interface ChecklistItem {
   id: string;

@@ -1,7 +1,6 @@
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import type { Audit } from "@/features/audits/queries/get-audits";
-import type { AuditStatus } from "@/features/audits/schemas/audit-schema";
-import type { AuditOutcome } from "@/types/database.types";
+import type { AuditStatus, AuditOutcome } from "@/features/audits/schemas/audit-schema";
 
 export type ChecklistItem = {
   id: string;

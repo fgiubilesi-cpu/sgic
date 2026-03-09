@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { CorrectiveActionStatus } from "@/types/database.types";
+import type { CorrectiveActionStatus } from "@/features/quality/schemas/nc-ac.schema";
 
 export interface CorrectiveAction {
   id: string;

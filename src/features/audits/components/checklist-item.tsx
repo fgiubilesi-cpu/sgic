@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { updateChecklistItem } from "@/features/audits/actions";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
-import type { AuditOutcome } from "@/types/database.types";
-import { OUTCOME_COLORS } from "@/types/database.types";
+import type { AuditOutcome } from "@/features/audits/schemas/audit-schema";
+import { OUTCOME_COLORS } from "@/features/audits/schemas/audit-schema";
 
 interface ChecklistItemProps {
   id: string;

@@ -2,6 +2,14 @@ import { z } from "zod";
 
 export const auditOutcomeValues = ["compliant", "non_compliant", "not_applicable", "pending"] as const;
 export const auditOutcomeSchema = z.enum(auditOutcomeValues);
+export type AuditOutcome = z.infer<typeof auditOutcomeSchema>;
+
+export const OUTCOME_COLORS: Record<AuditOutcome, string> = {
+  compliant: "bg-green-100 border-green-300",
+  non_compliant: "bg-red-100 border-red-300",
+  not_applicable: "bg-gray-100 border-gray-300",
+  pending: "bg-yellow-100 border-yellow-300",
+};
 
 export const auditStatusValues = ["Scheduled", "In Progress", "Review", "Closed"] as const;
 

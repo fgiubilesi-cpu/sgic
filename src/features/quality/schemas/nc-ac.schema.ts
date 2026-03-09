@@ -30,3 +30,7 @@ export type CorrectiveAction = z.infer<typeof correctiveActionSchema>;
 export type NCSeverity = z.infer<typeof ncSeverityEnum>;
 export type NCStatus = z.infer<typeof ncStatusEnum>;
 export type ACStatus = z.infer<typeof acStatusEnum>;
+
+// Aliases per compatibilità (alcuni file usano nomi leggermente diversi)
+export type NCsSeverity = NCSeverity;
+export type CorrectiveActionStatus = ACStatus;

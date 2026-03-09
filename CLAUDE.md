@@ -57,21 +57,35 @@ Seed: organization id `4ed14a8b-a5b5-4933-b83f-a940b4993707`, admin id `c6cc8a13
 id, title, status, scheduled_date, organization_id, client_id, location_id, **score numeric(5,2)**
 
 ### `checklists`
-id, audit_id, title, created_at, updated_at  
-⚠️ NON ha organization_id — non inserirla mai
+id, audit_id, title, organization_id, created_at  
+✅ Ha organization_id — inserirla sempre negli INSERT
 
 ### `checklist_items`
 id, checklist_id, question, outcome, notes, evidence_url, audio_url, organization_id, source_question_id, version, created_at, updated_at, sort_order integer, audit_id uuid (denormalizzato)  
-⚠️ NON ha audit_id come FK reale — è denormalizzato, non usare per join
+⚠️ `audit_id` è denormalizzato — NON usare per JOIN, usare sempre checklist_id → checklists.audit_id
 
 ### `non_conformities`
-id, audit_id, checklist_item_id, organization_id, title, description, severity, status, closed_at, created_at
+id, audit_id, checklist_item_id, organization_id, title, description, severity, status, closed_at, created_at, updated_at, deleted_at, evidence_url
 
 ### `corrective_actions`
-id, non_conformity_id, organization_id, title, description, assigned_to, due_date, status, closed_at  
+id, non_conformity_id, organization_id, description, due_date, status, closed_at, completed_at, deleted_at, responsible_person_name, responsible_person_email, root_cause, action_plan, owner_id, target_completion_date, created_at, updated_at  
 - Una NC può avere più AC (1:N), di solito 1:1 nella pratica  
 - due_date: opzionale, con reminder visivo UI quando scaduta  
-- status: open → in_progress → closed → verified (verifica avviene al prossimo audit)
+- status: open → in_progress → closed → verified (verifica avviene al prossimo audit)  
+- ⚠️ NON ha colonne `title` o `assigned_to` — usa `responsible_person_name` e `action_plan`
+
+### `corrective_actions` — colonne reali complete
+action_plan, closed_at, completed_at, created_at, deleted_at, description, due_date, id, non_conformity_id, organization_id, owner_id, responsible_person_email, responsible_person_name, root_cause, status, target_completion_date, updated_at
+
+### Tabelle secondarie presenti nel DB
+- `action_evidence` — allegati alle AC (file_url, file_name, file_type, notes)
+- `audit_logs` — log di sistema (action, table_name, record_id, old_data, new_data)
+- `audit_trail` — storico cambi status audit (old_status, new_status, changed_by)
+- `checklist_templates` + `template_questions` — template riutilizzabili
+- `documents` + `document_versions` — gestione documentale (RLS da abilitare)
+- `risks` — gestione rischi (RLS da abilitare)
+- `personnel` + `training_courses` + `training_records` — formazione (RLS da abilitare)
+- `samplings` + `lab_results` — campionamenti futuri
 
 ---
 
@@ -178,14 +192,24 @@ NON importare da database.types.ts. Schemas Zod → `features/{nome}/schemas/`
 | PGRST204 colonna non trovata | Schema cache vecchia | `NOTIFY pgrst, 'reload schema';` |
 | INSERT bloccato da RLS | Manca WITH CHECK | aggiungere `WITH CHECK (...)` alla policy |
 | `ncSeveritySchema is not defined` | Nome sbagliato | usare `ncSeverityEnum` da nc-ac.schema |
-| checklist_items non ha audit_id come FK | Struttura DB | FK è checklist_id; audit_id è denormalizzato |
-| organization_id su checklists | Colonna non esiste | non inserire mai organization_id in checklists |
+| checklist_items.audit_id in JOIN | audit_id è denormalizzato | usare checklist_id → checklists.audit_id |
+| corrective_actions INSERT fallisce | Colonne title/assigned_to non esistono | usare action_plan e responsible_person_name |
+| RLS lenta su query grandi | auth.uid() rivalutato per ogni riga | usare `(select auth.uid()::uuid)` con parentesi |
 
-### RLS policy corretta per INSERT/ALL
+### RLS policy corretta per INSERT/ALL — pattern ottimizzato
 ```sql
+-- CORRETTO (performante — auth.uid() valutato una sola volta)
 CREATE POLICY "nome" ON tabella FOR ALL
-  USING (organization_id IN (SELECT organization_id FROM profiles WHERE id = auth.uid()::uuid))
-  WITH CHECK (organization_id IN (SELECT organization_id FROM profiles WHERE id = auth.uid()::uuid));
+  USING (organization_id IN (
+    SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
+  ))
+  WITH CHECK (organization_id IN (
+    SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
+  ));
+
+-- SBAGLIATO (lento — rivalutato per ogni riga)
+CREATE POLICY "nome" ON tabella FOR ALL
+  USING (organization_id IN (SELECT organization_id FROM profiles WHERE id = auth.uid()::uuid));
 ```
 
 ---
@@ -196,8 +220,8 @@ CREATE POLICY "nome" ON tabella FOR ALL
 2. Un task alla volta — esegui → testa → marca [x] → fermati
 3. Prima di modificare il DB, verifica colonne esistenti:
    ```sql
-   SELECT column_name FROM information_schema.columns 
-   WHERE table_name = 'nome' AND table_schema = 'public';
+   SELECT column_name, data_type FROM information_schema.columns 
+   WHERE table_name = 'nome' AND table_schema = 'public' ORDER BY ordinal_position;
    ```
 4. Dopo ogni ALTER TABLE → `NOTIFY pgrst, 'reload schema';`
 5. Non aggiungere migration per colonne già esistenti
@@ -251,9 +275,40 @@ NOTIFY pgrst, 'reload schema';
 
 ---
 
-## 11. Backlog Tecnico
+## 11. Issues DB Noti (da fixare in sprint dedicato)
 
-- [ ] Rigenera database.types.ts dopo ogni migrazione DB significativa (`supabase gen types typescript --linked --schema public > src/types/database.types.ts`)
+### Sicurezza — RLS mancante
+Queste tabelle sono pubbliche senza protezione e vanno fixate:
+```sql
+ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.risks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.training_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.training_courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.personnel ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.document_versions ENABLE ROW LEVEL SECURITY;
+-- action_evidence: RLS abilitata ma zero policies — aggiungere policy
+```
+
+### Performance — FK senza indici
+Le FK più usate nelle query sono prive di indice. Da aggiungere su:
+- `audits(organization_id, client_id, location_id)`
+- `checklist_items(checklist_id, organization_id, audit_id)`
+- `non_conformities(audit_id, organization_id)`
+- `corrective_actions(non_conformity_id, organization_id)`
+- `checklists(audit_id, organization_id)`
+
+### Policy duplicate su `audits`
+Esistono due policies sovrapposte per INSERT: `"Users can create audits"` e `audits_insert_policy`. Rimuovere una delle due.
+
+---
+
+## 12. Backlog Tecnico
+
+- [ ] Rigenera database.types.ts dopo ogni migrazione DB significativa
+- [ ] Fix RLS su documents, risks, personnel, training_records, training_courses, document_versions
+- [ ] Fix RLS performance: sostituire `auth.uid()` con `(select auth.uid())` in tutte le policies
+- [ ] Aggiungere indici sulle FK principali
+- [ ] Rimuovere policy duplicate su audits INSERT
 - [ ] Portale cliente (fase 2): accesso dashboard filtrata per il proprio client_id
 - [ ] PDF report audit (nice-to-have, dopo Excel)
 - [ ] Multi-sito avanzato: dashboard aggregata cross-location per gruppo

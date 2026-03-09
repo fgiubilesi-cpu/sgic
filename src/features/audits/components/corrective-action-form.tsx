@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { analyzeNonConformityWithAI } from "@/features/audits/actions/ai-analysis-actions";
-import type { NCsSeverity } from "@/types/database.types";
+import type { NCsSeverity } from "@/features/quality/schemas/nc-ac.schema";
 
 interface CorrectiveActionFormProps {
   onSubmit: (data: {

@@ -103,7 +103,7 @@ export async function updateChecklistItem(formData: FormData) {
             organization_id: organizationId,
             title: item.question || 'Non-Conformity',
             description: item.question || 'Item marked as non-compliant',
-            severity: 'medium',
+            severity: 'minor',
             status: 'open',
           })
 
@@ -125,7 +125,7 @@ export async function updateChecklistItem(formData: FormData) {
       if (openNC) {
         const { error: cancelError } = await supabase
           .from('non_conformities')
-          .update({ status: 'cancelled', closed_at: new Date().toISOString() })
+          .update({ status: 'closed', closed_at: new Date().toISOString() })
           .eq('checklist_item_id', itemId)
           .eq('status', 'open')
 

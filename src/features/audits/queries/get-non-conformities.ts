@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { NCStatus, NCsSeverity } from "@/types/database.types";
+import type { NCStatus, NCsSeverity } from "@/features/quality/schemas/nc-ac.schema";
 
 export interface NonConformity {
   id: string;

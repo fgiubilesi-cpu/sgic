@@ -9,7 +9,7 @@ import { updateChecklistItem } from "@/features/audits/actions";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { MediaCapture } from "./media-capture";
 import { AudioRecorder } from "./audio-recorder";
-import type { AuditOutcome } from "@/types/database.types";
+import type { AuditOutcome } from "@/features/audits/schemas/audit-schema";
 
 interface ChecklistRowProps {
   id: string;
@@ -143,14 +143,20 @@ export function ChecklistRow({
 
   const isEvenRow = itemNumber % 2 === 0;
   const rowBgClass = isEvenRow ? "bg-white" : "bg-zinc-50";
-  const selectionClass = isSelected ? "border-l-4 border-l-blue-600" : "border-l-4 border-l-transparent";
+
+  // Border color based on outcome state
+  const stateBorderClass =
+    optimisticItem.outcome === "compliant" ? "border-l-green-500" :
+    optimisticItem.outcome === "non_compliant" ? "border-l-red-500" :
+    optimisticItem.outcome === "not_applicable" ? "border-l-gray-300" :
+    "border-l-transparent";
 
   return (
     <tr
       className={cn(
-        "h-11 border-b border-zinc-200 hover:bg-zinc-100 transition-colors cursor-pointer",
+        "group h-11 border-b border-zinc-200 hover:bg-zinc-100 transition-colors cursor-pointer border-l-4",
         rowBgClass,
-        selectionClass
+        stateBorderClass
       )}
       onClick={onSelect}
     >
@@ -272,7 +278,7 @@ export function ChecklistRow({
       {/* Media actions: camera + audio recorder */}
       <td className="px-3 py-0">
         <div
-          className="flex items-center gap-1"
+          className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-hover:group-focus:opacity-100 transition-opacity"
           onClick={(e) => e.stopPropagation()}
         >
           <MediaCapture

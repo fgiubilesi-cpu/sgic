@@ -1,62 +1,28 @@
-# Known Errors & Solutions
-
-## checklists — No organization_id Column
-
-**Problem**: `checklists` table does NOT have an `organization_id` column. It only has:
-- `id`
-- `audit_id` (FK to audits)
-- `title`
-- `created_at`
-- `updated_at`
-
-Trying to insert `organization_id` causes: `PGRST204: Could not find the 'organization_id' column of 'checklists' in the schema cache`
-
-**Solution**: Remove `organization_id` from checklists insert. It only belongs on `checklist_items`.
-
-**Example (from createAuditFromTemplate in actions.ts)**:
-```typescript
-// ❌ WRONG:
-const { data: checklist } = await supabase
-  .from('checklists')
-  .insert({
-    audit_id: audit.id,
-    title: title,
-    organization_id: organizationId,  // ← Remove this!
-  })
-
-// ✅ CORRECT:
-const { data: checklist } = await supabase
-  .from('checklists')
-  .insert({
-    audit_id: audit.id,
-    title: title,
-  })
-```
+# ERRORS.md — SGIC
+> Errori noti, cause e soluzioni. Aggiornato: 2026-03-08
 
 ---
 
-## checklist_items — No audit_id Column
+## ❌ RIMOSSO — Errore non più valido
 
-**Problem**: `checklist_items` table does NOT have an `audit_id` column. It only has:
-- `checklist_id` (FK to checklists)
-- `organization_id` (FK to organizations)
+~~`checklists` non ha `organization_id`~~ — **FALSO**. La colonna esiste nel DB reale. Verificato da `database.types.ts`. Inserire sempre `organization_id` negli INSERT su `checklists`.
 
-Trying to read or insert `audit_id` from `checklist_items` will fail with a column not found error.
+---
 
-**Solution**: To get the `audit_id` for a checklist item:
-1. Read the `checklist_id` from the checklist_item
-2. Query the `checklists` table to fetch `audit_id` using the `checklist_id`
-3. Use that `audit_id` in downstream operations (NC creation, score updates, etc.)
+## checklist_items — audit_id è denormalizzato, NON usarlo per JOIN
 
-**Example (from updateChecklistItem in actions.ts)**:
+**Problema**: `checklist_items.audit_id` esiste come colonna ma è denormalizzato — non è una FK affidabile per join. La FK reale è su `checklist_id`.
+
+**Se hai bisogno dell'audit_id partendo da un checklist_item:**
 ```typescript
+// 1. Leggi il checklist_id dall'item
 const { data: item } = await supabase
   .from('checklist_items')
   .select('organization_id, checklist_id, question, outcome')
   .eq('id', itemId)
   .single()
 
-// Get audit_id from checklists table
+// 2. Ottieni audit_id dalla tabella checklists
 const { data: checklist } = await supabase
   .from('checklists')
   .select('audit_id')
@@ -66,5 +32,150 @@ const { data: checklist } = await supabase
 const auditId = checklist.audit_id
 ```
 
-**Files affected**:
-- `src/features/audits/actions/actions.ts` → `updateChecklistItem()` function
+**File interessati**: `src/features/audits/actions/actions.ts` → `updateChecklistItem()`
+
+---
+
+## corrective_actions — colonne title e assigned_to non esistono
+
+**Problema**: `corrective_actions` NON ha le colonne `title` o `assigned_to`. Usarle causa PGRST204.
+
+**Colonne corrette da usare:**
+- Al posto di `title` → usare `action_plan` (descrizione del piano)
+- Al posto di `assigned_to` → usare `responsible_person_name` + `responsible_person_email`
+
+**Schema completo corrective_actions:**
+```
+action_plan, closed_at, completed_at, created_at, deleted_at,
+description, due_date, id, non_conformity_id, organization_id,
+owner_id, responsible_person_email, responsible_person_name,
+root_cause, status, target_completion_date, updated_at
+```
+
+---
+
+## RLS — Pattern corretto con performance ottimizzata
+
+**Problema**: Scrivere `auth.uid()` direttamente nel USING/WITH CHECK causa rivalutazione per ogni riga → lento su tabelle grandi.
+
+**Pattern SBAGLIATO (lento):**
+```sql
+USING (organization_id IN (
+  SELECT organization_id FROM profiles WHERE id = auth.uid()::uuid
+))
+```
+
+**Pattern CORRETTO (performante — valutato una sola volta):**
+```sql
+USING (organization_id IN (
+  SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
+))
+WITH CHECK (organization_id IN (
+  SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
+))
+```
+
+---
+
+## RLS — INSERT bloccato senza WITH CHECK
+
+**Problema**: Una policy con solo `USING` non copre INSERT. L'operazione viene bloccata silenziosamente.
+
+**Fix**: Aggiungere sempre `WITH CHECK` per policies FOR ALL o FOR INSERT:
+```sql
+CREATE POLICY "nome" ON tabella FOR ALL
+  USING (organization_id IN (
+    SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
+  ))
+  WITH CHECK (organization_id IN (
+    SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
+  ));
+```
+
+---
+
+## PGRST204 — Colonna non trovata
+
+**Causa**: La cache dello schema PostgREST è vecchia dopo un ALTER TABLE.
+
+**Fix immediato:**
+```sql
+NOTIFY pgrst, 'reload schema';
+```
+
+---
+
+## Loop ricorsivo createClient
+
+**Causa**: Conflitto di nome nell'import di Supabase.
+
+**Fix:**
+```typescript
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+```
+
+---
+
+## 404 su nuova route
+
+**Causa**: Il middleware non conosce la nuova route.
+
+**Fix**: Aggiungere il path a `isDashboardRoute` in `middleware.ts`.
+
+---
+
+## ncSeveritySchema is not defined
+
+**Causa**: Nome variabile sbagliato.
+
+**Fix**: Usare `ncSeverityEnum` (non `ncSeveritySchema`) importato da `features/quality/schemas/nc-ac.schema.ts`.
+
+---
+
+## Tabelle senza RLS — rischio sicurezza
+
+**Problema**: Le seguenti tabelle sono pubblicamente accessibili senza RLS:
+
+| Tabella | Stato |
+|---|---|
+| `documents` | RLS disabilitata (policies esistono ma inattive) |
+| `risks` | RLS disabilitata (policies esistono ma inattive) |
+| `training_records` | RLS assente |
+| `training_courses` | RLS assente |
+| `personnel` | RLS assente |
+| `document_versions` | RLS assente |
+| `action_evidence` | RLS abilitata ma zero policies |
+
+**Fix da applicare (sprint sicurezza):**
+```sql
+ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.risks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.training_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.training_courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.personnel ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.document_versions ENABLE ROW LEVEL SECURITY;
+
+-- Policy per action_evidence
+CREATE POLICY "action_evidence_org_isolation" ON public.action_evidence
+  FOR ALL
+  USING (organization_id IN (
+    SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
+  ))
+  WITH CHECK (organization_id IN (
+    SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
+  ));
+```
+
+---
+
+## Supabase joins — sintassi corretta
+
+**Sbagliato:**
+```typescript
+.select("*, clients(name), locations(name)")
+```
+
+**Corretto:**
+```typescript
+.select("*, client:client_id(name), location:location_id(name)")
+```

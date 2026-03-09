@@ -1276,16 +1276,3 @@ export const Constants = {
     },
   },
 } as const
-
-// ─── Domain type aliases (used across features) ──────────────────────────────
-export type AuditOutcome = "compliant" | "non_compliant" | "not_applicable" | "pending";
-export type NCsSeverity = "minor" | "major" | "critical";
-export type NCStatus = "open" | "pending_verification" | "closed";
-export type CorrectiveActionStatus = "open" | "completed" | "verified";
-
-export const OUTCOME_COLORS: Record<AuditOutcome, string> = {
-  compliant: "border-green-500 bg-green-50",
-  non_compliant: "border-red-500 bg-red-50",
-  not_applicable: "border-gray-300 bg-gray-50",
-  pending: "border-zinc-200 bg-white",
-};

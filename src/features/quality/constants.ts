@@ -2,9 +2,10 @@
  * Color and label constants for Non-Conformities and Corrective Actions
  */
 
-export type NCsSeverity = "minor" | "major" | "critical";
-export type NCsStatus = "open" | "pending_verification" | "closed";
-export type CAStatus = "open" | "completed" | "verified";
+import type { NCsSeverity, NCStatus as NCsStatus, ACStatus as CAStatus } from "@/features/quality/schemas/nc-ac.schema";
+
+// Re-export types for backward compatibility
+export type { NCsSeverity, NCsStatus, CAStatus };
 
 // Non-Conformity Severity
 export const NC_SEVERITY_LABELS: Record<NCsSeverity, string> = {

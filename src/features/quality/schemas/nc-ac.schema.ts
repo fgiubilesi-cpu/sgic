@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const ncSeverityEnum = z.enum(['critical', 'major', 'minor']);
 export const ncStatusEnum = z.enum(['open', 'pending_verification', 'closed']);
-export const acStatusEnum = z.enum(['open', 'completed', 'verified']);
+export const acStatusEnum = z.enum(['pending', 'in_progress', 'completed']);
 
 export const nonConformitySchema = z.object({
     id: z.string().uuid().optional(),
@@ -22,7 +22,7 @@ export const correctiveActionSchema = z.object({
     nc_id: z.string().uuid(),
     description: z.string().min(1, "La descrizione è obbligatoria"),
     due_date: z.string().optional().nullable(),
-    status: acStatusEnum.default('open'),
+    status: acStatusEnum.default('pending'),
 });
 
 export type NonConformity = z.infer<typeof nonConformitySchema>;

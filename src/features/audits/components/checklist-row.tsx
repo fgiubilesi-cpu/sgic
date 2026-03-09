@@ -172,7 +172,7 @@ export function ChecklistRow({
       {/* Question */}
       <td className="px-3 py-0">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-zinc-900 truncate max-w-xs">{question}</span>
+          <span className="text-xs text-zinc-900 lg:whitespace-normal lg:break-words line-clamp-2 lg:line-clamp-none max-w-xs lg:max-w-none">{question}</span>
           {hasNc && (
             <span
               className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold bg-red-100 text-red-700 shrink-0"

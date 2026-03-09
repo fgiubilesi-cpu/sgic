@@ -145,8 +145,7 @@ export function CorrectiveActionDetail({
             <Button variant="outline" onClick={() => setIsEditing(true)}>
               Edit
             </Button>
-            {correctiveAction.status !== "completed" &&
-              correctiveAction.status !== "verified" && (
+            {correctiveAction.status !== "completed" && (
                 <Button onClick={onCompleted} className="bg-green-600 hover:bg-green-700">
                   Mark as Complete
                 </Button>

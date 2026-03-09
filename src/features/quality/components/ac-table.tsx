@@ -84,16 +84,7 @@ export function ACTable({ acs, ncId }: { acs: any[], ncId: string }) {
                                             Completa
                                         </Button>
                                     )}
-                                    {ac.status === "completed" && (
-                                        <Button
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => handleStatusChange(ac, "verified")}
-                                        >
-                                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                                            Verifica
-                                        </Button>
-                                    )}
+                                    {/* Status is now final when completed, no verification step */}
                                 </div>
                             </TableCell>
                         </TableRow>

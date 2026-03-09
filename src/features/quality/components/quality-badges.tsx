@@ -35,9 +35,9 @@ export function NCStatusBadge({ status }: { status: NCStatus }) {
 
 export function ACStatusBadge({ status }: { status: ACStatus }) {
     const config = {
-        open: { label: "Aperta", className: "bg-blue-100 text-blue-800 border-blue-200" },
-        completed: { label: "Completata", className: "bg-amber-100 text-amber-800 border-amber-200" },
-        verified: { label: "Verificata", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+        pending: { label: "In attesa", className: "bg-zinc-100 text-zinc-700 border-zinc-200" },
+        in_progress: { label: "In corso", className: "bg-blue-100 text-blue-800 border-blue-200" },
+        completed: { label: "Completata", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
     };
 
     const { label, className } = config[status];

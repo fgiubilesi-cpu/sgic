@@ -27,14 +27,18 @@ interface NcAcTabProps {
 }
 
 interface AddCaFormProps {
+  nc: NonConformity;
   ncId: string;
   auditId: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-function AddCaForm({ ncId, auditId, onSuccess, onCancel }: AddCaFormProps) {
+// N3: Form creazione AC da NC with full fields
+function AddCaForm({ nc, ncId, auditId, onSuccess, onCancel }: AddCaFormProps) {
   const [description, setDescription] = useState("");
+  const [rootCause, setRootCause] = useState("");
+  const [actionPlan, setActionPlan] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +46,7 @@ function AddCaForm({ ncId, auditId, onSuccess, onCancel }: AddCaFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!description.trim()) {
-      toast.error("La descrizione è obbligatoria.");
+      toast.error("La descrizione dell'azione è obbligatoria.");
       return;
     }
 
@@ -51,6 +55,8 @@ function AddCaForm({ ncId, auditId, onSuccess, onCancel }: AddCaFormProps) {
       const result = await createCorrectiveAction({
         nonConformityId: ncId,
         description: description.trim(),
+        rootCause: rootCause.trim() || undefined,
+        actionPlan: actionPlan.trim() || undefined,
         responsiblePersonName: assignedTo.trim() || undefined,
         targetCompletionDate: dueDate || undefined,
       });
@@ -68,25 +74,63 @@ function AddCaForm({ ncId, auditId, onSuccess, onCancel }: AddCaFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 space-y-3">
-      <h4 className="text-xs font-semibold text-zinc-700 uppercase tracking-wide">
-        Nuova azione correttiva
-      </h4>
+      {/* NC Context */}
+      <div>
+        <h4 className="text-xs font-semibold text-zinc-700 uppercase tracking-wide">
+          Nuova azione correttiva per
+        </h4>
+        <p className="text-xs text-zinc-600 mt-1">
+          <span className="font-medium">NC:</span> {nc.title}
+        </p>
+      </div>
+
+      {/* Description — required */}
       <div>
         <label className="text-xs font-medium text-zinc-600 mb-1 block">
-          Descrizione <span className="text-red-500">*</span>
+          Descrizione dell'azione <span className="text-red-500">*</span>
         </label>
         <Input
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Descrivere l'azione correttiva da intraprendere..."
+          placeholder="Descrizione dettagliata dell'azione correttiva..."
           className="text-sm h-8"
           disabled={isLoading}
         />
       </div>
+
+      {/* Root Cause — optional */}
+      <div>
+        <label className="text-xs font-medium text-zinc-600 mb-1 block">
+          Causa radice
+        </label>
+        <Input
+          value={rootCause}
+          onChange={(e) => setRootCause(e.target.value)}
+          placeholder="Analisi della causa radice del problema..."
+          className="text-sm h-8"
+          disabled={isLoading}
+        />
+      </div>
+
+      {/* Action Plan — optional */}
+      <div>
+        <label className="text-xs font-medium text-zinc-600 mb-1 block">
+          Piano d'azione
+        </label>
+        <Input
+          value={actionPlan}
+          onChange={(e) => setActionPlan(e.target.value)}
+          placeholder="Dettagli del piano d'azione da intraprendere..."
+          className="text-sm h-8"
+          disabled={isLoading}
+        />
+      </div>
+
+      {/* Responsible + Due Date */}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-medium text-zinc-600 mb-1 block">
-            Assegnata a
+            Responsabile
           </label>
           <Input
             value={assignedTo}
@@ -109,6 +153,8 @@ function AddCaForm({ ncId, auditId, onSuccess, onCancel }: AddCaFormProps) {
           />
         </div>
       </div>
+
+      {/* Actions */}
       <div className="flex gap-2 justify-end">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isLoading}>
           Annulla
@@ -276,6 +322,7 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
               {/* Add CA form */}
               {showAddCa ? (
                 <AddCaForm
+                  nc={nc}
                   ncId={nc.id}
                   auditId={auditId}
                   onSuccess={() => setShowAddCa(false)}

@@ -53,7 +53,18 @@
     - CA list in expanded row con tutti i dettagli (responsabile, scadenza, status)
     - Add CA form nell'expanded section
   - ✅ **Zero errori TypeScript**
-- [ ] **N3** Form creazione AC da NC: titolo, responsabile, scadenza, descrizione
+- [x] **N3** Form creazione AC da NC: titolo, responsabile, scadenza, descrizione
+  - ✅ **Implementato**: Upgrade AddCaForm con tutti i campi richiesti
+  - ✅ **Campi form** (N3 requirement):
+    - Titolo (context NC mostrato in header)
+    - Descrizione dell'azione (required, min 5 chars)
+    - Causa radice (optional)
+    - Piano d'azione (optional)
+    - Responsabile (optional)
+    - Scadenza (optional)
+  - ✅ **Integrazione**: Form riceve props nc, ncId, auditId, onSuccess, onCancel
+  - ✅ **Server action**: createCorrectiveAction accetta tutti i campi
+  - ✅ **Zero errori TypeScript**
 - [ ] **N4** Cambio stato AC: Aperta → In Progress → Chiusa
 - [ ] **N5** Quando AC chiusa → NC si aggiorna a "risolta"
 - [ ] **N6** Dashboard NC globale: lista tutte le NC aperte di tutti gli audit, filtrabile per cliente

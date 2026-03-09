@@ -1,12 +1,13 @@
 import { Suspense } from "react";
 import { SlidersHorizontal, BarChart2, AlertTriangle } from "lucide-react";
-import { getDashboardFilterOptions, getDashboardMetrics, getGlobalNCs, getAuditScoreTrend, getRecentAudits, getUpcomingAudits } from "@/features/dashboard/queries/get-dashboard-data";
+import { getDashboardFilterOptions, getDashboardMetrics, getGlobalNCs, getAuditScoreTrend, getRecentAudits, getUpcomingAudits, getMonthlyKPIs } from "@/features/dashboard/queries/get-dashboard-data";
 import { DashboardFilters } from "@/features/dashboard/components/dashboard-filters";
 import { DashboardMetricsGrid } from "@/features/dashboard/components/dashboard-metrics";
 import { GlobalNCTable } from "@/features/dashboard/components/global-nc-table";
 import { AuditTrendChart } from "@/features/dashboard/components/audit-trend-chart";
 import { RecentAudits } from "@/features/dashboard/components/recent-audits";
 import { UpcomingAuditsWidget } from "@/features/dashboard/components/upcoming-audits-widget";
+import { MonthlyKPIs } from "@/features/dashboard/components/monthly-kpis";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +25,14 @@ export default async function DashboardPage({
 
   const filters = { clientId, locationId, dateFrom, dateTo };
 
-  const [filterOptions, metrics, globalNCs, trendData, recentAudits, upcomingAudits] = await Promise.all([
+  const [filterOptions, metrics, globalNCs, trendData, recentAudits, upcomingAudits, monthlyKPIs] = await Promise.all([
     getDashboardFilterOptions(),
     getDashboardMetrics(filters),
     getGlobalNCs(filters),
     getAuditScoreTrend(filters),
     getRecentAudits(),
     getUpcomingAudits(),
+    getMonthlyKPIs(),
   ]);
 
   return (
@@ -63,7 +65,17 @@ export default async function DashboardPage({
         </div>
       </section>
 
-      {/* Metrics */}
+      {/* D1: Monthly KPIs (fixed) */}
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <SlidersHorizontal className="w-4 h-4 text-zinc-400" />
+          <h2 className="text-sm font-semibold text-zinc-700">KPI del mese</h2>
+          <p className="text-xs text-zinc-400 ml-auto">Metriche fisse: questo mese, NC globali, ultimi 30gg</p>
+        </div>
+        <MonthlyKPIs kpis={monthlyKPIs} />
+      </section>
+
+            {/* Metrics */}
       <section>
         <DashboardMetricsGrid metrics={metrics} />
       </section>

@@ -55,6 +55,12 @@ export interface UpcomingAudit {
   isOverdue: boolean;
 }
 
+export interface MonthlyKPIs {
+  auditsThisMonth: number;
+  openNCsTotal: number;
+  complianceAvg: number | null;
+}
+
 export interface ClientOption {
   id: string;
   name: string;
@@ -356,4 +362,57 @@ export async function getUpcomingAudits(): Promise<UpcomingAudit[]> {
       isOverdue: diff < 0,
     };
   });
+}
+
+// ─── D1: Monthly KPIs (fixed: this month, all NCs, last 30 days compliance) ──
+export async function getMonthlyKPIs(): Promise<MonthlyKPIs> {
+  const ctx = await getOrganizationContext();
+  if (!ctx)
+    return { auditsThisMonth: 0, openNCsTotal: 0, complianceAvg: null };
+  const { supabase, organizationId } = ctx;
+
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const monthStartIso = monthStart.toISOString().split("T")[0];
+  const todayIso = today.toISOString().split("T")[0];
+
+  // 1. Audits scheduled in this month
+  const { count: auditsThisMonth } = await supabase
+    .from("audits")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .gte("scheduled_date", monthStartIso)
+    .lte("scheduled_date", todayIso);
+
+  // 2. Open NCs (all, not filtered)
+  const { count: openNCsTotal } = await supabase
+    .from("non_conformities")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("status", "open");
+
+  // 3. Compliance average (score) for last 30 days
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgoIso = thirtyDaysAgo.toISOString().split("T")[0];
+
+  const { data: auditScores } = await supabase
+    .from("audits")
+    .select("score")
+    .eq("organization_id", organizationId)
+    .gte("scheduled_date", thirtyDaysAgoIso)
+    .lte("scheduled_date", todayIso)
+    .not("score", "is", null);
+
+  const scores = (auditScores ?? [])
+    .map((a: any) => a.score)
+    .filter((s: any) => s !== null && s !== undefined) as number[];
+  const complianceAvg =
+    scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : null;
+
+  return {
+    auditsThisMonth: auditsThisMonth ?? 0,
+    openNCsTotal: openNCsTotal ?? 0,
+    complianceAvg,
+  };
 }

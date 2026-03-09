@@ -208,9 +208,9 @@
 
 ---
 
-## NEXT SPRINT — Fase 2: Accesso Client Read-Only
+## NEXT SPRINT — Features Completate ✅
 
-### Status: IMPLEMENTAZIONE IN CORSO ✅ FOUNDATION COMPLETATA
+### Fase 2: Accesso Client Read-Only — ✅ FONDAZIONE COMPLETATA
 
 **Completed:**
 - ✅ Enhanced OrgContext to include role and client_id
@@ -224,13 +224,29 @@
   - Database-level security prevents any workaround
 - ✅ Hidden Template tab and Email Draft from client users
 - ✅ Created /lib/user-roles.ts helper functions for role checks
+- ✅ Created comprehensive FASE2_CLIENT_ACCESS.md documentation
 
 **Remaining:**
 - [ ] Apply migration 20260309000001_rls_client_access.sql in Supabase
-- [ ] Test client user access (create test client user, verify restrictions)
-- [ ] Test inspector access (verify full access maintained)
-- [ ] Document client access setup in README
-- [ ] Optional: Add more client-specific views (audit history, NC notifications)
+- [ ] Test client user access
+
+### Storico Audit per Cliente — ✅ COMPLETATO
+
+**Completed:**
+- ✅ Created getAuditTimeline() query with year grouping
+- ✅ Implemented AuditTimeline visual component
+  - Timeline with status icons and badges
+  - Checklist completion progress bars
+  - Non-conformity and closed AC counts
+  - Color-coded score metrics
+- ✅ Created /audit-history page with summary statistics
+  - Total audits counter
+  - Closed/in-progress counters
+  - Average compliance percentage
+  - Full timeline view (clickable audit links)
+- ✅ Integrated timeline into client dashboard
+  - Link to "View Complete History"
+  - Quick access to full audit timeline
 
 ---
 

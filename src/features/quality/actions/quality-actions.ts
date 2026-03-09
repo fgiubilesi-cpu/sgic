@@ -36,6 +36,39 @@ export async function getNCList() {
 }
 
 /**
+ * N6: Fetch only OPEN Non-Conformities for the dashboard (filterable by client)
+ */
+export async function getOpenNCList(clientId?: string) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .single();
+
+    if (!profile?.organization_id) throw new Error("Organization not found");
+
+    let query = supabase
+        .from("non_conformities")
+        .select("*, audit:audit_id(id, client_id, location_id, client:client_id(name), location:location_id(name)), corrective_actions(id, target_completion_date, status)")
+        .eq("organization_id", profile.organization_id)
+        .eq("status", "open");
+
+    // N6: Filter by client if specified
+    if (clientId) {
+        query = query.eq("audit.client_id", clientId);
+    }
+
+    const { data, error } = await query.order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data;
+}
+
+/**
  * Fetch a single Non-Conformity by ID
  */
 export async function getNCDetail(id: string) {

@@ -84,7 +84,18 @@
   - ✅ **Condizione**: Solo se NC è già in 'pending_verification' (non modifica altri stati)
   - ✅ **Revalidate path**: After NC update
   - ✅ **Zero errori TypeScript**
-- [ ] **N6** Dashboard NC globale: lista tutte le NC aperte di tutti gli audit, filtrabile per cliente
+- [x] **N6** Dashboard NC globale: lista tutte le NC aperte di tutti gli audit, filtrabile per cliente
+  - ✅ **Implementato**: Refactor NonConformities page a "use client" con filtering
+  - ✅ **Funzione server action**: getOpenNCList(clientId?) in quality-actions.ts
+    - Filtra NCs con status='open' solamente
+    - Supporta filtro opzionale per client_id
+    - Fetch connesso con audit e corrective_actions info
+  - ✅ **UI componente**:
+    - Select dropdown per filtro cliente (mostra tutti i clienti con conteggio NC)
+    - Header dashboard mostra: "X NC aperte · Y clienti interessati"
+    - Loading state e fetch data su selectedClientId change
+  - ✅ **Compilazione**: Zero errori TypeScript
+  - ✅ **State management**: useState hooks per ncs, clients, selectedClientId, isLoading
 
 ### P3 — Report Excel
 

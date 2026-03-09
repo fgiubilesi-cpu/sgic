@@ -75,7 +75,15 @@
   - ✅ **Azione**: Clicked button chiama updateCorrectiveAction con nuovo status
   - ✅ **Toast feedback**: Notifica cambio stato
   - ✅ **Zero errori TypeScript**
-- [ ] **N5** Quando AC chiusa → NC si aggiorna a "risolta"
+- [x] **N5** Quando AC chiusa → NC si aggiorna a "risolta"
+  - ✅ **Implementato**: Logic in updateCorrectiveAction per status→'verified'
+  - ✅ **Flow completo**:
+    - AC completed (completeCorrectiveAction) → NC status='pending_verification' (already existed)
+    - AC verified (updateCorrectiveAction with status='verified') → NC status='closed' (risolta)
+  - ✅ **Logica**: Quando AC raggiunge 'verified' → NC diventa 'closed' con closed_at timestamp
+  - ✅ **Condizione**: Solo se NC è già in 'pending_verification' (non modifica altri stati)
+  - ✅ **Revalidate path**: After NC update
+  - ✅ **Zero errori TypeScript**
 - [ ] **N6** Dashboard NC globale: lista tutte le NC aperte di tutti gli audit, filtrabile per cliente
 
 ### P3 — Report Excel

@@ -108,6 +108,15 @@ export async function updateCorrectiveAction(
       .single();
 
     if (ca?.non_conformity_id) {
+      // N5: When AC is verified → NC becomes closed (risolta)
+      if (validated.status === "verified") {
+        await supabase
+          .from("non_conformities")
+          .update({ status: "closed", closed_at: new Date().toISOString() })
+          .eq("id", ca.non_conformity_id)
+          .eq("status", "pending_verification");
+      }
+
       const { data: nc } = await supabase
         .from("non_conformities")
         .select("audit_id")

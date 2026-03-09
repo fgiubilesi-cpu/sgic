@@ -13,8 +13,8 @@ import {
   createTemplate,
   updateTemplate,
   deleteTemplate,
-  softDeleteTemplateQuestion,
 } from "@/features/audits/actions/template-actions";
+import { EditTemplateSheet } from "./edit-template-sheet";
 
 interface TemplateTabProps {
   audit: AuditWithChecklists;
@@ -31,6 +31,8 @@ type FormQuestion = {
 export function TemplateTab({ audit, templates, readOnly = false }: TemplateTabProps) {
   const [showNewTemplate, setShowNewTemplate] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TemplateWithDetails | null>(null);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [formTitle, setFormTitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
@@ -49,12 +51,8 @@ export function TemplateTab({ audit, templates, readOnly = false }: TemplateTabP
   };
 
   const handleOpenEditTemplate = async (template: TemplateWithDetails) => {
-    setEditingTemplate(template);
-    setFormTitle(template.title);
-    setFormDescription(template.description || "");
-    // Fetch questions for this template
-    setFormQuestions([]); // Will be loaded from DB in a real scenario
-    setShowNewTemplate(true);
+    setEditingTemplateId(template.id);
+    setEditSheetOpen(true);
   };
 
   const handleSaveTemplate = async () => {
@@ -109,11 +107,6 @@ export function TemplateTab({ audit, templates, readOnly = false }: TemplateTabP
   };
 
   const handleDeleteQuestion = (index: number) => {
-    const question = formQuestions[index];
-    if (question.id && editingTemplate) {
-      // If it's a saved question, soft-delete it from DB
-      softDeleteTemplateQuestion(question.id, editingTemplate.id);
-    }
     setFormQuestions(formQuestions.filter((_, i) => i !== index));
   };
 
@@ -175,13 +168,29 @@ export function TemplateTab({ audit, templates, readOnly = false }: TemplateTabP
   const allItems = audit.checklists.flatMap((c) => c.items || []);
 
   return (
-    <div className="space-y-8">
+    <>
+      <EditTemplateSheet
+        templateId={editingTemplateId || ""}
+        open={editSheetOpen}
+        onOpenChange={setEditSheetOpen}
+        onSaved={() => {
+          // Refresh templates if needed
+          setEditingTemplateId(null);
+        }}
+      />
+      <div className="space-y-8">
       {/* Section 1: Current Template Associated with Audit */}
       <div className="rounded-lg border border-zinc-200 bg-white overflow-hidden shadow-sm">
         <div className="px-4 py-4 border-b border-zinc-200 bg-gradient-to-r from-blue-50 to-cyan-50">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-zinc-900">Template associato</h2>
+              <h2 className="text-lg font-semibold text-zinc-900">
+                Template: {
+                  activeTemplateId
+                    ? templates.find(t => t.id === activeTemplateId)?.title ?? "Nessun template"
+                    : "Nessun template"
+                }
+              </h2>
               <p className="text-sm text-zinc-600 mt-1">
                 {audit.checklists.length > 0
                   ? `${allItems.length} domande in ${audit.checklists.length} checklist`
@@ -481,6 +490,7 @@ export function TemplateTab({ audit, templates, readOnly = false }: TemplateTabP
           )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

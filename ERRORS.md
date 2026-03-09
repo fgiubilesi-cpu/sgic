@@ -1,36 +1,28 @@
 # SGIC — Known Errors & Solutions
-> Aggiornato: 2026-03-09 | Sprint 5
+> Aggiornato: 2026-03-09 | Sprint 6
 
 ---
 
 ## checklist_items — audit_id denormalizzato (CRITICO)
 
-**Problema**: `checklist_items.audit_id` esiste ma è spesso NULL — non affidabile per query.
+**Problema**: `checklist_items.audit_id` esiste ma è spesso NULL.
+NON usarlo per query — porta a risultati vuoti silenziosamente.
 
-**Pattern corretto** (obbligatorio ovunque):
+**Pattern obbligatorio ovunque**:
 ```typescript
-// ❌ SBAGLIATO — audit_id spesso NULL
+// ❌ SBAGLIATO
 await supabase.from('checklist_items').select('outcome').eq('audit_id', auditId)
 
-// ✅ CORRETTO — sempre questo pattern
+// ✅ CORRETTO — sempre questo
 const { data: checklists } = await supabase
   .from('checklists').select('id').eq('audit_id', auditId)
-
 const checklistIds = checklists?.map(c => c.id) ?? []
-
-if (checklistIds.length === 0) {
-  return /* empty/zero result appropriato al contesto */
-}
-
-const { data: items } = await supabase
-  .from('checklist_items')
-  .select('outcome')
-  .in('checklist_id', checklistIds)
+if (checklistIds.length === 0) return /* zero/empty result */
+await supabase.from('checklist_items')
+  .select('outcome').in('checklist_id', checklistIds)
 ```
 
-**File fixati**: 
-- `audit-completion-section.tsx` — compliance score (Sprint 5)
-- `actions.ts` → updateChecklistItem() (Sprint 4)
+**File fixati**: `audit-completion-section.tsx` (Sprint 5), `actions.ts` (Sprint 4)
 
 ---
 
@@ -48,66 +40,61 @@ completed_at, closed_at, deleted_at
 
 **NON esistono:** `title`, `assigned_to`
 
-**Status values reali:** `pending` | `in_progress` | `completed`  
+**Status values reali:** `pending` | `in_progress` | `completed`
 **NON esistono:** `closed`, `verified`, `open`
 
-**Logica corretta:**
 ```typescript
 // Completare una AC
 { status: 'completed', completedAt: new Date().toISOString() }
-// closed_at è per logiche future (verifica prossimo audit)
 ```
 
 ---
 
-## corrective_actions — RLS Fix (Sprint 4) ✅
+## corrective_actions — RLS Fix ✅ (Sprint 4)
 
-**Problema**: Policy usava `get_user_organization_id()` che legge `organization_id`
-dal JWT Supabase. Il JWT non contiene questo campo → ritorna NULL → INSERT bloccato.
+**Problema**: Policy usava `get_user_organization_id()` che legge dal JWT.
+Supabase non include `organization_id` nel JWT → ritorna NULL → INSERT bloccato.
 
-**Fix applicato**: Migration `fix_corrective_actions_rls` — tutte e 4 le policy
-riscritte con pattern `profiles WHERE id = (select auth.uid()::uuid)`.
+**Fix**: Tutte le policy riscritte con `profiles WHERE id = (select auth.uid()::uuid)`.
 
 ---
 
-## audits — updated_at non esiste ✅
-
-**Problema**: `audits` NON ha `updated_at`. Passarla causa PGRST204.
+## audits — updated_at non esiste ✅ (Sprint 4)
 
 ```typescript
-// ❌ SBAGLIATO
-await supabase.from('audits').update({ score: 85, updated_at: new Date().toISOString() })
-
+// ❌ SBAGLIATO — PGRST204
+await supabase.from('audits').update({ score: 85, updated_at: new Date() })
 // ✅ CORRETTO
 await supabase.from('audits').update({ score: 85 })
 ```
 
-**File fixato**: `audit-completion-actions.ts` (Sprint 4)
-
 ---
 
-## NC auto-create — errore swallowed ✅
+## NC auto-create — errore swallowed ✅ (Sprint 4)
 
-**Problema**: Se INSERT su `non_conformities` falliva, l'errore veniva solo loggato
-e la funzione ritornava `{ success: true }`. Frontend non sapeva del fallimento.
-
-**Fix applicato** (Sprint 4):
 ```typescript
-// ✅ Ora ritorna errore visibile
-if (ncError) {
-  return { success: false, error: `NC creation failed: ${ncError.message}` }
-}
-
+// ✅ Ora visibile
+if (ncError) return { success: false, error: `NC creation failed: ${ncError.message}` }
 // ✅ Frontend mostra errore specifico
 toast.error(result.error ?? "Failed to save outcome.")
 ```
 
 ---
 
+## non_conformities — filtrare sempre deleted_at
+
+```typescript
+// ✅ Sempre aggiungere questo filtro
+.from('non_conformities')
+.select('...')
+.is('deleted_at', null)  // oppure .filter('deleted_at', 'is', null)
+```
+
+---
+
 ## checklists — HA organization_id
 
-⚠️ Documentazione precedente era errata. La colonna **ESISTE** e va passata negli INSERT:
-
+Documentazione precedente era errata. La colonna esiste e va passata:
 ```typescript
 await supabase.from('checklists').insert({
   audit_id: auditId,
@@ -130,30 +117,24 @@ CREATE POLICY "nome" ON tabella FOR ALL
   ));
 ```
 
-La subquery `(select auth.uid()::uuid)` viene eseguita una volta per statement
-invece che per ogni riga — performance migliori su tabelle grandi.
+La subquery `(select auth.uid()::uuid)` ottimizza le performance — viene eseguita
+una volta per statement invece che per ogni riga.
 
 ---
 
 ## Template import — CSV/Excel edge cases
 
-**CSV parser** (`template-schema.ts` → `parseImportedQuestions()`):
-- Colonne riconosciute: `question`, `domanda`, `Question`, `Domanda` (case-insensitive)
-- Fallback: primo valore della riga se nessuna colonna riconosciuta
-- Righe vuote e whitespace extra gestiti
+**CSV**: colonne riconosciute: `question`, `domanda` (case-insensitive).
+Fallback: primo valore della riga. Righe vuote ignorate.
 
-**Excel parser** (SheetJS):
-- Try SheetJS prima
-- Se errore → toast error + suggerimento formato CSV
+**Excel (SheetJS)**: se errore → toast + suggerimento "usa formato CSV".
 
 ---
 
 ## WARN sicurezza — function_search_path_mutable (non urgente)
 
-Funzioni DB senza `search_path` fisso (solo WARN, non ERROR):
-`update_updated_at_column`, `log_table_change`, `update_non_conformities_updated_at`,
-`update_corrective_actions_updated_at`, `update_corrective_actions_closed_at`,
-`sync_user_metadata_to_jwt`, `get_user_role`, `get_user_organization_id`,
-`update_version_and_timestamp`, `handle_new_user`
+Funzioni senza `search_path` fisso (WARN, non ERROR — non bloccante):
+`update_updated_at_column`, `log_table_change`, `get_user_role`,
+`get_user_organization_id`, `handle_new_user`, e altre.
 
-**Fix futuro**: Aggiungere `SET search_path = public` a ogni funzione.
+Fix futuro: `SET search_path = public` in ogni funzione.

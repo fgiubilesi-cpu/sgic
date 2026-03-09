@@ -6,6 +6,7 @@ import { getNonConformitiesByAudit } from "@/features/audits/queries/get-non-con
 import { getCorrectiveActionsByAudit } from "@/features/audits/queries/get-corrective-actions";
 import { getAuditSummary } from "@/features/audits/queries/get-audit-summary";
 import { canManageTemplates } from "@/lib/user-roles";
+import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import { AuditStatusBadge } from "@/features/audits/components/audit-status-badge";
 import { ChecklistManager } from "@/features/audits/components/checklist-manager";
 import { AuditStats } from "@/features/audits/components/audit-stats";
@@ -45,8 +46,10 @@ export default async function AuditDetailPage({
     notFound();
   }
 
-  // Check if current user is an inspector
+  // Check if current user is an inspector and get role
   const userCanManageTemplates = await canManageTemplates();
+  const ctx = await getOrganizationContext();
+  const isReadOnly = ctx?.role === "client";
 
   // Filter tabs based on user role
   const TABS: TabConfig[] = ALL_TABS.filter(
@@ -76,6 +79,13 @@ export default async function AuditDetailPage({
 
   return (
     <div className="flex flex-col space-y-6">
+      {/* Read-only banner for clients */}
+      {isReadOnly && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          📋 Modalità sola lettura — Puoi visualizzare i dati ma non modificarli.
+        </div>
+      )}
+
       {/* Breadcrumb locale */}
       <div className="flex items-center gap-1.5 text-xs text-zinc-400 mb-4">
         <span>Audit</span>
@@ -115,13 +125,13 @@ export default async function AuditDetailPage({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {userCanManageTemplates && (
+            {userCanManageTemplates && !isReadOnly && (
               <EmailDraftModal
                 auditId={audit.id}
                 hasNonConformities={nonConformities.length > 0}
               />
             )}
-            <ExportExcelButton auditId={audit.id} auditTitle={audit.title} />
+            {!isReadOnly && <ExportExcelButton auditId={audit.id} auditTitle={audit.title} />}
           </div>
         </div>
       </div>
@@ -156,8 +166,8 @@ export default async function AuditDetailPage({
       {/* Tab content */}
       {activeTab === "checklist" && (
         <>
-          <ChecklistManager audit={audit} nonConformities={nonConformities} />
-          <AuditCompletionSection audit={audit} summary={summary} />
+          <ChecklistManager audit={audit} nonConformities={nonConformities} readOnly={isReadOnly} />
+          {!isReadOnly && <AuditCompletionSection audit={audit} summary={summary} />}
         </>
       )}
 
@@ -166,6 +176,7 @@ export default async function AuditDetailPage({
           audit={audit}
           nonConformities={nonConformities}
           correctiveActions={correctiveActions}
+          readOnly={isReadOnly}
         />
       )}
 

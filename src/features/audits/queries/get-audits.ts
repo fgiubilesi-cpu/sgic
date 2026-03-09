@@ -23,13 +23,19 @@ export async function getAudits(): Promise<AuditWithNCCount[]> {
   const ctx = await getOrganizationContext();
   if (!ctx) return [];
 
-  const { supabase, organizationId } = ctx;
+  const { supabase, organizationId, role, clientId } = ctx;
 
-  const { data: audits, error: auditsError } = await supabase
+  let query = supabase
     .from("audits")
     .select("id, title, status, scheduled_date, score, client_id, location_id, client:client_id(name), location:location_id(name)")
-    .eq("organization_id", organizationId)
-    .order("scheduled_date", { ascending: false });
+    .eq("organization_id", organizationId);
+
+  // Clients see only their own audits
+  if (role === "client" && clientId) {
+    query = query.eq("client_id", clientId);
+  }
+
+  const { data: audits, error: auditsError } = await query.order("scheduled_date", { ascending: false });
 
   if (auditsError || !audits) {
     return [];

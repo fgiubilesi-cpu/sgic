@@ -35,6 +35,7 @@ interface NcAcTabProps {
   audit: AuditWithChecklists;
   nonConformities: NonConformity[];
   correctiveActions: CorrectiveAction[];
+  readOnly?: boolean;
 }
 
 // ============================================
@@ -193,9 +194,10 @@ interface NcRowProps {
   nc: NonConformity;
   cas: CorrectiveAction[];
   auditId: string;
+  readOnly?: boolean;
 }
 
-function NcRow({ nc, cas, auditId }: NcRowProps) {
+function NcRow({ nc, cas, auditId, readOnly = false }: NcRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [showAddCa, setShowAddCa] = useState(false);
 
@@ -246,11 +248,16 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
             type="button"
             variant="ghost"
             size="sm"
+            disabled={readOnly}
             onClick={(e) => {
               e.stopPropagation();
               setShowAddCa(!showAddCa);
             }}
-            className="gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+            className={cn(
+              "gap-1 text-xs transition-opacity",
+              readOnly ? "opacity-0 cursor-not-allowed" : "opacity-0 group-hover:opacity-100"
+            )}
+            title={readOnly ? "Modalità sola lettura" : "Aggiungi AC"}
           >
             <Plus className="w-3.5 h-3.5" />
             AC
@@ -337,7 +344,7 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
                               <Badge className={cn("text-xs", CA_STATUS_COLORS[caStatus])}>
                                 {CA_STATUS_LABELS[caStatus]}
                               </Badge>
-                              {canAdvanceStatus && (
+                              {canAdvanceStatus && !readOnly && (
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -383,9 +390,10 @@ interface AcTableProps {
   correctiveActions: CorrectiveAction[];
   nonConformities: NonConformity[];
   auditId: string;
+  readOnly?: boolean;
 }
 
-function AcTable({ correctiveActions, nonConformities, auditId }: AcTableProps) {
+function AcTable({ correctiveActions, nonConformities, auditId, readOnly = false }: AcTableProps) {
   const [editingCaId, setEditingCaId] = useState<string | null>(null);
 
   const handleStatusChange = async (caId: string, newStatus: string) => {
@@ -494,12 +502,19 @@ function AcTable({ correctiveActions, nonConformities, auditId }: AcTableProps) 
 
                     {/* Azioni */}
                     <td className="px-3 py-0 text-right shrink-0">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className={cn(
+                        "flex items-center justify-end gap-1 transition-opacity",
+                        readOnly ? "opacity-0" : "opacity-0 group-hover:opacity-100"
+                      )}>
                         {/* Status Dropdown */}
                         <select
                           value={ca.status ?? "pending"}
                           onChange={(e) => handleStatusChange(ca.id, e.target.value)}
-                          className="text-xs border border-zinc-200 rounded px-1.5 py-0.5 bg-white text-zinc-700 h-6"
+                          disabled={readOnly}
+                          className={cn(
+                            "text-xs border border-zinc-200 rounded px-1.5 py-0.5 bg-white text-zinc-700 h-6",
+                            readOnly && "opacity-50 cursor-not-allowed"
+                          )}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <option value="pending">In attesa</option>
@@ -512,12 +527,13 @@ function AcTable({ correctiveActions, nonConformities, auditId }: AcTableProps) 
                           type="button"
                           variant="ghost"
                           size="sm"
+                          disabled={readOnly}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleQuickClose(ca.id);
                           }}
                           className="h-6 px-2 text-xs"
-                          title="Chiudi AC"
+                          title={readOnly ? "Modalità sola lettura" : "Chiudi AC"}
                         >
                           <X className="w-3 h-3" />
                         </Button>
@@ -527,12 +543,13 @@ function AcTable({ correctiveActions, nonConformities, auditId }: AcTableProps) 
                           type="button"
                           variant="ghost"
                           size="sm"
+                          disabled={readOnly}
                           onClick={(e) => {
                             e.stopPropagation();
                             setEditingCaId(isEditing ? null : ca.id);
                           }}
                           className="h-6 px-2 text-xs"
-                          title="Modifica AC"
+                          title={readOnly ? "Modalità sola lettura" : "Modifica AC"}
                         >
                           <Edit2 className="w-3 h-3" />
                         </Button>
@@ -851,7 +868,7 @@ function EditCaForm({ ca, onSuccess, onCancel }: EditCaFormProps) {
 // MAIN TAB COMPONENT
 // ============================================
 
-export function NcAcTab({ audit, nonConformities, correctiveActions }: NcAcTabProps) {
+export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = false }: NcAcTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<"nc" | "ac">("nc");
   const [reportOpen, setReportOpen] = useState(false);
 
@@ -942,7 +959,7 @@ export function NcAcTab({ audit, nonConformities, correctiveActions }: NcAcTabPr
                 {nonConformities.map((nc) => {
                   const ncCas = correctiveActions.filter((ca) => ca.nonConformityId === nc.id);
                   return (
-                    <NcRow key={nc.id} nc={nc} cas={ncCas} auditId={audit.id} />
+                    <NcRow key={nc.id} nc={nc} cas={ncCas} auditId={audit.id} readOnly={readOnly} />
                   );
                 })}
               </tbody>
@@ -953,6 +970,7 @@ export function NcAcTab({ audit, nonConformities, correctiveActions }: NcAcTabPr
             correctiveActions={correctiveActions}
             nonConformities={nonConformities}
             auditId={audit.id}
+            readOnly={readOnly}
           />
         )}
       </div>

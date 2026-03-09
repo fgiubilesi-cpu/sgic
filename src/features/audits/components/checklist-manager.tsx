@@ -9,9 +9,10 @@ import { ChecklistRow } from "./checklist-row";
 type ChecklistManagerProps = {
   audit: AuditWithChecklists;
   nonConformities?: NonConformity[];
+  readOnly?: boolean;
 };
 
-export function ChecklistManager({ audit, nonConformities = [] }: ChecklistManagerProps) {
+export function ChecklistManager({ audit, nonConformities = [], readOnly = false }: ChecklistManagerProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   const ncItemIds = new Set(nonConformities.map((nc) => nc.checklistItemId));
@@ -108,6 +109,7 @@ export function ChecklistManager({ audit, nonConformities = [] }: ChecklistManag
                   hasNc={ncItemIds.has(item.id)}
                   onSelect={() => setSelectedItemId(item.id)}
                   path={`/audits/${audit.id}`}
+                  readOnly={readOnly}
                 />
               ))
             ) : (

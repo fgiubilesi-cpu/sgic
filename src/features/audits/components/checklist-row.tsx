@@ -24,6 +24,7 @@ interface ChecklistRowProps {
   hasNc?: boolean;
   onSelect: () => void;
   path: string;
+  readOnly?: boolean;
 }
 
 type OptimisticState = {
@@ -45,6 +46,7 @@ export function ChecklistRow({
   hasNc = false,
   onSelect,
   path,
+  readOnly = false,
 }: ChecklistRowProps) {
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { isListening, transcript, startListening, stopListening, isSupported } =
@@ -186,17 +188,19 @@ export function ChecklistRow({
       {/* OK button */}
       <td className="px-3 py-0 text-center">
         <button
+          disabled={readOnly}
           onClick={(e) => {
             e.stopPropagation();
             handleOutcomeChange("compliant");
           }}
           className={cn(
             "inline-flex items-center justify-center w-7 h-7 rounded border-2 transition-colors",
+            readOnly && "opacity-50 cursor-not-allowed",
             optimisticItem.outcome === "compliant"
               ? "border-green-600 bg-green-100 text-green-700"
               : "border-zinc-300 bg-white text-zinc-400 hover:border-green-300"
           )}
-          title="Compliant"
+          title={readOnly ? "Modalità sola lettura" : "Compliant"}
         >
           <Check className="w-4 h-4" />
         </button>
@@ -205,17 +209,19 @@ export function ChecklistRow({
       {/* NOK button */}
       <td className="px-3 py-0 text-center">
         <button
+          disabled={readOnly}
           onClick={(e) => {
             e.stopPropagation();
             handleOutcomeChange("non_compliant");
           }}
           className={cn(
             "inline-flex items-center justify-center w-7 h-7 rounded border-2 transition-colors",
+            readOnly && "opacity-50 cursor-not-allowed",
             optimisticItem.outcome === "non_compliant"
               ? "border-red-600 bg-red-100 text-red-700"
               : "border-zinc-300 bg-white text-zinc-400 hover:border-red-300"
           )}
-          title="Non-compliant"
+          title={readOnly ? "Modalità sola lettura" : "Non-compliant"}
         >
           <X className="w-4 h-4" />
         </button>
@@ -224,17 +230,19 @@ export function ChecklistRow({
       {/* N/A button */}
       <td className="px-3 py-0 text-center">
         <button
+          disabled={readOnly}
           onClick={(e) => {
             e.stopPropagation();
             handleOutcomeChange("not_applicable");
           }}
           className={cn(
             "inline-flex items-center justify-center w-7 h-7 rounded border-2 transition-colors",
+            readOnly && "opacity-50 cursor-not-allowed",
             optimisticItem.outcome === "not_applicable"
               ? "border-gray-600 bg-gray-100 text-gray-700"
               : "border-zinc-300 bg-white text-zinc-400 hover:border-gray-300"
           )}
-          title="Not applicable"
+          title={readOnly ? "Modalità sola lettura" : "Not applicable"}
         >
           <Minus className="w-4 h-4" />
         </button>
@@ -245,16 +253,20 @@ export function ChecklistRow({
         <div className="flex items-center gap-1">
           <Input
             type="text"
+            disabled={readOnly}
             value={localNotes}
             onChange={(e) => {
               e.stopPropagation();
               handleNotesChange(e.target.value);
             }}
             onClick={(e) => e.stopPropagation()}
-            placeholder="Notes..."
-            className="h-7 text-xs placeholder:text-zinc-400 border-zinc-300 focus:ring-1 flex-1"
+            placeholder={readOnly ? "Sola lettura" : "Notes..."}
+            className={cn(
+              "h-7 text-xs placeholder:text-zinc-400 border-zinc-300 focus:ring-1 flex-1",
+              readOnly && "opacity-60 cursor-not-allowed"
+            )}
           />
-          {isSupported && (
+          {isSupported && !readOnly && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -282,7 +294,10 @@ export function ChecklistRow({
       {/* Media actions: camera + audio recorder */}
       <td className="px-3 py-0">
         <div
-          className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-hover:group-focus:opacity-100 transition-opacity"
+          className={cn(
+            "flex items-center gap-1 transition-opacity",
+            readOnly ? "hidden" : "opacity-0 group-hover:opacity-100 group-hover:group-focus:opacity-100"
+          )}
           onClick={(e) => e.stopPropagation()}
         >
           <MediaCapture

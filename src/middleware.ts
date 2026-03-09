@@ -35,6 +35,7 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/clients") ||
       pathname.startsWith("/templates") ||
       pathname.startsWith("/organization") ||
+      pathname.startsWith("/settings") ||
       pathname.startsWith("/impostazioni");
 
     if (isDashboardRoute && !user) {

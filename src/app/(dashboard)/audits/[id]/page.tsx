@@ -5,6 +5,7 @@ import { getAudit } from "@/features/audits/queries/get-audit";
 import { getNonConformitiesByAudit } from "@/features/audits/queries/get-non-conformities";
 import { getCorrectiveActionsByAudit } from "@/features/audits/queries/get-corrective-actions";
 import { getAuditSummary } from "@/features/audits/queries/get-audit-summary";
+import { getAllTemplates } from "@/features/audits/queries/get-templates";
 import { canManageTemplates } from "@/lib/user-roles";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import { AuditStatusBadge } from "@/features/audits/components/audit-status-badge";
@@ -63,10 +64,11 @@ export default async function AuditDetailPage({
       ? (rawTab as TabId)
       : "checklist") || "checklist";
 
-  const [nonConformities, correctiveActions, summary] = await Promise.all([
+  const [nonConformities, correctiveActions, summary, templates] = await Promise.all([
     getNonConformitiesByAudit(id),
     getCorrectiveActionsByAudit(id),
     getAuditSummary(id),
+    getAllTemplates(),
   ]);
 
   const formattedDate = audit.scheduled_date
@@ -181,7 +183,7 @@ export default async function AuditDetailPage({
       )}
 
       {activeTab === "templates" && userCanManageTemplates && (
-        <TemplateTab audit={audit} />
+        <TemplateTab audit={audit} templates={templates} readOnly={isReadOnly} />
       )}
     </div>
   );

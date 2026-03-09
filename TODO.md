@@ -44,7 +44,15 @@
     - Audit page: fetches nonConformities in parallel, passa a ChecklistManager
   - ✅ **Compilazione**: Zero errori TypeScript dopo fix
   - ✅ **Flusso end-to-end**: outcome='non_compliant' → crea NC con severity='minor' + status='open' → badge appears → quando outcome cambia → NC chiuso (status='closed')
-- [ ] **N2** Lista NC nella pagina audit: tabella compatta con stato, severità, domanda collegata
+- [x] **N2** Lista NC nella pagina audit: tabella compatta con stato, severità, domanda collegata
+  - ✅ **Implementato**: Refactor da accordion/card a table layout (simile a checklist compatta)
+  - ✅ **Colonne table**: | Severità | Stato | Domanda Collegata | Azioni (Aggiungi AC)
+  - ✅ **Altezza riga**: ~44px (h-11 class) — tabella compatta stile checklist
+  - ✅ **Funzionalità mantenute**:
+    - Expand/collapse via row click o tasto AC
+    - CA list in expanded row con tutti i dettagli (responsabile, scadenza, status)
+    - Add CA form nell'expanded section
+  - ✅ **Zero errori TypeScript**
 - [ ] **N3** Form creazione AC da NC: titolo, responsabile, scadenza, descrizione
 - [ ] **N4** Cambio stato AC: Aperta → In Progress → Chiusa
 - [ ] **N5** Quando AC chiusa → NC si aggiorna a "risolta"

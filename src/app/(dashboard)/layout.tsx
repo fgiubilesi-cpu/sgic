@@ -24,6 +24,8 @@ import {
   Menu,
   FlaskConical,
   GraduationCap,
+  Building2,
+  Settings,
 } from "lucide-react";
 
 type DashboardLayoutProps = {
@@ -53,8 +55,10 @@ function getNavItems(role?: string | null): NavItem[] {
   return [
     { label: "Dashboard", href: "/dashboard", icon: HomeIcon },
     { label: "Audit", href: "/audits", icon: ClipboardCheck },
+    { label: "Organization", href: "/organization", icon: Building2 },
     { label: "Campionamenti", href: null, icon: FlaskConical, disabled: true },
     { label: "Formazione", href: null, icon: GraduationCap, disabled: true },
+    { label: "Settings", href: null, icon: Settings, disabled: true },
   ];
 }
 

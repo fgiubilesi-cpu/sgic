@@ -5,6 +5,7 @@ import { getAudit } from "@/features/audits/queries/get-audit";
 import { getNonConformitiesByAudit } from "@/features/audits/queries/get-non-conformities";
 import { getCorrectiveActionsByAudit } from "@/features/audits/queries/get-corrective-actions";
 import { getAuditSummary } from "@/features/audits/queries/get-audit-summary";
+import { canManageTemplates } from "@/lib/user-roles";
 import { AuditStatusBadge } from "@/features/audits/components/audit-status-badge";
 import { ChecklistManager } from "@/features/audits/components/checklist-manager";
 import { AuditStats } from "@/features/audits/components/audit-stats";
@@ -14,13 +15,19 @@ import { AuditCompletionSection } from "@/features/audits/components/audit-compl
 import { ExportExcelButton } from "@/features/audits/components/export-excel-button";
 import { EmailDraftModal } from "@/features/audits/components/email-draft-modal";
 
-const TABS = [
+interface TabConfig {
+  id: "checklist" | "nc" | "templates";
+  label: string;
+  requiresInspector?: boolean;
+}
+
+const ALL_TABS: TabConfig[] = [
   { id: "checklist", label: "Checklist" },
   { id: "nc", label: "Non Conformità / AC" },
-  { id: "templates", label: "Template" },
-] as const;
+  { id: "templates", label: "Template", requiresInspector: true },
+];
 
-type TabId = (typeof TABS)[number]["id"];
+type TabId = TabConfig["id"];
 
 export default async function AuditDetailPage({
   params,
@@ -32,14 +39,26 @@ export default async function AuditDetailPage({
   const { id } = await params;
   const { tab: rawTab } = await searchParams;
 
-  const activeTab: TabId =
-    rawTab === "nc" || rawTab === "templates" ? rawTab : "checklist";
-
   const audit = await getAudit(id);
 
   if (!audit) {
     notFound();
   }
+
+  // Check if current user is an inspector
+  const userCanManageTemplates = await canManageTemplates();
+
+  // Filter tabs based on user role
+  const TABS: TabConfig[] = ALL_TABS.filter(
+    (tab) => !tab.requiresInspector || userCanManageTemplates
+  );
+
+  // Validate the active tab
+  const validTabIds = TABS.map((t) => t.id);
+  const activeTab: TabId =
+    (rawTab && validTabIds.includes(rawTab as TabId)
+      ? (rawTab as TabId)
+      : "checklist") || "checklist";
 
   const [nonConformities, correctiveActions, summary] = await Promise.all([
     getNonConformitiesByAudit(id),
@@ -77,10 +96,12 @@ export default async function AuditDetailPage({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <EmailDraftModal
-              auditId={audit.id}
-              hasNonConformities={nonConformities.length > 0}
-            />
+            {userCanManageTemplates && (
+              <EmailDraftModal
+                auditId={audit.id}
+                hasNonConformities={nonConformities.length > 0}
+              />
+            )}
             <ExportExcelButton auditId={audit.id} auditTitle={audit.title} />
           </div>
         </div>
@@ -129,7 +150,7 @@ export default async function AuditDetailPage({
         />
       )}
 
-      {activeTab === "templates" && (
+      {activeTab === "templates" && userCanManageTemplates && (
         <TemplateTab audit={audit} />
       )}
     </div>

@@ -1,6 +1,6 @@
 # CLAUDE.md — SGIC
 > Contesto completo per agenti AI. Leggi tutto prima di iniziare qualsiasi task.
-> Aggiornato: 2026-03-09 | Sprint 6 completato — 0 errori TypeScript — tag v0.5-sprint6
+> Aggiornato: 2026-03-09 | Sprint 7 completato — 0 errori TypeScript — tag v0.5-sprint7
 
 ---
 
@@ -11,21 +11,21 @@ Client: Giubilesi Associati (consulenza agri-food, ISO 9001)
 Stack: Next.js 16 App Router + TypeScript strict + Supabase + Tailwind + shadcn/ui + Zod + Sonner  
 Porta dev: 3000 (o 3010 se avviato da Claude Code)  
 Supabase project_id: `dchmmcnnfpyzemxqgnmb`  
-Git tag stabile: `v0.5-sprint6`
+Git tag stabile: `v0.5-sprint7`
 
 ### Ruoli utente
-- `inspector` / `admin` — Giubilesi (is_platform_owner=true): accesso completo
-- `client` — fase 2: read-only filtrato per client_id
+- `admin` / `inspector` — Giubilesi (is_platform_owner=true): accesso completo
+- `client` — accesso read-only filtrato per client_id (implementato Sprint 7)
 
 ### Struttura navigazione
 ```
 Dashboard     ← KPI reali + NC globale filtrabile + widget scadenze
 Audit         ← modulo operativo
-  [tab] Checklist
+  [tab] Checklist          ← read-only per client
   [tab] Non Conformità / AC
-    [subtab] Non Conformità
-    [subtab] Azioni Correttive
-  [tab] Template     ← CRUD + reorder + import CSV/Excel
+    [subtab] Non Conformità  ← read-only per client
+    [subtab] Azioni Correttive ← read-only per client
+  [tab] Template           ← read-only per client
 Organization
 Campionamenti ← futuro
 Formazione    ← futuro
@@ -57,8 +57,7 @@ id, title, status, scheduled_date, organization_id, client_id, location_id, scor
 ⚠️ NON ha `updated_at`
 
 ### `checklists`
-id, audit_id, title, organization_id, created_at  
-✅ HA organization_id
+id, audit_id, title, organization_id, created_at ✅ HA organization_id
 
 ### `checklist_items`
 id, checklist_id, question, outcome, notes, evidence_url, audio_url,  
@@ -77,14 +76,14 @@ responsible_person_name, responsible_person_email,
 due_date (date), target_completion_date (date),  
 status (default 'pending'), updated_at, completed_at, closed_at, deleted_at  
 ⚠️ NON esistono: `title`, `assigned_to`  
-⚠️ Status reali: `pending` | `in_progress` | `completed` SOLTANTO
+⚠️ Status reali SOLTANTO: `pending` | `in_progress` | `completed`
 
 ### `checklist_templates`
 id, title, description, organization_id, created_at
 
 ### `template_questions`
 id, template_id, question, sort_order, weight, deleted_at  
-⚠️ Soft delete via deleted_at
+⚠️ Soft delete via deleted_at — mai DELETE fisico
 
 ### `profiles`
 id, email, full_name, role, organization_id, client_id  
@@ -92,56 +91,95 @@ Ruoli: `admin`, `inspector`, `client`
 
 ---
 
-## 4. Struttura Cartelle
+## 4. Portale Cliente — Implementato Sprint 7
+
+### Logica di filtro
+```typescript
+// In ogni query che deve rispettare il ruolo client
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('role, client_id')
+  .eq('id', userId)
+  .single()
+
+if (profile.role === 'client' && profile.client_id) {
+  query = query.eq('client_id', profile.client_id)
+}
+```
+
+### Read-only mode
+```typescript
+// Page level
+const isReadOnly = profile.role === 'client'
+
+// Props ai componenti
+<ChecklistManager readOnly={isReadOnly} />
+<NcAcTab readOnly={isReadOnly} />
+<TemplateEditor readOnly={isReadOnly} />
+```
+
+### Comportamento read-only
+- Banner ambra in cima alla pagina audit: "📋 Modalità sola lettura"
+- Bottoni outcome (OK/NOK/N/A): disabilitati + opacity
+- Input note: disabilitato + placeholder "Sola lettura"
+- Microfono e media: nascosti
+- Bottoni Add AC, Edit AC, Close AC: disabilitati/nascosti
+- Dropdown stato AC: disabilitato
+- Bottoni "Esporta Excel" e "Bozza mail": nascosti
+- Sezione completamento audit: nascosta
+
+---
+
+## 5. Struttura Cartelle
 
 ```
 src/
   app/(dashboard)/
-    dashboard/          ← KPI reali, NC globale, widget scadenze
+    dashboard/
     audits/[id]/
-      page.tsx          ← breadcrumb locale cliente/sede, tab via ?tab=
+      page.tsx          ← readOnly prop, breadcrumb locale, tab via ?tab=
     clients/[id]/
   features/
     audits/
       actions/
-        actions.ts                    ← updateChecklistItem (NC auto-create)
-        corrective-action-actions.ts  ← createCorrectiveAction, updateCorrectiveAction
-        template-actions.ts           ← CRUD + reorderTemplateQuestion + importTemplateQuestions
+        actions.ts
+        corrective-action-actions.ts
+        template-actions.ts
         audit-completion-actions.ts
         export-actions.ts
       queries/
         get-audit.ts                  ← AuditWithChecklists (client_name, location_name)
-        get-audits.ts                 ← AuditWithNCCount type (score, nc_count)
+        get-audits.ts                 ← AuditWithNCCount, filtro client_id per ruolo client
         get-non-conformities.ts
         get-corrective-actions.ts
       schemas/
         audit-schema.ts
         non-conformity-schema.ts
-        template-schema.ts            ← Zod + parseImportedQuestions()
+        template-schema.ts
       components/
-        checklist-manager.tsx
-        checklist-row.tsx             ← toast specifico + feedback note
-        nc-ac-tab.tsx                 ← subtab NC+AC, EditCaForm, Report modal
-        template-editor.tsx           ← reorder + import
-        audit-completion-section.tsx  ← compliance score (fix Sprint 5)
-        audit-table.tsx               ← colonne Score + NC Aperte (Sprint 6)
+        checklist-manager.tsx         ← prop readOnly
+        checklist-row.tsx             ← prop readOnly, toast errori specifici
+        nc-ac-tab.tsx                 ← prop readOnly, subtab NC+AC, Report modal
+        template-editor.tsx           ← prop readOnly, reorder + import
+        audit-completion-section.tsx  ← nascosta se readOnly
+        audit-table.tsx               ← colonne Score + NC Aperte
         export-excel-button.tsx
     clients/
     dashboard/
-      queries/    → getDashboardStats (KPI reali), getNCGlobal (filtrabile)
-      components/ → DashboardFilters, NCGlobalTable, AuditTrendChart, widget scadenze
+      queries/    → getDashboardStats (KPI reali, filtrabile per client)
+      components/ → DashboardFilters, NCGlobalTable, widget scadenze
     quality/
       schemas/    → nc-ac.schema.ts
       constants.ts
   lib/supabase/
-    get-org-context.ts  → getOrganizationContext() → { supabase, organizationId, userId }
+    get-org-context.ts
   types/
-    database.types.ts   ← rigenerato Sprint 5, 0 errori TS
+    database.types.ts ← rigenerato Sprint 7
 ```
 
 ---
 
-## 5. Pattern Obbligatori
+## 6. Pattern Obbligatori
 
 ### Server Actions
 ```typescript
@@ -159,20 +197,20 @@ const { supabase, organizationId, userId } = ctx
 .select("..., clients(name), locations(name)")
 ```
 
-### checklist_items → audit (pattern obbligatorio)
+### checklist_items → audit (CRITICO)
 ```typescript
-// ❌ MAI così — audit_id spesso NULL
-.from('checklist_items').select('outcome').eq('audit_id', auditId)
+// ❌ MAI — audit_id spesso NULL
+.from('checklist_items').eq('audit_id', auditId)
 
-// ✅ SEMPRE così
+// ✅ SEMPRE
 const { data: checklists } = await supabase
   .from('checklists').select('id').eq('audit_id', auditId)
 const checklistIds = checklists?.map(c => c.id) ?? []
 if (checklistIds.length === 0) return /* empty */
-await supabase.from('checklist_items').select('outcome').in('checklist_id', checklistIds)
+await supabase.from('checklist_items').in('checklist_id', checklistIds)
 ```
 
-### RLS policy (pattern standard)
+### RLS policy
 ```sql
 CREATE POLICY "nome" ON tabella FOR ALL
   USING (organization_id IN (
@@ -185,33 +223,19 @@ CREATE POLICY "nome" ON tabella FOR ALL
 
 ---
 
-## 6. Errori Noti — Tabella Rapida
+## 7. Errori Noti — Tabella Rapida
 
 | Errore | Fix |
 |--------|-----|
 | audits non ha updated_at | non passarla negli update |
 | checklist_items.audit_id NULL | usa checklist_id→checklists pattern |
 | corrective_actions status sbagliato | solo: pending, in_progress, completed |
-| RLS corrective_actions blocca INSERT | ✅ fixato Sprint 4 — usa profiles lookup |
-| Compliance Score 0% | ✅ fixato Sprint 5 — usa checklist_id pattern |
-| NC creation swallowed | ✅ fixato Sprint 4 — ritorna errore visibile |
+| RLS corrective_actions blocca INSERT | ✅ fixato Sprint 4 |
+| Compliance Score 0% | ✅ fixato Sprint 5 |
+| NC creation swallowed | ✅ fixato Sprint 4 |
 | PGRST204 | NOTIFY pgrst, 'reload schema'; |
 | 404 nuova route | aggiungere a isDashboardRoute in middleware.ts |
-
----
-
-## 7. Portale Cliente — Specifiche (Fase 2, Sprint 7)
-
-Quando ruolo = 'client':
-- Vedere solo audit del proprio `client_id`
-- NON modificare checklist, NC, AC, template
-- Dashboard filtrata per il proprio client_id
-- Middleware deve permettere accesso a /dashboard alle route audit
-
-Implementazione:
-- `getOrganizationContext()` già disponibile con userId
-- Query deve fare JOIN su `profiles` per recuperare `client_id` se ruolo = 'client'
-- Bottoni di modifica disabilitati via props `readOnly={role === 'client'}`
+| non_conformities query restituisce deleted | aggiungere .is('deleted_at', null) |
 
 ---
 
@@ -247,6 +271,7 @@ NOTIFY pgrst, 'reload schema';
 ## 10. Backlog Tecnico
 
 - [ ] Fix search_path funzioni DB (WARN sicurezza — non urgente)
-- [ ] PDF report audit
-- [ ] CI/CD GitHub Actions
-- [ ] Notifiche email NC scadute (Resend)
+- [ ] PDF report audit (Sprint 8)
+- [ ] Email notifiche NC scadute via Resend (Sprint 8)
+- [ ] Ricerca globale (Sprint 8)
+- [ ] CI/CD GitHub Actions (Sprint 9)

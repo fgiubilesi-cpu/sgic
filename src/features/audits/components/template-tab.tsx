@@ -37,6 +37,9 @@ export function TemplateTab({ audit, templates, readOnly = false }: TemplateTabP
   const [isSaving, setIsSaving] = useState(false);
   const [templatesData, setTemplatesData] = useState<TemplateWithDetails[]>(templates);
 
+  // Determine active template (from audit.template_id or first checklist's source)
+  const activeTemplateId = (audit as any)?.template_id || null;
+
   const handleOpenNewTemplate = () => {
     setEditingTemplate(null);
     setFormTitle("");
@@ -197,19 +200,37 @@ export function TemplateTab({ audit, templates, readOnly = false }: TemplateTabP
                     <SheetTitle>Seleziona un template</SheetTitle>
                   </SheetHeader>
                   <div className="mt-6 space-y-2">
-                    {templatesData.map((t) => (
-                      <button
-                        key={t.id}
-                        className="w-full p-3 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-left transition"
-                        onClick={async () => {
-                          // TODO: Implement template switching on audit
-                          toast.info("Cambio template: implementazione in corso");
-                        }}
-                      >
-                        <div className="font-medium text-sm text-zinc-900">{t.title}</div>
-                        <div className="text-xs text-zinc-600 mt-1">{t.questionCount} domande</div>
-                      </button>
-                    ))}
+                    {templatesData.map((t) => {
+                      const isActive = activeTemplateId === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          className={`w-full p-3 rounded-lg border transition text-left ${
+                            isActive
+                              ? "border-blue-300 bg-blue-50 hover:bg-blue-100"
+                              : "border-zinc-200 bg-white hover:bg-zinc-50"
+                          }`}
+                          onClick={async () => {
+                            // TODO: Implement template switching on audit
+                            toast.info("Cambio template: implementazione in corso");
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className={`font-medium text-sm ${isActive ? "text-blue-900" : "text-zinc-900"}`}>
+                                {t.title}
+                              </div>
+                              <div className={`text-xs mt-1 ${isActive ? "text-blue-700" : "text-zinc-600"}`}>
+                                {t.questionCount} domande
+                              </div>
+                            </div>
+                            {isActive && (
+                              <div className="text-xs font-semibold text-blue-700 whitespace-nowrap">● Attivo</div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </SheetContent>
               </Sheet>
@@ -366,32 +387,64 @@ export function TemplateTab({ audit, templates, readOnly = false }: TemplateTabP
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {templatesData.map((template) => (
-                <div key={template.id} className="rounded-lg border border-zinc-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition">
-                  <div className="px-4 py-3 border-b border-zinc-100 bg-gradient-to-r from-zinc-50 to-zinc-100">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm text-zinc-900 truncate">{template.title}</h3>
-                        {template.description && (
-                          <p className="text-xs text-zinc-600 mt-1 line-clamp-2">{template.description}</p>
+              {templatesData.map((template) => {
+                const isActive = activeTemplateId === template.id;
+                return (
+                  <div
+                    key={template.id}
+                    className={`rounded-lg border overflow-hidden shadow-sm hover:shadow-md transition ${
+                      isActive
+                        ? "border-blue-300 bg-blue-50"
+                        : "border-zinc-200 bg-white"
+                    }`}
+                  >
+                    <div className={`px-4 py-3 border-b ${
+                      isActive
+                        ? "border-blue-200 bg-gradient-to-r from-blue-100 to-blue-50"
+                        : "border-zinc-100 bg-gradient-to-r from-zinc-50 to-zinc-100"
+                    }`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className={`font-semibold text-sm truncate ${isActive ? "text-blue-900" : "text-zinc-900"}`}>
+                            {template.title}
+                          </h3>
+                          {template.description && (
+                            <p className={`text-xs mt-1 line-clamp-2 ${isActive ? "text-blue-700" : "text-zinc-600"}`}>
+                              {template.description}
+                            </p>
+                          )}
+                        </div>
+                        {isActive && (
+                          <span className="text-xs font-bold text-blue-700 whitespace-nowrap">● Attivo</span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          isActive
+                            ? "bg-blue-200 text-blue-800 border border-blue-300"
+                            : "bg-white border border-zinc-200 text-zinc-700"
+                        }`}>
+                          {template.questionCount} domande
+                        </span>
+                        {template.clientName ? (
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            isActive
+                              ? "bg-blue-300 text-blue-900"
+                              : "bg-blue-100 text-blue-800"
+                          }`}>
+                            Per: {template.clientName}
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            isActive
+                              ? "bg-blue-200 text-blue-800"
+                              : "bg-zinc-100 text-zinc-700"
+                          }`}>
+                            Global
+                          </span>
                         )}
                       </div>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white border border-zinc-200 text-zinc-700">
-                        {template.questionCount} domande
-                      </span>
-                      {template.clientName ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          Per: {template.clientName}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700">
-                          Global
-                        </span>
-                      )}
-                    </div>
-                  </div>
 
                   <div className="px-4 py-3 flex gap-2">
                     <Button
@@ -422,7 +475,8 @@ export function TemplateTab({ audit, templates, readOnly = false }: TemplateTabP
                     </Button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

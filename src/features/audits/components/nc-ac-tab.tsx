@@ -445,10 +445,26 @@ function AcTable({ correctiveActions, nonConformities, auditId, readOnly = false
 
               return (
                 <React.Fragment key={ca.id}>
-                  <tr className="h-11 border-b border-zinc-200 hover:bg-zinc-50 transition-colors group">
-                    {/* Descrizione */}
+                  <tr
+                    onClick={() => !readOnly && setEditingCaId(isEditing ? null : ca.id)}
+                    className={cn(
+                      "h-11 border-b border-zinc-200 transition-colors group",
+                      !readOnly && "hover:bg-blue-50 cursor-pointer"
+                    )}
+                  >
+                    {/* Espandi/Collassa + Descrizione */}
                     <td className="px-3 py-0">
-                      <p className="text-xs text-zinc-900 truncate max-w-xs">{ca.description}</p>
+                      <div className="flex items-center gap-2">
+                        {!readOnly && (
+                          <ChevronRight
+                            className={cn(
+                              "w-4 h-4 text-zinc-400 transition-transform shrink-0",
+                              isEditing && "rotate-90"
+                            )}
+                          />
+                        )}
+                        <p className="text-xs text-zinc-900 truncate max-w-xs">{ca.description}</p>
+                      </div>
                     </td>
 
                     {/* NC Collegata */}
@@ -474,13 +490,14 @@ function AcTable({ correctiveActions, nonConformities, auditId, readOnly = false
                     <td className="px-3 py-0">
                       {ca.dueDate ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-zinc-600">
+                          <span className={cn(
+                            "text-xs",
+                            overdue && ca.status !== "completed" ? "text-red-600 font-medium" : "text-zinc-600"
+                          )}>
                             {new Intl.DateTimeFormat("it-IT").format(new Date(ca.dueDate))}
                           </span>
                           {overdue && ca.status !== "completed" && (
-                            <Badge className="text-xs bg-red-100 text-red-700 border-0">
-                              Scaduta
-                            </Badge>
+                            <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
                           )}
                           {dueSoon && !overdue && ca.status !== "completed" && (
                             <Badge className="text-xs bg-yellow-100 text-yellow-700 border-0">

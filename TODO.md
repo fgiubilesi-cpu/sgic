@@ -15,26 +15,32 @@
 
 ### P1 — Bug noti da investigare
 
-- [ ] **B1** Compliance Score mostra 0% anche con 3 NOK — verificare calcolo in audit-completion-section.tsx  
+- [x] **B1** Compliance Score mostra 0% anche con 3 NOK — verificare calcolo in audit-completion-section.tsx
   Ipotesi: il calcolo conta solo `compliant` e ignora `non_compliant` nel denominatore
-- [ ] **B2** Breadcrumb mostra "Control Panel" invece di nome cliente/sede — trovare e correggere il componente breadcrumb in audits/[id]/page.tsx
+  **Fix**: Query checklist_items via checklist_id join (audit_id denormalizzato)
+- [x] **B2** Breadcrumb mostra "Control Panel" invece di nome cliente/sede — trovare e correggere il componente breadcrumb in audits/[id]/page.tsx
+  **Fix**: Aggiunto breadcrumb locale in /audits/[id]/page.tsx con Audit > Client > Location > Title
 
 ### P2 — Errori TypeScript pre-esistenti
 
-- [ ] **TS1** Fix 5 errori in routes.d.ts (pre-esistenti, non introdotti da Sprint 4)
-- [ ] **TS2** Fix 1 errore in audit-workflow.spec.ts (Playwright — pre-esistente)
+- [x] **TS1** Fix 5 errori in routes.d.ts (pre-esistenti, non introdotti da Sprint 4)
+  **Fix**: Escluso .next/dev/types/**/*.ts da tsconfig.json include (file generato auto)
+- [x] **TS2** Fix 1 errore in audit-workflow.spec.ts (Playwright — pre-esistente)
+  **Fix**: .click({nth}) → .locator().nth(index).click() sintassi corretta
 
 ### P3 — UX Miglioramenti
 
 - [ ] **UX1** Checklist: note salvate ma campo non si svuota visivamente dopo il salvataggio — fix feedback UI
 - [ ] **UX2** Lista audit: aggiungere colonna "Score" e "NC aperte" nella tabella audit
 - [ ] **UX3** Dashboard: KPI "% compliance media ultimi 30 giorni" — verificare che usi dati reali dal DB
-- [ ] **UX4** Tab NC badge contatore non si aggiorna in real-time dopo aggiunta AC — fix con router.refresh() o revalidatePath
+- [x] **UX4** Tab NC badge contatore non si aggiorna in real-time dopo aggiunta AC — fix con router.refresh() o revalidatePath
+  **Verificato**: revalidatePath() è già in createCorrectiveAction, updateCorrectiveAction, completeCorrectiveAction
 
 ### P4 — Commit e Tag
 
-- [ ] **G1** Commit stabile con tutti i fix Sprint 4: `git commit -m "feat: Sprint 4 - NC/AC subtab, template management, RLS fix"` → tag `v0.4-sprint4-complete`
-- [ ] **G2** Rigenera database.types.ts: `supabase gen types typescript --linked --schema public > src/types/database.types.ts`
+- [x] **G1** Commit stabile con tutti i fix Sprint 5: `208ef78` → tag `v0.4-sprint5` → git push origin main --tags ✅
+- [x] **G2** Rigenera database.types.ts: `supabase gen types typescript --linked --schema public > src/types/database.types.ts` ✅
+  **Risultato**: 0 TypeScript errors, dev server online
 
 ---
 

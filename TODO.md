@@ -208,11 +208,36 @@
 
 ---
 
+## NEXT SPRINT — Fase 2: Accesso Client Read-Only
+
+### Status: IMPLEMENTAZIONE IN CORSO ✅ FOUNDATION COMPLETATA
+
+**Completed:**
+- ✅ Enhanced OrgContext to include role and client_id
+- ✅ Updated middleware for role-based routing (client → /client-dashboard)
+- ✅ Created client-dashboard page with filtered audit list
+- ✅ Created getClientAudits() query filtered by client_id
+- ✅ Updated dashboard layout navigation (show appropriate menu per role)
+- ✅ Created RLS policies for audits, checklist_items, non_conformities
+  - Clients can only see their own client's audits
+  - Inspectors can see all audits in their organization
+  - Database-level security prevents any workaround
+- ✅ Hidden Template tab and Email Draft from client users
+- ✅ Created /lib/user-roles.ts helper functions for role checks
+
+**Remaining:**
+- [ ] Apply migration 20260309000001_rls_client_access.sql in Supabase
+- [ ] Test client user access (create test client user, verify restrictions)
+- [ ] Test inspector access (verify full access maintained)
+- [ ] Document client access setup in README
+- [ ] Optional: Add more client-specific views (audit history, NC notifications)
+
+---
+
 ## BACKLOG — Sprint Futuri
 
 - [ ] Notifiche email NC aperte da più di X giorni (Resend)
 - [ ] Storico audit per cliente: vista timeline
-- [ ] Accesso client read-only (Fase 2 — ruolo `client`)
 - [ ] Import checklist da Excel (già sviluppato, da testare)
 - [ ] Personalizzazione template per cliente (già sviluppato, da testare)
 - [ ] Trascrizione vocale note (Web Speech API — da testare)

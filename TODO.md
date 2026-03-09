@@ -5,14 +5,14 @@
 
 ## CURRENT SPRINT — Stabilizzazione + Deploy Ready
 
-### P0 — Fix DB e Sicurezza (fare subito)
+### P0 — Fix DB e Sicurezza (fare subito) ✅ COMPLETATO
 
-- [ ] **DB1** Applicare migration RLS client access: `supabase/migrations/20260309000001_rls_client_access.sql`
-- [ ] **DB2** Abilitare RLS su tabelle esposte: `documents`, `risks`, `training_records`, `training_courses`, `personnel`, `document_versions`
-- [ ] **DB3** Aggiungere policy su `action_evidence` (RLS abilitata ma zero policies)
-- [ ] **DB4** Fix RLS performance: sostituire `auth.uid()` con `(select auth.uid()::uuid)` in tutte le policies
-- [ ] **DB5** Rimuovere policy duplicate su `audits` INSERT (`"Users can create audits"` e `audits_insert_policy`)
-- [ ] **DB6** Aggiungere indici FK mancanti su: `audits`, `checklist_items`, `non_conformities`, `corrective_actions`, `checklists`
+- [x] **DB1** Applicare migration RLS client access: `supabase/migrations/20260309000001_rls_client_access.sql`
+- [x] **DB2** Abilitare RLS su tabelle esposte: `documents`, `risks`, `training_records`, `training_courses`, `personnel`, `document_versions`
+- [x] **DB3** Aggiungere policy su `action_evidence` (RLS abilitata ma zero policies)
+- [x] **DB4** Fix RLS performance: sostituire `auth.uid()` con `(select auth.uid()::uuid)` in tutte le policies
+- [x] **DB5** Rimuovere policy duplicate su `audits` INSERT (`"Users can create audits"` e `audits_insert_policy`)
+- [x] **DB6** Aggiungere indici FK mancanti su: `audits`, `checklist_items`, `non_conformities`, `corrective_actions`, `checklists`
 
 ### P1 — Test e Verifica Funzionale
 

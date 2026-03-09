@@ -292,6 +292,7 @@ export type Database = {
       }
       checklist_templates: {
         Row: {
+          client_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -299,6 +300,7 @@ export type Database = {
           title: string
         }
         Insert: {
+          client_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -306,6 +308,7 @@ export type Database = {
           title: string
         }
         Update: {
+          client_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -313,6 +316,13 @@ export type Database = {
           title?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "checklist_templates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "checklist_templates_organization_id_fkey"
             columns: ["organization_id"]

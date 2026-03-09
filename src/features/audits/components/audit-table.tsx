@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { Audit, AuditStatus } from "@/features/audits/queries/get-audits";
+import type { AuditWithNCCount, AuditStatus } from "@/features/audits/queries/get-audits";
 import {
   Table,
   TableBody,
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 type AuditTableProps = {
-  audits: Audit[];
+  audits: AuditWithNCCount[];
 };
 
 function formatStatus(status: AuditStatus): { label: string; className: string } {
@@ -71,6 +71,8 @@ export function AuditTable({ audits }: AuditTableProps) {
             <TableHead>Client</TableHead>
             <TableHead>Location</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Score</TableHead>
+            <TableHead>NC Aperte</TableHead>
             <TableHead>Scheduled Date</TableHead>
             <TableHead className="w-[50px] text-right">Actions</TableHead>
           </TableRow>
@@ -100,6 +102,18 @@ export function AuditTable({ audits }: AuditTableProps) {
                   <Badge variant="outline" className={statusInfo.className}>
                     {statusInfo.label}
                   </Badge>
+                </TableCell>
+                <TableCell className="text-sm text-zinc-600">
+                  {audit.score !== null ? `${audit.score.toFixed(1)}%` : "—"}
+                </TableCell>
+                <TableCell className="text-sm text-zinc-600">
+                  {audit.nc_count > 0 ? (
+                    <span className="inline-flex items-center justify-center min-w-6 h-6 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
+                      {audit.nc_count}
+                    </span>
+                  ) : (
+                    <span className="text-zinc-400">—</span>
+                  )}
                 </TableCell>
                 <TableCell>{formatDate(audit.scheduled_date)}</TableCell>
                 <TableCell className="text-right">

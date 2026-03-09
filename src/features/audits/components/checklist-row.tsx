@@ -78,7 +78,11 @@ export function ChecklistRow({
       formData.append("notes", notes);
       formData.append("path", path);
       updateChecklistItem(formData).then((result) => {
-        if ("error" in result) toast.error(result.error ?? "Failed to save note.");
+        if ("error" in result) {
+          toast.error(result.error ?? "Failed to save note.");
+        } else {
+          toast.success("Note salvate.");
+        }
       });
     },
     [id, path]

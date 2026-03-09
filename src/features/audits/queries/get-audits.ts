@@ -15,7 +15,11 @@ export type Audit = {
   location_name: string | null;
 };
 
-export async function getAudits(): Promise<Audit[]> {
+export type AuditWithNCCount = Audit & {
+  nc_count: number;
+};
+
+export async function getAudits(): Promise<AuditWithNCCount[]> {
   const ctx = await getOrganizationContext();
   if (!ctx) return [];
 
@@ -31,6 +35,22 @@ export async function getAudits(): Promise<Audit[]> {
     return [];
   }
 
+  // Fetch NC counts for each audit
+  const auditIds = audits.map((a: any) => a.id);
+  const { data: ncCounts } = await supabase
+    .from("non_conformities")
+    .select("audit_id")
+    .in("audit_id", auditIds)
+    .eq("organization_id", organizationId);
+
+  const ncCountByAuditId = (ncCounts ?? []).reduce(
+    (acc: Record<string, number>, nc: any) => {
+      acc[nc.audit_id] = (acc[nc.audit_id] ?? 0) + 1;
+      return acc;
+    },
+    {}
+  );
+
   return audits.map((audit: any) => ({
     id: String(audit.id),
     title: audit.title ?? null,
@@ -41,5 +61,6 @@ export async function getAudits(): Promise<Audit[]> {
     location_id: audit.location_id ?? null,
     client_name: audit.client?.name ?? null,
     location_name: audit.location?.name ?? null,
+    nc_count: ncCountByAuditId[audit.id] ?? 0,
   }));
 }

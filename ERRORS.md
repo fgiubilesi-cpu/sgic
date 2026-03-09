@@ -1,35 +1,40 @@
 # SGIC — Known Errors & Solutions
-> Aggiornato: 2026-03-09 | Sprint 4
+> Aggiornato: 2026-03-09 | Sprint 5
 
 ---
 
-## checklist_items — audit_id denormalizzato
+## checklist_items — audit_id denormalizzato (CRITICO)
 
-**Problema**: `checklist_items.audit_id` esiste nel DB ma è denormalizzato e spesso NULL.
-Non usarlo per JOIN o per recuperare l'audit di appartenenza.
+**Problema**: `checklist_items.audit_id` esiste ma è spesso NULL — non affidabile per query.
 
-**Soluzione**: Recuperare audit_id tramite checklists table:
+**Pattern corretto** (obbligatorio ovunque):
 ```typescript
-const { data: item } = await supabase
+// ❌ SBAGLIATO — audit_id spesso NULL
+await supabase.from('checklist_items').select('outcome').eq('audit_id', auditId)
+
+// ✅ CORRETTO — sempre questo pattern
+const { data: checklists } = await supabase
+  .from('checklists').select('id').eq('audit_id', auditId)
+
+const checklistIds = checklists?.map(c => c.id) ?? []
+
+if (checklistIds.length === 0) {
+  return /* empty/zero result appropriato al contesto */
+}
+
+const { data: items } = await supabase
   .from('checklist_items')
-  .select('checklist_id, question, outcome')
-  .eq('id', itemId)
-  .single()
-
-const { data: checklist } = await supabase
-  .from('checklists')
-  .select('audit_id')
-  .eq('id', item.checklist_id)
-  .single()
-
-const auditId = checklist.audit_id
+  .select('outcome')
+  .in('checklist_id', checklistIds)
 ```
 
-**File interessati**: `src/features/audits/actions/actions.ts` → updateChecklistItem()
+**File fixati**: 
+- `audit-completion-section.tsx` — compliance score (Sprint 5)
+- `actions.ts` → updateChecklistItem() (Sprint 4)
 
 ---
 
-## corrective_actions — Schema Reale
+## corrective_actions — Schema e Status Reali
 
 **Colonne che ESISTONO:**
 ```
@@ -41,53 +46,33 @@ status (default 'pending'), updated_at,
 completed_at, closed_at, deleted_at
 ```
 
-**Colonne che NON ESISTONO (non usarle mai):**
-- `title` ❌
-- `assigned_to` ❌
+**NON esistono:** `title`, `assigned_to`
 
-**Status values reali nel DB:**
-- `pending` ✅
-- `in_progress` ✅
-- `completed` ✅
-- `closed` ❌ — non esiste
-- `verified` ❌ — non esiste
-- `open` ❌ — non esiste
+**Status values reali:** `pending` | `in_progress` | `completed`  
+**NON esistono:** `closed`, `verified`, `open`
 
-**Logica status corretta:**
-- Completare una AC: `status = 'completed'` + `completed_at = now()`
-- `closed_at` è per logiche future (es. verifica al prossimo audit)
-
----
-
-## corrective_actions — RLS Fix (Sprint 4)
-
-**Problema**: Le policy originali usavano `get_user_organization_id()` che legge
-`organization_id` dal JWT Supabase. Supabase NON include organization_id nel JWT
-di default → la funzione ritornava NULL → `organization_id = NULL` non matcha mai
-→ INSERT/UPDATE/SELECT bloccati per tutti gli utenti.
-
-**Fix applicato** (migration `fix_corrective_actions_rls`):
-```sql
--- Sostituite tutte e 4 le policy con pattern profiles lookup:
-CREATE POLICY "corrective_actions_insert_own_org" ON corrective_actions
-  FOR INSERT WITH CHECK (
-    organization_id IN (
-      SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
-    )
-  );
--- (stesso pattern per SELECT, UPDATE, DELETE)
+**Logica corretta:**
+```typescript
+// Completare una AC
+{ status: 'completed', completedAt: new Date().toISOString() }
+// closed_at è per logiche future (verifica prossimo audit)
 ```
 
-**File interessati**: Migration applicata direttamente su Supabase.
+---
+
+## corrective_actions — RLS Fix (Sprint 4) ✅
+
+**Problema**: Policy usava `get_user_organization_id()` che legge `organization_id`
+dal JWT Supabase. Il JWT non contiene questo campo → ritorna NULL → INSERT bloccato.
+
+**Fix applicato**: Migration `fix_corrective_actions_rls` — tutte e 4 le policy
+riscritte con pattern `profiles WHERE id = (select auth.uid()::uuid)`.
 
 ---
 
-## audits — updated_at non esiste
+## audits — updated_at non esiste ✅
 
-**Problema**: La tabella `audits` NON ha una colonna `updated_at`.
-Passare `updated_at` in un `.update()` su audits causa errore PGRST204.
-
-**Fix**: Rimuovere `updated_at` da tutti gli update su `audits`.
+**Problema**: `audits` NON ha `updated_at`. Passarla causa PGRST204.
 
 ```typescript
 // ❌ SBAGLIATO
@@ -97,60 +82,45 @@ await supabase.from('audits').update({ score: 85, updated_at: new Date().toISOSt
 await supabase.from('audits').update({ score: 85 })
 ```
 
-**File interessati**: `src/features/audits/actions/audit-completion-actions.ts` — fixato Sprint 4.
+**File fixato**: `audit-completion-actions.ts` (Sprint 4)
 
 ---
 
-## NC auto-create — errore swallowed
+## NC auto-create — errore swallowed ✅
 
-**Problema**: In `updateChecklistItem`, se l'INSERT su `non_conformities` falliva,
-l'errore veniva solo loggato in console e la funzione ritornava `{ success: true }`.
-Il frontend non sapeva del fallimento.
+**Problema**: Se INSERT su `non_conformities` falliva, l'errore veniva solo loggato
+e la funzione ritornava `{ success: true }`. Frontend non sapeva del fallimento.
 
 **Fix applicato** (Sprint 4):
 ```typescript
-// ❌ PRIMA
-if (ncError) {
-  console.error('Failed to create non-conformity:', ncError)
-}
-
-// ✅ DOPO
+// ✅ Ora ritorna errore visibile
 if (ncError) {
   return { success: false, error: `NC creation failed: ${ncError.message}` }
 }
-```
 
-E nel frontend (checklist-row.tsx):
-```typescript
-// ✅ Mostra errore specifico nel toast
+// ✅ Frontend mostra errore specifico
 toast.error(result.error ?? "Failed to save outcome.")
 ```
 
-**File interessati**: 
-- `src/features/audits/actions/actions.ts`
-- `src/features/audits/components/checklist-row.tsx`
+---
+
+## checklists — HA organization_id
+
+⚠️ Documentazione precedente era errata. La colonna **ESISTE** e va passata negli INSERT:
+
+```typescript
+await supabase.from('checklists').insert({
+  audit_id: auditId,
+  title: 'Checklist',
+  organization_id: organizationId,  // ← obbligatoria
+})
+```
 
 ---
 
-## Template import — CSV edge cases
-
-**CSV Parser** (in template-schema.ts):
-- Supporta colonne: "question", "domanda", "Question", "Domanda" (case-insensitive)
-- Fallback: usa il primo valore della riga se nessuna colonna riconosciuta
-- Gestisce righe vuote e whitespace extra
-- Sort order: usa colonna "sort_order" se presente, altrimenti indice riga
-
-**Excel Parser** (SheetJS):
-- Try SheetJS prima
-- Se errore → toast error + suggerimento "usa formato CSV"
-- Versione: xlsx v0.18.5
-
----
-
-## RLS pattern corretto (usare sempre questo)
+## RLS pattern corretto (sempre questo)
 
 ```sql
--- ✅ Pattern ottimizzato con subquery per performance
 CREATE POLICY "nome" ON tabella FOR ALL
   USING (organization_id IN (
     SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
@@ -160,41 +130,30 @@ CREATE POLICY "nome" ON tabella FOR ALL
   ));
 ```
 
-**Perché `(select auth.uid()::uuid)` invece di `auth.uid()::uuid`**:
-La subquery viene eseguita una volta sola per statement invece che per ogni riga,
-migliorando le performance su tabelle con molte righe.
+La subquery `(select auth.uid()::uuid)` viene eseguita una volta per statement
+invece che per ogni riga — performance migliori su tabelle grandi.
+
+---
+
+## Template import — CSV/Excel edge cases
+
+**CSV parser** (`template-schema.ts` → `parseImportedQuestions()`):
+- Colonne riconosciute: `question`, `domanda`, `Question`, `Domanda` (case-insensitive)
+- Fallback: primo valore della riga se nessuna colonna riconosciuta
+- Righe vuote e whitespace extra gestiti
+
+**Excel parser** (SheetJS):
+- Try SheetJS prima
+- Se errore → toast error + suggerimento formato CSV
 
 ---
 
 ## WARN sicurezza — function_search_path_mutable (non urgente)
 
-Supabase advisor segnala WARN su queste funzioni DB che non hanno `search_path` fisso:
-- `update_updated_at_column`
-- `log_table_change`  
-- `update_non_conformities_updated_at`
-- `update_corrective_actions_updated_at`
-- `update_corrective_actions_closed_at`
-- `sync_user_metadata_to_jwt`
-- `get_user_role`
-- `get_user_organization_id`
-- `update_version_and_timestamp`
-- `handle_new_user`
+Funzioni DB senza `search_path` fisso (solo WARN, non ERROR):
+`update_updated_at_column`, `log_table_change`, `update_non_conformities_updated_at`,
+`update_corrective_actions_updated_at`, `update_corrective_actions_closed_at`,
+`sync_user_metadata_to_jwt`, `get_user_role`, `get_user_organization_id`,
+`update_version_and_timestamp`, `handle_new_user`
 
-**Impatto**: Basso — WARN non ERROR. Non bloccante per il funzionamento.  
 **Fix futuro**: Aggiungere `SET search_path = public` a ogni funzione.
-
----
-
-## checklists — HA organization_id
-
-**Nota**: Documentazione precedente diceva erroneamente che `checklists` non aveva
-`organization_id`. **La colonna ESISTE** e va passata negli INSERT.
-
-```typescript
-// ✅ CORRETTO
-await supabase.from('checklists').insert({
-  audit_id: auditId,
-  title: 'Checklist',
-  organization_id: organizationId,  // ← va inclusa
-})
-```

@@ -4,6 +4,8 @@ export interface OrgContext {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
   organizationId: string;
+  role?: "inspector" | "client" | "admin";
+  clientId?: string;
 }
 
 /**
@@ -42,5 +44,7 @@ export async function getOrganizationContext(): Promise<OrgContext | null> {
     supabase,
     userId: user.id,
     organizationId: profile.organization_id,
+    role: profile.role as "inspector" | "client" | "admin" | undefined,
+    clientId: profile.client_id,
   };
 }

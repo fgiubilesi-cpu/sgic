@@ -34,20 +34,33 @@ type DashboardUser = {
   email: string;
   fullName?: string | null;
   avatarUrl?: string | null;
+  role?: string | null;
 };
 
 type NavItem =
   | { label: string; href: string; icon: React.ElementType; disabled?: false }
   | { label: string; href: null; icon: React.ElementType; disabled: true };
 
-const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: HomeIcon },
-  { label: "Audit", href: "/audits", icon: ClipboardCheck },
-  { label: "Campionamenti", href: null, icon: FlaskConical, disabled: true },
-  { label: "Formazione", href: null, icon: GraduationCap, disabled: true },
-];
+function getNavItems(role?: string | null): NavItem[] {
+  if (role === "client") {
+    // Client users see only the client dashboard
+    return [
+      { label: "Client Dashboard", href: "/client-dashboard", icon: HomeIcon },
+    ];
+  }
 
-function NavLinks() {
+  // Inspector and admin users see the full menu
+  return [
+    { label: "Dashboard", href: "/dashboard", icon: HomeIcon },
+    { label: "Audit", href: "/audits", icon: ClipboardCheck },
+    { label: "Campionamenti", href: null, icon: FlaskConical, disabled: true },
+    { label: "Formazione", href: null, icon: GraduationCap, disabled: true },
+  ];
+}
+
+function NavLinks({ role }: { role?: string | null }) {
+  const NAV_ITEMS = getNavItems(role);
+
   return (
     <nav className="flex-1 space-y-1 px-3 py-4">
       {NAV_ITEMS.map((item) => {
@@ -113,6 +126,13 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  // Fetch user's role from profiles
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
   const dashboardUser: DashboardUser = {
     email: user.email ?? "",
     fullName:
@@ -128,6 +148,7 @@ export default async function DashboardLayout({
         | string
         | null ??
       null,
+    role: profile?.role ?? null,
   };
 
   return (
@@ -136,7 +157,7 @@ export default async function DashboardLayout({
         {/* Desktop sidebar */}
         <aside className="border-r bg-white/80 backdrop-blur-sm hidden md:flex md:w-64 md:flex-col">
           <BrandLogo />
-          <NavLinks />
+          <NavLinks role={dashboardUser.role} />
           <div className="border-t px-4 py-3">
             <UserNav user={dashboardUser} />
           </div>
@@ -162,7 +183,7 @@ export default async function DashboardLayout({
                   </SheetTrigger>
                   <SheetContent side="left" className="flex w-72 flex-col p-0">
                     <BrandLogo />
-                    <NavLinks />
+                    <NavLinks role={dashboardUser.role} />
                     <div className="border-t px-4 py-3">
                       <UserNav user={dashboardUser} />
                     </div>
@@ -176,7 +197,7 @@ export default async function DashboardLayout({
                   <BreadcrumbList>
                     <BreadcrumbItem>
                       <Link
-                        href="/dashboard"
+                        href={dashboardUser.role === "client" ? "/client-dashboard" : "/dashboard"}
                         className="text-xs font-medium text-zinc-500 hover:text-zinc-700"
                       >
                         SGIC
@@ -185,13 +206,13 @@ export default async function DashboardLayout({
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
                       <BreadcrumbPage className="text-xs font-medium">
-                        Dashboard
+                        {dashboardUser.role === "client" ? "Client Dashboard" : "Control Panel"}
                       </BreadcrumbPage>
                     </BreadcrumbItem>
                   </BreadcrumbList>
                 </Breadcrumb>
                 <span className="text-sm font-semibold text-zinc-900">
-                  Control Panel
+                  {dashboardUser.role === "client" ? "Audit Viewer" : "Control Panel"}
                 </span>
               </div>
             </div>

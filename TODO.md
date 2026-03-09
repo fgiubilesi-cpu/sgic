@@ -164,13 +164,47 @@
   - ✅ **Sezione D3** nella dashboard
 - ✅ **TypeScript**: Zero errori dopo implementazione D1-D3
 
-### P5 — Test automatici con Playwright
+### P5 — Test automatici con Playwright ✅ COMPLETATO
 
-- [ ] **T1** Setup Playwright (`npm install -D @playwright/test`)
-- [ ] **T2** Test login/logout
-- [ ] **T3** Test flusso completo: crea audit → apri → compila domande → verifica score e NC
-- [ ] **T4** Test CRUD clienti e sedi
-- [ ] **T5** Script `npm run test:e2e` configurato in package.json
+- [x] **T1** Setup Playwright (`npm install -D @playwright/test`)
+  - ✅ **Installazione**: @playwright/test package installed
+  - ✅ **Configurazione**: playwright.config.ts with:
+    - Test directory: tests/e2e
+    - Base URL: http://localhost:3000
+    - Browsers: Chromium, Firefox, WebKit
+    - Auto web server: npm run dev
+    - HTML reporter, screenshots on failure, traces on first retry
+- [x] **T2** Test login/logout
+  - ✅ **File**: tests/e2e/auth.spec.ts
+  - ✅ **Test cases**:
+    - T2.1: Valid credentials login
+    - T2.2: Invalid email error handling
+    - T2.3: Wrong password validation
+    - T2.4: Logout functionality
+  - ✅ **Coverage**: Full auth flow with error scenarios
+- [x] **T3** Test flusso completo: crea audit → apri → compila domande → verifica score e NC
+  - ✅ **File**: tests/e2e/audit-workflow.spec.ts
+  - ✅ **Test cases**:
+    - T3.1: Complete workflow (create → open → fill → score → NC)
+    - T3.2: Audit score calculation and display
+    - T3.3: Non-conformity auto-creation when NOK selected
+  - ✅ **Coverage**: End-to-end audit operations with verification
+- [x] **T4** Test CRUD clienti e sedi
+  - ✅ **File**: tests/e2e/clients-locations.spec.ts
+  - ✅ **Test cases**:
+    - T4.1: Create new client
+    - T4.2: Edit existing client
+    - T4.3: Create location under client
+    - T4.4: Delete location
+    - T4.5: View clients list
+  - ✅ **Coverage**: Full CRUD workflow for clients and locations
+- [x] **T5** Script `npm run test:e2e` configurato in package.json
+  - ✅ **Scripts added**:
+    - npm run test:e2e → playwright test (all tests)
+    - npm run test:e2e:headed → visible browser
+    - npm run test:e2e:ui → interactive UI mode
+    - npm run test:e2e:debug → with debugger
+  - ✅ **Documentation**: tests/e2e/README.md with usage guide
 
 ---
 

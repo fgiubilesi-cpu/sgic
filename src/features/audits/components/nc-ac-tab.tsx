@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Plus, AlertTriangle, Calendar, User } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, AlertTriangle, Calendar, User, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ import {
   CA_STATUS_LABELS,
   CA_STATUS_COLORS,
 } from "@/features/quality/constants";
-import { createCorrectiveAction } from "@/features/audits/actions/corrective-action-actions";
+import { createCorrectiveAction, updateCorrectiveAction } from "@/features/audits/actions/corrective-action-actions";
 
 interface NcAcTabProps {
   audit: AuditWithChecklists;
@@ -275,6 +275,32 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
                         ? isDueDateOverdue(ca.targetCompletionDate)
                         : false;
                       const caStatus = ca.status as keyof typeof CA_STATUS_LABELS;
+
+                      // N4: Status progression logic
+                      const canAdvanceStatus =
+                        (caStatus === "open") ||
+                        (caStatus === "completed");
+
+                      const nextStatus =
+                        caStatus === "open" ? "completed" :
+                        caStatus === "completed" ? "verified" :
+                        undefined;
+
+                      const handleStatusChange = async () => {
+                        if (!nextStatus) return;
+
+                        const result = await updateCorrectiveAction({
+                          id: ca.id,
+                          status: nextStatus,
+                        });
+
+                        if (result.success) {
+                          toast.success(`Stato AC cambiato a ${CA_STATUS_LABELS[nextStatus]}`);
+                        } else {
+                          toast.error(result.error || "Errore durante l'aggiornamento.");
+                        }
+                      };
+
                       return (
                         <div
                           key={ca.id}
@@ -308,9 +334,24 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
                                 )}
                               </div>
                             </div>
-                            <Badge className={cn("text-xs shrink-0", CA_STATUS_COLORS[caStatus])}>
-                              {CA_STATUS_LABELS[caStatus]}
-                            </Badge>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Badge className={cn("text-xs", CA_STATUS_COLORS[caStatus])}>
+                                {CA_STATUS_LABELS[caStatus]}
+                              </Badge>
+                              {canAdvanceStatus && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleStatusChange}
+                                  className="gap-0.5 text-xs h-6 px-2"
+                                  title={`Cambia a ${CA_STATUS_LABELS[nextStatus!]}`}
+                                >
+                                  <Check className="w-3 h-3" />
+                                  Avanti
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );

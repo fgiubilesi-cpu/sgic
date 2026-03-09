@@ -65,7 +65,16 @@
   - ✅ **Integrazione**: Form riceve props nc, ncId, auditId, onSuccess, onCancel
   - ✅ **Server action**: createCorrectiveAction accetta tutti i campi
   - ✅ **Zero errori TypeScript**
-- [ ] **N4** Cambio stato AC: Aperta → In Progress → Chiusa
+- [x] **N4** Cambio stato AC: Aperta → In Progress → Chiusa
+  - ✅ **Implementato**: Status transition UI buttons per CA
+  - ✅ **Stati AC**: open → completed → verified (schema-defined enums)
+  - ✅ **Flow logica**:
+    - open state: mostra button "Avanti" → completed
+    - completed state: mostra button "Avanti" → verified
+    - verified state: niente button (end state)
+  - ✅ **Azione**: Clicked button chiama updateCorrectiveAction con nuovo status
+  - ✅ **Toast feedback**: Notifica cambio stato
+  - ✅ **Zero errori TypeScript**
 - [ ] **N5** Quando AC chiusa → NC si aggiorna a "risolta"
 - [ ] **N6** Dashboard NC globale: lista tutte le NC aperte di tutti gli audit, filtrabile per cliente
 

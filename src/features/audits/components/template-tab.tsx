@@ -474,7 +474,7 @@ export function TemplateTab({ audit, templates, readOnly = false }: TemplateTabP
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
-                </div>
+                  </div>
                 );
               })}
             </div>

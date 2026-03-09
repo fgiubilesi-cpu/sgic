@@ -91,6 +91,7 @@ export async function updateCorrectiveAction(
         action_plan: validated.actionPlan,
         responsible_person_name: validated.responsiblePersonName,
         responsible_person_email: validated.responsiblePersonEmail,
+        due_date: validated.dueDate,
         target_completion_date: validated.targetCompletionDate,
         status: validated.status,
         updated_at: new Date().toISOString(),

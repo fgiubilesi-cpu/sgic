@@ -116,7 +116,7 @@ export async function completeAudit(
     const completedAt = new Date().toISOString();
     const { error: updateError } = await supabase
       .from("audits")
-      .update({ status: "Review", updated_at: completedAt })
+      .update({ status: "Review" })
       .eq("id", validated.auditId)
       .eq("organization_id", organizationId);
 
@@ -182,7 +182,7 @@ export async function closeAudit(
     const closedAt = new Date().toISOString();
     const { error: updateError } = await supabase
       .from("audits")
-      .update({ status: "Closed", updated_at: closedAt })
+      .update({ status: "Closed" })
       .eq("id", input.auditId)
       .eq("organization_id", organizationId);
 

@@ -78,7 +78,7 @@ export function ChecklistRow({
       formData.append("notes", notes);
       formData.append("path", path);
       updateChecklistItem(formData).then((result) => {
-        if ("error" in result) toast.error("Failed to save note.");
+        if ("error" in result) toast.error(result.error ?? "Failed to save note.");
       });
     },
     [id, path]
@@ -120,7 +120,7 @@ export function ChecklistRow({
 
     const result = await updateChecklistItem(formData);
     if ("error" in result) {
-      toast.error("Failed to save outcome.");
+      toast.error(result.error ?? "Failed to save outcome.");
     } else if (result.ncCreated) {
       toast.info("Non conformità registrata automaticamente.");
     } else if (result.ncCancelled) {

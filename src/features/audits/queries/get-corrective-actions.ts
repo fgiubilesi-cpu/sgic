@@ -9,6 +9,7 @@ export interface CorrectiveAction {
   actionPlan: string | null;
   responsiblePersonName: string | null;
   responsiblePersonEmail: string | null;
+  dueDate: string | null;
   targetCompletionDate: string | null;
   status: CorrectiveActionStatus;
   createdAt: string;
@@ -40,6 +41,7 @@ export async function getCorrectiveActionsByNonConformity(
     actionPlan: ca.action_plan,
     responsiblePersonName: ca.responsible_person_name,
     responsiblePersonEmail: ca.responsible_person_email,
+    dueDate: ca.due_date,
     targetCompletionDate: ca.target_completion_date,
     status: ca.status,
     createdAt: ca.created_at,
@@ -86,6 +88,7 @@ export async function getCorrectiveActionsByAudit(
     actionPlan: ca.action_plan,
     responsiblePersonName: ca.responsible_person_name,
     responsiblePersonEmail: ca.responsible_person_email,
+    dueDate: ca.due_date,
     targetCompletionDate: ca.target_completion_date,
     status: ca.status,
     createdAt: ca.created_at,
@@ -120,6 +123,7 @@ export async function getCorrectiveAction(
     actionPlan: data.action_plan,
     responsiblePersonName: data.responsible_person_name,
     responsiblePersonEmail: data.responsible_person_email,
+    dueDate: data.due_date,
     targetCompletionDate: data.target_completion_date,
     status: data.status,
     createdAt: data.created_at,

@@ -108,7 +108,7 @@ export async function updateChecklistItem(formData: FormData) {
           })
 
         if (ncError) {
-          console.error('Failed to create non-conformity:', ncError)
+          return { success: false, error: `NC creation failed: ${ncError.message}` }
         } else {
           ncCreated = true
         }

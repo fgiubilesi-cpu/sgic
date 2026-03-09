@@ -1,8 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Plus, AlertTriangle, Calendar, User, Check } from "lucide-react";
+import {
+  ChevronDown, ChevronRight, Plus, AlertTriangle, Calendar, User, Check, X, Edit2, FileText
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,13 +27,41 @@ import {
   CA_STATUS_LABELS,
   CA_STATUS_COLORS,
 } from "@/features/quality/constants";
-import { createCorrectiveAction, updateCorrectiveAction } from "@/features/audits/actions/corrective-action-actions";
+import {
+  createCorrectiveAction, updateCorrectiveAction
+} from "@/features/audits/actions/corrective-action-actions";
 
 interface NcAcTabProps {
   audit: AuditWithChecklists;
   nonConformities: NonConformity[];
   correctiveActions: CorrectiveAction[];
 }
+
+// ============================================
+// UTILITY: Date checks
+// ============================================
+
+function isDueDateOverdue(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(dateStr);
+  return due < today;
+}
+
+function isDueSoon(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(dateStr);
+  const diffMs = due.getTime() - today.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  return diffDays > 0 && diffDays <= 7;
+}
+
+// ============================================
+// SUBTAB 1: NON CONFORMITÀ (existing logic)
+// ============================================
 
 interface AddCaFormProps {
   nc: NonConformity;
@@ -34,7 +71,6 @@ interface AddCaFormProps {
   onCancel: () => void;
 }
 
-// N3: Form creazione AC da NC with full fields
 function AddCaForm({ nc, ncId, auditId, onSuccess, onCancel }: AddCaFormProps) {
   const [description, setDescription] = useState("");
   const [rootCause, setRootCause] = useState("");
@@ -74,7 +110,6 @@ function AddCaForm({ nc, ncId, auditId, onSuccess, onCancel }: AddCaFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 space-y-3">
-      {/* NC Context */}
       <div>
         <h4 className="text-xs font-semibold text-zinc-700 uppercase tracking-wide">
           Nuova azione correttiva per
@@ -84,7 +119,6 @@ function AddCaForm({ nc, ncId, auditId, onSuccess, onCancel }: AddCaFormProps) {
         </p>
       </div>
 
-      {/* Description — required */}
       <div>
         <label className="text-xs font-medium text-zinc-600 mb-1 block">
           Descrizione dell'azione <span className="text-red-500">*</span>
@@ -98,40 +132,31 @@ function AddCaForm({ nc, ncId, auditId, onSuccess, onCancel }: AddCaFormProps) {
         />
       </div>
 
-      {/* Root Cause — optional */}
       <div>
-        <label className="text-xs font-medium text-zinc-600 mb-1 block">
-          Causa radice
-        </label>
+        <label className="text-xs font-medium text-zinc-600 mb-1 block">Causa radice</label>
         <Input
           value={rootCause}
           onChange={(e) => setRootCause(e.target.value)}
-          placeholder="Analisi della causa radice del problema..."
+          placeholder="Analisi della causa radice..."
           className="text-sm h-8"
           disabled={isLoading}
         />
       </div>
 
-      {/* Action Plan — optional */}
       <div>
-        <label className="text-xs font-medium text-zinc-600 mb-1 block">
-          Piano d'azione
-        </label>
+        <label className="text-xs font-medium text-zinc-600 mb-1 block">Piano d'azione</label>
         <Input
           value={actionPlan}
           onChange={(e) => setActionPlan(e.target.value)}
-          placeholder="Dettagli del piano d'azione da intraprendere..."
+          placeholder="Dettagli del piano d'azione..."
           className="text-sm h-8"
           disabled={isLoading}
         />
       </div>
 
-      {/* Responsible + Due Date */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs font-medium text-zinc-600 mb-1 block">
-            Responsabile
-          </label>
+          <label className="text-xs font-medium text-zinc-600 mb-1 block">Responsabile</label>
           <Input
             value={assignedTo}
             onChange={(e) => setAssignedTo(e.target.value)}
@@ -141,9 +166,7 @@ function AddCaForm({ nc, ncId, auditId, onSuccess, onCancel }: AddCaFormProps) {
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-zinc-600 mb-1 block">
-            Scadenza
-          </label>
+          <label className="text-xs font-medium text-zinc-600 mb-1 block">Scadenza</label>
           <Input
             type="date"
             value={dueDate}
@@ -154,7 +177,6 @@ function AddCaForm({ nc, ncId, auditId, onSuccess, onCancel }: AddCaFormProps) {
         </div>
       </div>
 
-      {/* Actions */}
       <div className="flex gap-2 justify-end">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isLoading}>
           Annulla
@@ -167,21 +189,12 @@ function AddCaForm({ nc, ncId, auditId, onSuccess, onCancel }: AddCaFormProps) {
   );
 }
 
-function isDueDateOverdue(dateStr: string | null): boolean {
-  if (!dateStr) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(dateStr);
-  return due < today;
-}
-
 interface NcRowProps {
   nc: NonConformity;
   cas: CorrectiveAction[];
   auditId: string;
 }
 
-// N2: Compact table layout for NC
 function NcRow({ nc, cas, auditId }: NcRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [showAddCa, setShowAddCa] = useState(false);
@@ -191,12 +204,10 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
 
   return (
     <>
-      {/* NC table row: ~44px height */}
       <tr
         onClick={() => setExpanded((prev) => !prev)}
         className="h-11 border-b border-zinc-200 hover:bg-zinc-50 transition-colors cursor-pointer group"
       >
-        {/* Expand icon */}
         <td className="px-3 py-0 text-zinc-400 shrink-0 w-8 text-center">
           {expanded ? (
             <ChevronDown className="w-4 h-4 inline" />
@@ -205,21 +216,18 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
           )}
         </td>
 
-        {/* Severity badge */}
         <td className="px-3 py-0 w-24">
           <Badge className={cn("text-xs", NC_SEVERITY_COLORS[severity])}>
             {NC_SEVERITY_LABELS[severity]}
           </Badge>
         </td>
 
-        {/* Status badge */}
         <td className="px-3 py-0 w-32">
           <Badge className={cn("text-xs", NC_STATUS_COLORS[status])}>
             {NC_STATUS_LABELS[status]}
           </Badge>
         </td>
 
-        {/* Linked question / NC title */}
         <td className="px-3 py-0 flex-1 min-w-0">
           <div className="flex items-center gap-1.5 h-full">
             <span className="text-xs text-zinc-900 truncate">
@@ -233,7 +241,6 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
           </div>
         </td>
 
-        {/* Actions */}
         <td className="px-3 py-0 text-right shrink-0">
           <Button
             type="button"
@@ -251,7 +258,6 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
         </td>
       </tr>
 
-      {/* Expanded details row */}
       {expanded && (
         <tr className="border-b border-zinc-100 bg-zinc-50">
           <td colSpan={5} className="px-4 py-3">
@@ -263,7 +269,6 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
                 </div>
               )}
 
-              {/* Corrective Actions list */}
               {cas.length > 0 && (
                 <div>
                   <h4 className="text-xs font-semibold text-zinc-600 uppercase tracking-wide mb-1.5">
@@ -271,15 +276,11 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
                   </h4>
                   <div className="space-y-1.5">
                     {cas.map((ca) => {
-                      const overdue = ca.targetCompletionDate
-                        ? isDueDateOverdue(ca.targetCompletionDate)
-                        : false;
+                      const overdue = ca.dueDate ? isDueDateOverdue(ca.dueDate) : false;
                       const caStatus = ca.status as keyof typeof CA_STATUS_LABELS;
 
-                      // N4: Status progression logic
                       const canAdvanceStatus =
-                        (caStatus === "open") ||
-                        (caStatus === "completed");
+                        (caStatus === "open") || (caStatus === "completed");
 
                       const nextStatus =
                         caStatus === "open" ? "completed" :
@@ -316,7 +317,7 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
                                     {ca.responsiblePersonName}
                                   </span>
                                 )}
-                                {ca.targetCompletionDate && (
+                                {ca.dueDate && (
                                   <span
                                     className={cn(
                                       "flex items-center gap-0.5 text-xs",
@@ -324,9 +325,7 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
                                     )}
                                   >
                                     <Calendar className="w-2.5 h-2.5" />
-                                    {new Intl.DateTimeFormat("it-IT").format(
-                                      new Date(ca.targetCompletionDate)
-                                    )}
+                                    {new Intl.DateTimeFormat("it-IT").format(new Date(ca.dueDate))}
                                     {overdue && (
                                       <AlertTriangle className="w-2.5 h-2.5 text-red-500" />
                                     )}
@@ -345,7 +344,6 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
                                   size="sm"
                                   onClick={handleStatusChange}
                                   className="gap-0.5 text-xs h-6 px-2"
-                                  title={`Cambia a ${CA_STATUS_LABELS[nextStatus!]}`}
                                 >
                                   <Check className="w-3 h-3" />
                                   Avanti
@@ -360,7 +358,6 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
                 </div>
               )}
 
-              {/* Add CA form */}
               {showAddCa ? (
                 <AddCaForm
                   nc={nc}
@@ -378,7 +375,488 @@ function NcRow({ nc, cas, auditId }: NcRowProps) {
   );
 }
 
+// ============================================
+// SUBTAB 2: AZIONI CORRETTIVE (NEW)
+// ============================================
+
+interface AcTableProps {
+  correctiveActions: CorrectiveAction[];
+  nonConformities: NonConformity[];
+  auditId: string;
+}
+
+function AcTable({ correctiveActions, nonConformities, auditId }: AcTableProps) {
+  const [editingCaId, setEditingCaId] = useState<string | null>(null);
+
+  const handleStatusChange = async (caId: string, newStatus: string) => {
+    const updateData: Record<string, unknown> = {
+      status: newStatus,
+    };
+
+    if (newStatus === "completed") {
+      updateData.completedAt = new Date().toISOString();
+    }
+
+    const result = await updateCorrectiveAction({
+      id: caId,
+      ...updateData,
+    });
+
+    if (result.success) {
+      toast.success(`AC cambiata a ${CA_STATUS_LABELS[newStatus as keyof typeof CA_STATUS_LABELS]}`);
+    } else {
+      toast.error(result.error || "Errore durante l'aggiornamento.");
+    }
+  };
+
+  const handleQuickClose = async (caId: string) => {
+    await handleStatusChange(caId, "completed");
+  };
+
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white overflow-hidden shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-zinc-50 border-b border-zinc-200">
+            <tr>
+              <th className="px-3 py-3 text-left font-semibold text-zinc-700">Descrizione</th>
+              <th className="px-3 py-3 text-left font-semibold text-zinc-700 w-40">NC Collegata</th>
+              <th className="px-3 py-3 text-left font-semibold text-zinc-700 w-32">Responsabile</th>
+              <th className="px-3 py-3 text-left font-semibold text-zinc-700 w-32">Scadenza</th>
+              <th className="px-3 py-3 text-left font-semibold text-zinc-700 w-28">Stato</th>
+              <th className="px-3 py-3 text-right font-semibold text-zinc-700 w-24">Azioni</th>
+            </tr>
+          </thead>
+          <tbody>
+            {correctiveActions.map((ca) => {
+              const nc = nonConformities.find((n) => n.id === ca.nonConformityId);
+              const overdue = ca.dueDate ? isDueDateOverdue(ca.dueDate) : false;
+              const dueSoon = ca.dueDate ? isDueSoon(ca.dueDate) : false;
+              const caStatus = ca.status as keyof typeof CA_STATUS_LABELS;
+              const isEditing = editingCaId === ca.id;
+
+              return (
+                <React.Fragment key={ca.id}>
+                  <tr className="h-11 border-b border-zinc-200 hover:bg-zinc-50 transition-colors group">
+                    {/* Descrizione */}
+                    <td className="px-3 py-0">
+                      <p className="text-xs text-zinc-900 truncate max-w-xs">{ca.description}</p>
+                    </td>
+
+                    {/* NC Collegata */}
+                    <td className="px-3 py-0">
+                      <p className="text-xs text-zinc-600 truncate max-w-xs">
+                        {nc?.checklistItem?.question || nc?.title || "N/A"}
+                      </p>
+                    </td>
+
+                    {/* Responsabile */}
+                    <td className="px-3 py-0">
+                      <div className="flex items-center gap-1">
+                        {ca.responsiblePersonName && (
+                          <>
+                            <User className="w-3 h-3 text-zinc-400" />
+                            <span className="text-xs text-zinc-600">{ca.responsiblePersonName}</span>
+                          </>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Scadenza + Badge */}
+                    <td className="px-3 py-0">
+                      {ca.dueDate ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-zinc-600">
+                            {new Intl.DateTimeFormat("it-IT").format(new Date(ca.dueDate))}
+                          </span>
+                          {overdue && ca.status !== "completed" && (
+                            <Badge className="text-xs bg-red-100 text-red-700 border-0">
+                              Scaduta
+                            </Badge>
+                          )}
+                          {dueSoon && !overdue && ca.status !== "completed" && (
+                            <Badge className="text-xs bg-yellow-100 text-yellow-700 border-0">
+                              In scadenza
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-zinc-400">-</span>
+                      )}
+                    </td>
+
+                    {/* Stato */}
+                    <td className="px-3 py-0">
+                      <Badge className={cn("text-xs", CA_STATUS_COLORS[caStatus])}>
+                        {CA_STATUS_LABELS[caStatus]}
+                      </Badge>
+                    </td>
+
+                    {/* Azioni */}
+                    <td className="px-3 py-0 text-right shrink-0">
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* Status Dropdown */}
+                        <select
+                          value={ca.status ?? "pending"}
+                          onChange={(e) => handleStatusChange(ca.id, e.target.value)}
+                          className="text-xs border border-zinc-200 rounded px-1.5 py-0.5 bg-white text-zinc-700 h-6"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <option value="pending">In attesa</option>
+                          <option value="in_progress">In corso</option>
+                          <option value="completed">Completata</option>
+                        </select>
+
+                        {/* Quick Close Button */}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleQuickClose(ca.id);
+                          }}
+                          className="h-6 px-2 text-xs"
+                          title="Chiudi AC"
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+
+                        {/* Edit Button */}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingCaId(isEditing ? null : ca.id);
+                          }}
+                          className="h-6 px-2 text-xs"
+                          title="Modifica AC"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+
+                  {/* EDIT FORM ROW (expanded below AC row) */}
+                  {isEditing && (
+                    <tr className="border-b border-zinc-100 bg-zinc-50">
+                      <td colSpan={6} className="px-4 py-3">
+                        <EditCaForm
+                          ca={ca}
+                          onSuccess={() => setEditingCaId(null)}
+                          onCancel={() => setEditingCaId(null)}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// REPORT GENERATOR (utility function)
+// ============================================
+
+function generateNcAcReport(
+  audit: AuditWithChecklists,
+  nonConformities: NonConformity[],
+  correctiveActions: CorrectiveAction[]
+): string {
+  const clientName = audit.client_name || "N/A";
+  const locationName = audit.location_name || "N/A";
+  const auditDate = audit.scheduled_date
+    ? new Intl.DateTimeFormat("it-IT").format(new Date(audit.scheduled_date))
+    : "N/A";
+
+  let report = "RIEPILOGO NON CONFORMITÀ E AZIONI CORRETTIVE\n";
+  report += `Audit: ${audit.title} — ${clientName} — ${locationName} — ${auditDate}\n`;
+  report += `Totale NC: ${nonConformities.length} | AC registrate: ${correctiveActions.length}\n`;
+  report += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
+
+  nonConformities.forEach((nc, index) => {
+    const severity = (nc.severity as string).toUpperCase();
+    const status = NC_STATUS_LABELS[nc.status as keyof typeof NC_STATUS_LABELS] || nc.status;
+
+    report += `NC #${index + 1} — ${severity} — Stato: ${status}\n`;
+    report += `Domanda: ${nc.checklistItem?.question || nc.title}\n`;
+
+    if (nc.description) {
+      report += `Descrizione: ${nc.description}\n`;
+    }
+
+    const ncCas = correctiveActions.filter((ca) => ca.nonConformityId === nc.id);
+
+    if (ncCas.length > 0) {
+      ncCas.forEach((ca) => {
+        report += `  → Azione Correttiva:\n`;
+        report += `     ${ca.description}\n`;
+
+        if (ca.responsiblePersonName) {
+          report += `     Responsabile: ${ca.responsiblePersonName}\n`;
+        }
+
+        if (ca.dueDate) {
+          const caDate = new Intl.DateTimeFormat("it-IT").format(new Date(ca.dueDate));
+          report += `     Scadenza: ${caDate}\n`;
+        }
+
+        const caStatus = CA_STATUS_LABELS[ca.status as keyof typeof CA_STATUS_LABELS] || ca.status;
+        report += `     Stato: ${caStatus}\n`;
+      });
+    } else {
+      report += `  → Nessuna azione correttiva registrata.\n`;
+    }
+
+    report += "\n";
+  });
+
+  report += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+
+  return report;
+}
+
+// ============================================
+// REPORT MODAL (Dialog component)
+// ============================================
+
+interface ReportModalProps {
+  isOpen: boolean;
+  reportText: string;
+  onClose: () => void;
+}
+
+function ReportModal({ isOpen, reportText, onClose }: ReportModalProps) {
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(reportText);
+      toast.success("Report copiato negli appunti!");
+    } catch (error) {
+      toast.error("Errore durante la copia.");
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-96">
+        <DialogHeader>
+          <DialogTitle>Report NC/AC</DialogTitle>
+        </DialogHeader>
+        <textarea
+          value={reportText}
+          readOnly
+          className="w-full h-64 text-xs border border-zinc-300 rounded p-3 bg-zinc-50 font-mono resize-none focus:ring-1 focus:ring-zinc-500"
+        />
+        <DialogFooter className="flex gap-2 justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleCopy}
+            className="gap-1"
+          >
+            Copia negli appunti
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+          >
+            Chiudi
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================
+// EDIT CA FORM (NEW COMPONENT)
+// ============================================
+
+interface EditCaFormProps {
+  ca: CorrectiveAction;
+  onSuccess: () => void;
+  onCancel: () => void;
+}
+
+function EditCaForm({ ca, onSuccess, onCancel }: EditCaFormProps) {
+  const [description, setDescription] = useState(ca.description);
+  const [actionPlan, setActionPlan] = useState(ca.actionPlan ?? "");
+  const [rootCause, setRootCause] = useState(ca.rootCause ?? "");
+  const [responsiblePersonName, setResponsiblePersonName] = useState(ca.responsiblePersonName ?? "");
+  const [responsiblePersonEmail, setResponsiblePersonEmail] = useState(ca.responsiblePersonEmail ?? "");
+  const [dueDate, setDueDate] = useState(ca.dueDate ? ca.dueDate.split("T")[0] : "");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!description.trim()) {
+      toast.error("La descrizione dell'azione è obbligatoria.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await updateCorrectiveAction({
+        id: ca.id,
+        description: description.trim(),
+        actionPlan: actionPlan.trim() || undefined,
+        rootCause: rootCause.trim() || undefined,
+        responsiblePersonName: responsiblePersonName.trim() || undefined,
+        responsiblePersonEmail: responsiblePersonEmail.trim() || undefined,
+        dueDate: dueDate || undefined,
+      });
+
+      if (result.success) {
+        toast.success("Azione correttiva aggiornata.");
+        onSuccess();
+      } else {
+        toast.error(result.error || "Errore durante l'aggiornamento.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-lg border border-zinc-200 bg-white p-4 space-y-3">
+      <h4 className="text-xs font-semibold text-zinc-700 uppercase tracking-wide mb-2">
+        Modifica Azione Correttiva
+      </h4>
+
+      <div className="grid grid-cols-2 gap-3">
+        {/* Descrizione */}
+        <div>
+          <label className="text-xs font-medium text-zinc-600 mb-1 block">
+            Descrizione <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Descrizione dell'azione correttiva..."
+            rows={2}
+            className="w-full text-xs border border-zinc-300 rounded px-2 py-1.5 placeholder:text-zinc-400 focus:ring-1 focus:ring-zinc-500"
+            disabled={isLoading}
+          />
+        </div>
+
+        {/* Piano d'azione */}
+        <div>
+          <label className="text-xs font-medium text-zinc-600 mb-1 block">
+            Piano d'azione
+          </label>
+          <textarea
+            value={actionPlan}
+            onChange={(e) => setActionPlan(e.target.value)}
+            placeholder="Dettagli del piano d'azione..."
+            rows={2}
+            className="w-full text-xs border border-zinc-300 rounded px-2 py-1.5 placeholder:text-zinc-400 focus:ring-1 focus:ring-zinc-500"
+            disabled={isLoading}
+          />
+        </div>
+
+        {/* Causa radice */}
+        <div>
+          <label className="text-xs font-medium text-zinc-600 mb-1 block">
+            Causa radice
+          </label>
+          <Input
+            value={rootCause}
+            onChange={(e) => setRootCause(e.target.value)}
+            placeholder="Analisi della causa radice..."
+            className="text-xs h-8"
+            disabled={isLoading}
+          />
+        </div>
+
+        {/* Responsabile */}
+        <div>
+          <label className="text-xs font-medium text-zinc-600 mb-1 block">
+            Responsabile
+          </label>
+          <Input
+            value={responsiblePersonName}
+            onChange={(e) => setResponsiblePersonName(e.target.value)}
+            placeholder="Nome responsabile"
+            className="text-xs h-8"
+            disabled={isLoading}
+          />
+        </div>
+
+        {/* Email responsabile */}
+        <div>
+          <label className="text-xs font-medium text-zinc-600 mb-1 block">
+            Email responsabile
+          </label>
+          <Input
+            type="email"
+            value={responsiblePersonEmail}
+            onChange={(e) => setResponsiblePersonEmail(e.target.value)}
+            placeholder="email@example.com"
+            className="text-xs h-8"
+            disabled={isLoading}
+          />
+        </div>
+
+        {/* Scadenza */}
+        <div>
+          <label className="text-xs font-medium text-zinc-600 mb-1 block">
+            Scadenza
+          </label>
+          <Input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className="text-xs h-8"
+            disabled={isLoading}
+          />
+        </div>
+      </div>
+
+      {/* Bottoni */}
+      <div className="flex gap-2 justify-end pt-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onCancel}
+          disabled={isLoading}
+        >
+          Annulla
+        </Button>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={isLoading}
+          className="bg-zinc-900 text-white"
+        >
+          {isLoading ? "Salvataggio..." : "Salva"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ============================================
+// MAIN TAB COMPONENT
+// ============================================
+
 export function NcAcTab({ audit, nonConformities, correctiveActions }: NcAcTabProps) {
+  const [activeSubTab, setActiveSubTab] = useState<"nc" | "ac">("nc");
+  const [reportOpen, setReportOpen] = useState(false);
+
+  const reportText = generateNcAcReport(audit, nonConformities, correctiveActions);
+
   if (nonConformities.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-zinc-200 bg-white px-6 py-10 text-center">
@@ -397,45 +875,94 @@ export function NcAcTab({ audit, nonConformities, correctiveActions }: NcAcTabPr
     <div className="rounded-lg border border-zinc-200 bg-white overflow-hidden shadow-sm">
       {/* Header */}
       <div className="px-4 py-4 border-b border-zinc-200">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
-            Non Conformità e Azioni Correttive
-          </h2>
-          <p className="text-sm text-zinc-500 mt-1">
-            {nonConformities.length} NC trovate · {correctiveActions.length} AC registrate
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
+              Non Conformità e Azioni Correttive
+            </h2>
+            <p className="text-sm text-zinc-500 mt-1">
+              {nonConformities.length} NC trovate · {correctiveActions.length} AC registrate
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setReportOpen(true)}
+            className="gap-2"
+          >
+            <FileText className="w-4 h-4" />
+            Genera Report
+          </Button>
+        </div>
+
+        {/* Subtab Buttons */}
+        <div className="flex gap-4 mt-4 border-b border-zinc-100">
+          <button
+            onClick={() => setActiveSubTab("nc")}
+            className={cn(
+              "px-3 py-2 text-sm font-medium transition-colors pb-2 border-b-2",
+              activeSubTab === "nc"
+                ? "text-zinc-900 border-b-zinc-900"
+                : "text-zinc-500 border-b-transparent hover:text-zinc-700"
+            )}
+          >
+            Non Conformità
+          </button>
+          <button
+            onClick={() => setActiveSubTab("ac")}
+            className={cn(
+              "px-3 py-2 text-sm font-medium transition-colors pb-2 border-b-2",
+              activeSubTab === "ac"
+                ? "text-zinc-900 border-b-zinc-900"
+                : "text-zinc-500 border-b-transparent hover:text-zinc-700"
+            )}
+          >
+            Azioni Correttive
+          </button>
         </div>
       </div>
 
-      {/* Compact table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-zinc-50 border-b border-zinc-200">
-            <tr>
-              <th className="px-3 py-3 text-left font-semibold text-zinc-700 w-8"></th>
-              <th className="px-3 py-3 text-left font-semibold text-zinc-700 w-24">Severità</th>
-              <th className="px-3 py-3 text-left font-semibold text-zinc-700 w-32">Stato</th>
-              <th className="px-3 py-3 text-left font-semibold text-zinc-700 flex-1">Domanda Collegata</th>
-              <th className="px-3 py-3 text-right font-semibold text-zinc-700 w-12">Azioni</th>
-            </tr>
-          </thead>
-          <tbody>
-            {nonConformities.map((nc) => {
-              const ncCas = correctiveActions.filter(
-                (ca) => ca.nonConformityId === nc.id
-              );
-              return (
-                <NcRow
-                  key={nc.id}
-                  nc={nc}
-                  cas={ncCas}
-                  auditId={audit.id}
-                />
-              );
-            })}
-          </tbody>
-        </table>
+      {/* Content */}
+      <div className="p-4">
+        {activeSubTab === "nc" ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-zinc-50 border-b border-zinc-200">
+                <tr>
+                  <th className="px-3 py-3 text-left font-semibold text-zinc-700 w-8"></th>
+                  <th className="px-3 py-3 text-left font-semibold text-zinc-700 w-24">Severità</th>
+                  <th className="px-3 py-3 text-left font-semibold text-zinc-700 w-32">Stato</th>
+                  <th className="px-3 py-3 text-left font-semibold text-zinc-700 flex-1">
+                    Domanda Collegata
+                  </th>
+                  <th className="px-3 py-3 text-right font-semibold text-zinc-700 w-12">Azioni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {nonConformities.map((nc) => {
+                  const ncCas = correctiveActions.filter((ca) => ca.nonConformityId === nc.id);
+                  return (
+                    <NcRow key={nc.id} nc={nc} cas={ncCas} auditId={audit.id} />
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <AcTable
+            correctiveActions={correctiveActions}
+            nonConformities={nonConformities}
+            auditId={audit.id}
+          />
+        )}
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={reportOpen}
+        reportText={reportText}
+        onClose={() => setReportOpen(false)}
+      />
     </div>
   );
 }

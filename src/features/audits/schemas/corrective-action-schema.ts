@@ -18,6 +18,7 @@ export const updateCorrectiveActionSchema = z.object({
   actionPlan: z.string().optional(),
   responsiblePersonName: z.string().optional(),
   responsiblePersonEmail: z.string().email().optional(),
+  dueDate: z.string().date().optional(),
   targetCompletionDate: z.string().date().optional(),
   status: acStatusEnum.optional(),
 });

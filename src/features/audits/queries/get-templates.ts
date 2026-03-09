@@ -52,3 +52,50 @@ export async function getTemplatesForClient(clientId: string): Promise<AuditTemp
 
   return (data ?? []).map((t: any) => ({ id: String(t.id), title: t.title ?? "" }));
 }
+
+export type TemplateWithDetails = {
+  id: string;
+  title: string;
+  description: string | null;
+  clientId: string | null;
+  clientName: string | null;
+  questionCount: number;
+};
+
+/**
+ * Fetches all templates in the organization with metadata.
+ * Includes question count and associated client name.
+ */
+export async function getAllTemplates(): Promise<TemplateWithDetails[]> {
+  const ctx = await getOrganizationContext();
+  if (!ctx) return [];
+
+  const { supabase, organizationId } = ctx;
+
+  const { data, error } = await supabase
+    .from("checklist_templates")
+    .select(`
+      id,
+      title,
+      description,
+      client_id,
+      client:client_id(name),
+      template_questions(id, deleted_at)
+    `)
+    .eq("organization_id", organizationId)
+    .order("title");
+
+  if (error) {
+    console.error("Error fetching all templates:", error);
+    return [];
+  }
+
+  return (data ?? []).map((t: any) => ({
+    id: String(t.id),
+    title: t.title ?? "",
+    description: t.description ?? null,
+    clientId: t.client_id ?? null,
+    clientName: t.client?.[0]?.name ?? null,
+    questionCount: (t.template_questions ?? []).filter((q: any) => !q.deleted_at).length,
+  }));
+}

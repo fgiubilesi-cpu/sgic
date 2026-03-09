@@ -1,9 +1,13 @@
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
+import type { TemplateWithDetails } from "@/features/audits/types/templates";
 
 export type AuditTemplate = {
   id: string;
   title: string;
 };
+
+// Re-export for backwards compatibility
+export type { TemplateWithDetails };
 
 /**
  * Fetches all checklist templates accessible to the current user.
@@ -52,15 +56,6 @@ export async function getTemplatesForClient(clientId: string): Promise<AuditTemp
 
   return (data ?? []).map((t: any) => ({ id: String(t.id), title: t.title ?? "" }));
 }
-
-export type TemplateWithDetails = {
-  id: string;
-  title: string;
-  description: string | null;
-  clientId: string | null;
-  clientName: string | null;
-  questionCount: number;
-};
 
 /**
  * Fetches all templates in the organization with metadata.

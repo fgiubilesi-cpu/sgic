@@ -1,27 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { FileText, Plus, Edit2, Copy, Trash2, ChevronUp, ChevronDown, X, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { FileText, Plus, Edit2, Copy, Trash2, ChevronUp, ChevronDown, X } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import type { AuditWithChecklists } from "@/features/audits/queries/get-audit";
-import type { TemplateWithDetails } from "@/features/audits/queries/get-templates";
-import { getAllTemplates } from "@/features/audits/queries/get-templates";
+import type { TemplateWithDetails } from "@/features/audits/types/templates";
 import {
   createTemplate,
   updateTemplate,
   deleteTemplate,
-  addTemplateQuestion,
   softDeleteTemplateQuestion,
-  updateTemplateQuestion,
-  reorderTemplateQuestions,
 } from "@/features/audits/actions/template-actions";
 
 interface TemplateTabProps {
   audit: AuditWithChecklists;
+  templates: TemplateWithDetails[];
   readOnly?: boolean;
 }
 
@@ -31,32 +28,14 @@ type FormQuestion = {
   sortOrder: number;
 };
 
-export function TemplateTab({ audit, readOnly = false }: TemplateTabProps) {
-  const [templates, setTemplates] = useState<TemplateWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
+export function TemplateTab({ audit, templates, readOnly = false }: TemplateTabProps) {
   const [showNewTemplate, setShowNewTemplate] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TemplateWithDetails | null>(null);
   const [formTitle, setFormTitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Load templates on mount
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const data = await getAllTemplates();
-        setTemplates(data);
-      } catch (err) {
-        console.error("Failed to load templates:", err);
-        toast.error("Errore nel caricamento dei template");
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
+  const [templatesData, setTemplatesData] = useState<TemplateWithDetails[]>(templates);
 
   const handleOpenNewTemplate = () => {
     setEditingTemplate(null);
@@ -93,10 +72,8 @@ export function TemplateTab({ audit, readOnly = false }: TemplateTabProps) {
 
         if (result.success) {
           toast.success("Template aggiornato");
-          // Refresh templates
-          const data = await getAllTemplates();
-          setTemplates(data);
           setShowNewTemplate(false);
+          // Templates will be refreshed from parent page
         } else {
           toast.error(result.error);
         }
@@ -109,10 +86,8 @@ export function TemplateTab({ audit, readOnly = false }: TemplateTabProps) {
 
         if (result.success) {
           toast.success("Template creato");
-          // Refresh templates
-          const data = await getAllTemplates();
-          setTemplates(data);
           setShowNewTemplate(false);
+          // Templates will be refreshed from parent page
         } else {
           toast.error(result.error);
         }
@@ -165,8 +140,7 @@ export function TemplateTab({ audit, readOnly = false }: TemplateTabProps) {
       const result = await deleteTemplate(template.id);
       if (result.success) {
         toast.success("Template eliminato");
-        const data = await getAllTemplates();
-        setTemplates(data);
+        // Templates will be refreshed from parent page
       } else {
         toast.error(result.error);
       }
@@ -185,8 +159,7 @@ export function TemplateTab({ audit, readOnly = false }: TemplateTabProps) {
 
       if (result.success) {
         toast.success("Template duplicato");
-        const data = await getAllTemplates();
-        setTemplates(data);
+        // Templates will be refreshed from parent page
       } else {
         toast.error(result.error);
       }
@@ -224,7 +197,7 @@ export function TemplateTab({ audit, readOnly = false }: TemplateTabProps) {
                     <SheetTitle>Seleziona un template</SheetTitle>
                   </SheetHeader>
                   <div className="mt-6 space-y-2">
-                    {templates.map((t) => (
+                    {templatesData.map((t) => (
                       <button
                         key={t.id}
                         className="w-full p-3 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-left transition"
@@ -284,7 +257,7 @@ export function TemplateTab({ audit, readOnly = false }: TemplateTabProps) {
             </div>
             <Sheet open={showNewTemplate} onOpenChange={setShowNewTemplate}>
               <SheetTrigger asChild>
-                <Button onClick={handleOpenNewTemplate} size="sm" className="gap-2">
+                <Button size="sm" className="gap-2" onClick={handleOpenNewTemplate}>
                   <Plus className="w-4 h-4" />
                   Nuovo Template
                 </Button>
@@ -386,16 +359,14 @@ export function TemplateTab({ audit, readOnly = false }: TemplateTabProps) {
           </div>
 
           {/* Templates Grid */}
-          {loading ? (
-            <div className="text-center py-8 text-zinc-500">Caricamento...</div>
-          ) : templates.length === 0 ? (
+          {templatesData.length === 0 ? (
             <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50 px-6 py-8 text-center">
               <FileText className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
               <p className="text-sm text-zinc-500">Nessun template disponibile</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {templates.map((template) => (
+              {templatesData.map((template) => (
                 <div key={template.id} className="rounded-lg border border-zinc-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition">
                   <div className="px-4 py-3 border-b border-zinc-100 bg-gradient-to-r from-zinc-50 to-zinc-100">
                     <div className="flex items-start justify-between gap-2">

@@ -26,7 +26,7 @@ test.describe('Audit Workflow', () => {
     // Fill audit details (this depends on your form structure)
     // Select client
     await page.click('select[name="client_id"], [data-testid="client-select"]');
-    await page.click('option, [role="option"]', { nth: 1 }).catch(() => null);
+    await page.locator('option, [role="option"]').nth(1).click().catch(() => null);
     
     // Select template or continue
     await page.click('button:has-text("Crea audit"), button:has-text("Avanti")');

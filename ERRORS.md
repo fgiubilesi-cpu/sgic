@@ -1,28 +1,21 @@
-# ERRORS.md — SGIC
-> Errori noti, cause e soluzioni. Aggiornato: 2026-03-08
+# SGIC — Known Errors & Solutions
+> Aggiornato: 2026-03-09 | Sprint 4
 
 ---
 
-## ❌ RIMOSSO — Errore non più valido
+## checklist_items — audit_id denormalizzato
 
-~~`checklists` non ha `organization_id`~~ — **FALSO**. La colonna esiste nel DB reale. Verificato da `database.types.ts`. Inserire sempre `organization_id` negli INSERT su `checklists`.
+**Problema**: `checklist_items.audit_id` esiste nel DB ma è denormalizzato e spesso NULL.
+Non usarlo per JOIN o per recuperare l'audit di appartenenza.
 
----
-
-## checklist_items — audit_id è denormalizzato, NON usarlo per JOIN
-
-**Problema**: `checklist_items.audit_id` esiste come colonna ma è denormalizzato — non è una FK affidabile per join. La FK reale è su `checklist_id`.
-
-**Se hai bisogno dell'audit_id partendo da un checklist_item:**
+**Soluzione**: Recuperare audit_id tramite checklists table:
 ```typescript
-// 1. Leggi il checklist_id dall'item
 const { data: item } = await supabase
   .from('checklist_items')
-  .select('organization_id, checklist_id, question, outcome')
+  .select('checklist_id, question, outcome')
   .eq('id', itemId)
   .single()
 
-// 2. Ottieni audit_id dalla tabella checklists
 const { data: checklist } = await supabase
   .from('checklists')
   .select('audit_id')
@@ -32,57 +25,132 @@ const { data: checklist } = await supabase
 const auditId = checklist.audit_id
 ```
 
-**File interessati**: `src/features/audits/actions/actions.ts` → `updateChecklistItem()`
+**File interessati**: `src/features/audits/actions/actions.ts` → updateChecklistItem()
 
 ---
 
-## corrective_actions — colonne title e assigned_to non esistono
+## corrective_actions — Schema Reale
 
-**Problema**: `corrective_actions` NON ha le colonne `title` o `assigned_to`. Usarle causa PGRST204.
-
-**Colonne corrette da usare:**
-- Al posto di `title` → usare `action_plan` (descrizione del piano)
-- Al posto di `assigned_to` → usare `responsible_person_name` + `responsible_person_email`
-
-**Schema completo corrective_actions:**
+**Colonne che ESISTONO:**
 ```
-action_plan, closed_at, completed_at, created_at, deleted_at,
-description, due_date, id, non_conformity_id, organization_id,
-owner_id, responsible_person_email, responsible_person_name,
-root_cause, status, target_completion_date, updated_at
+id, non_conformity_id, organization_id,
+description, root_cause, action_plan,
+responsible_person_name, responsible_person_email,
+due_date (date), target_completion_date (date),
+status (default 'pending'), updated_at,
+completed_at, closed_at, deleted_at
 ```
+
+**Colonne che NON ESISTONO (non usarle mai):**
+- `title` ❌
+- `assigned_to` ❌
+
+**Status values reali nel DB:**
+- `pending` ✅
+- `in_progress` ✅
+- `completed` ✅
+- `closed` ❌ — non esiste
+- `verified` ❌ — non esiste
+- `open` ❌ — non esiste
+
+**Logica status corretta:**
+- Completare una AC: `status = 'completed'` + `completed_at = now()`
+- `closed_at` è per logiche future (es. verifica al prossimo audit)
 
 ---
 
-## RLS — Pattern corretto con performance ottimizzata
+## corrective_actions — RLS Fix (Sprint 4)
 
-**Problema**: Scrivere `auth.uid()` direttamente nel USING/WITH CHECK causa rivalutazione per ogni riga → lento su tabelle grandi.
+**Problema**: Le policy originali usavano `get_user_organization_id()` che legge
+`organization_id` dal JWT Supabase. Supabase NON include organization_id nel JWT
+di default → la funzione ritornava NULL → `organization_id = NULL` non matcha mai
+→ INSERT/UPDATE/SELECT bloccati per tutti gli utenti.
 
-**Pattern SBAGLIATO (lento):**
+**Fix applicato** (migration `fix_corrective_actions_rls`):
 ```sql
-USING (organization_id IN (
-  SELECT organization_id FROM profiles WHERE id = auth.uid()::uuid
-))
+-- Sostituite tutte e 4 le policy con pattern profiles lookup:
+CREATE POLICY "corrective_actions_insert_own_org" ON corrective_actions
+  FOR INSERT WITH CHECK (
+    organization_id IN (
+      SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
+    )
+  );
+-- (stesso pattern per SELECT, UPDATE, DELETE)
 ```
 
-**Pattern CORRETTO (performante — valutato una sola volta):**
-```sql
-USING (organization_id IN (
-  SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
-))
-WITH CHECK (organization_id IN (
-  SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
-))
-```
+**File interessati**: Migration applicata direttamente su Supabase.
 
 ---
 
-## RLS — INSERT bloccato senza WITH CHECK
+## audits — updated_at non esiste
 
-**Problema**: Una policy con solo `USING` non copre INSERT. L'operazione viene bloccata silenziosamente.
+**Problema**: La tabella `audits` NON ha una colonna `updated_at`.
+Passare `updated_at` in un `.update()` su audits causa errore PGRST204.
 
-**Fix**: Aggiungere sempre `WITH CHECK` per policies FOR ALL o FOR INSERT:
+**Fix**: Rimuovere `updated_at` da tutti gli update su `audits`.
+
+```typescript
+// ❌ SBAGLIATO
+await supabase.from('audits').update({ score: 85, updated_at: new Date().toISOString() })
+
+// ✅ CORRETTO
+await supabase.from('audits').update({ score: 85 })
+```
+
+**File interessati**: `src/features/audits/actions/audit-completion-actions.ts` — fixato Sprint 4.
+
+---
+
+## NC auto-create — errore swallowed
+
+**Problema**: In `updateChecklistItem`, se l'INSERT su `non_conformities` falliva,
+l'errore veniva solo loggato in console e la funzione ritornava `{ success: true }`.
+Il frontend non sapeva del fallimento.
+
+**Fix applicato** (Sprint 4):
+```typescript
+// ❌ PRIMA
+if (ncError) {
+  console.error('Failed to create non-conformity:', ncError)
+}
+
+// ✅ DOPO
+if (ncError) {
+  return { success: false, error: `NC creation failed: ${ncError.message}` }
+}
+```
+
+E nel frontend (checklist-row.tsx):
+```typescript
+// ✅ Mostra errore specifico nel toast
+toast.error(result.error ?? "Failed to save outcome.")
+```
+
+**File interessati**: 
+- `src/features/audits/actions/actions.ts`
+- `src/features/audits/components/checklist-row.tsx`
+
+---
+
+## Template import — CSV edge cases
+
+**CSV Parser** (in template-schema.ts):
+- Supporta colonne: "question", "domanda", "Question", "Domanda" (case-insensitive)
+- Fallback: usa il primo valore della riga se nessuna colonna riconosciuta
+- Gestisce righe vuote e whitespace extra
+- Sort order: usa colonna "sort_order" se presente, altrimenti indice riga
+
+**Excel Parser** (SheetJS):
+- Try SheetJS prima
+- Se errore → toast error + suggerimento "usa formato CSV"
+- Versione: xlsx v0.18.5
+
+---
+
+## RLS pattern corretto (usare sempre questo)
+
 ```sql
+-- ✅ Pattern ottimizzato con subquery per performance
 CREATE POLICY "nome" ON tabella FOR ALL
   USING (organization_id IN (
     SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
@@ -92,90 +160,41 @@ CREATE POLICY "nome" ON tabella FOR ALL
   ));
 ```
 
----
-
-## PGRST204 — Colonna non trovata
-
-**Causa**: La cache dello schema PostgREST è vecchia dopo un ALTER TABLE.
-
-**Fix immediato:**
-```sql
-NOTIFY pgrst, 'reload schema';
-```
+**Perché `(select auth.uid()::uuid)` invece di `auth.uid()::uuid`**:
+La subquery viene eseguita una volta sola per statement invece che per ogni riga,
+migliorando le performance su tabelle con molte righe.
 
 ---
 
-## Loop ricorsivo createClient
+## WARN sicurezza — function_search_path_mutable (non urgente)
 
-**Causa**: Conflitto di nome nell'import di Supabase.
+Supabase advisor segnala WARN su queste funzioni DB che non hanno `search_path` fisso:
+- `update_updated_at_column`
+- `log_table_change`  
+- `update_non_conformities_updated_at`
+- `update_corrective_actions_updated_at`
+- `update_corrective_actions_closed_at`
+- `sync_user_metadata_to_jwt`
+- `get_user_role`
+- `get_user_organization_id`
+- `update_version_and_timestamp`
+- `handle_new_user`
 
-**Fix:**
+**Impatto**: Basso — WARN non ERROR. Non bloccante per il funzionamento.  
+**Fix futuro**: Aggiungere `SET search_path = public` a ogni funzione.
+
+---
+
+## checklists — HA organization_id
+
+**Nota**: Documentazione precedente diceva erroneamente che `checklists` non aveva
+`organization_id`. **La colonna ESISTE** e va passata negli INSERT.
+
 ```typescript
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-```
-
----
-
-## 404 su nuova route
-
-**Causa**: Il middleware non conosce la nuova route.
-
-**Fix**: Aggiungere il path a `isDashboardRoute` in `middleware.ts`.
-
----
-
-## ncSeveritySchema is not defined
-
-**Causa**: Nome variabile sbagliato.
-
-**Fix**: Usare `ncSeverityEnum` (non `ncSeveritySchema`) importato da `features/quality/schemas/nc-ac.schema.ts`.
-
----
-
-## Tabelle senza RLS — rischio sicurezza
-
-**Problema**: Le seguenti tabelle sono pubblicamente accessibili senza RLS:
-
-| Tabella | Stato |
-|---|---|
-| `documents` | RLS disabilitata (policies esistono ma inattive) |
-| `risks` | RLS disabilitata (policies esistono ma inattive) |
-| `training_records` | RLS assente |
-| `training_courses` | RLS assente |
-| `personnel` | RLS assente |
-| `document_versions` | RLS assente |
-| `action_evidence` | RLS abilitata ma zero policies |
-
-**Fix da applicare (sprint sicurezza):**
-```sql
-ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.risks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.training_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.training_courses ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.personnel ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.document_versions ENABLE ROW LEVEL SECURITY;
-
--- Policy per action_evidence
-CREATE POLICY "action_evidence_org_isolation" ON public.action_evidence
-  FOR ALL
-  USING (organization_id IN (
-    SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
-  ))
-  WITH CHECK (organization_id IN (
-    SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
-  ));
-```
-
----
-
-## Supabase joins — sintassi corretta
-
-**Sbagliato:**
-```typescript
-.select("*, clients(name), locations(name)")
-```
-
-**Corretto:**
-```typescript
-.select("*, client:client_id(name), location:location_id(name)")
+// ✅ CORRETTO
+await supabase.from('checklists').insert({
+  audit_id: auditId,
+  title: 'Checklist',
+  organization_id: organizationId,  // ← va inclusa
+})
 ```

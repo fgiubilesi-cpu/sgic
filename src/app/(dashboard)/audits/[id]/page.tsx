@@ -76,6 +76,25 @@ export default async function AuditDetailPage({
 
   return (
     <div className="flex flex-col space-y-6">
+      {/* Breadcrumb locale */}
+      <div className="flex items-center gap-1.5 text-xs text-zinc-400 mb-4">
+        <span>Audit</span>
+        {audit.client_name && (
+          <>
+            <span>/</span>
+            <span className="text-zinc-600">{audit.client_name}</span>
+          </>
+        )}
+        {audit.location_name && (
+          <>
+            <span>/</span>
+            <span className="text-zinc-600">{audit.location_name}</span>
+          </>
+        )}
+        <span>/</span>
+        <span className="text-zinc-900 font-medium">{audit.title}</span>
+      </div>
+
       {/* Audit header */}
       <div>
         <div className="flex items-start justify-between gap-4">

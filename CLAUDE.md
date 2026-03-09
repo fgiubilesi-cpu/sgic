@@ -1,5 +1,6 @@
 # CLAUDE.md — SGIC
 > Contesto completo per agenti AI. Leggi tutto prima di iniziare qualsiasi task.
+> Aggiornato: 2026-03-09 | Sprint 4 completato
 
 ---
 
@@ -8,29 +9,31 @@
 **SGIC** — Sistema di Gestione Ispezioni e Conformità  
 Client: Giubilesi Associati (consulenza agri-food, ISO 9001)  
 Stack: Next.js 16 App Router + TypeScript strict + Supabase + Tailwind + shadcn/ui + Zod + Sonner  
-Porta dev: 3000 (o 3010 se avviato da Claude Code)
+Porta dev: 3000 (o 3010 se avviato da Claude Code)  
+Supabase project_id: `dchmmcnnfpyzemxqgnmb`
 
 ### Ruoli utente
-- `inspector` — Giubilesi (is_platform_owner=true): crea audit, compila checklist, gestisce NC/AC
-- `client` — cliente finale: oggi riceve solo report via mail, in futuro accede al portale
+- `inspector` / `admin` — Giubilesi (is_platform_owner=true): crea audit, compila checklist, gestisce NC/AC
+- `client` — cliente finale: fase 2, accesso read-only al portale
 
 ### Struttura navigazione (menu laterale sinistro)
 ```
-Dashboard     ← centro di controllo con filtri (cliente, sede, modulo, periodo)
+Dashboard     ← centro di controllo con filtri
 Audit         ← modulo operativo padre
   [tab] Checklist
   [tab] Non Conformità / AC
-  [tab] Template
+    [subtab] Non Conformità
+    [subtab] Azioni Correttive
+  [tab] Template     ← gestione template organizzazione + import CSV/Excel
+Organization  ← dati organizzazione
 Campionamenti ← futuro
 Formazione    ← futuro
 ```
-⚠️ NON esiste più "Qualità" come voce separata — le NC/AC globali vivono nella Dashboard con filtri.
 
 ### Report audit (deliverable core)
-- Formato primario: **Excel** — checklist completa con domande, outcome, note, allegati media
-- Formato secondario: PDF (nice-to-have futuro)
-- Sintesi mail: testo bozza auto-generato post-audit con lista NC trovate (helper per ispettore)
-- Il report viene ancora revisionato e inviato manualmente dall'ispettore
+- Formato primario: **Excel** — checklist completa con domande, outcome, note, allegati
+- Bottone "Genera Report NC-AC" → testo bozza mail con lista NC+AC (client-side, no API)
+- Il report viene revisionato e inviato manualmente dall'ispettore
 
 ---
 
@@ -47,80 +50,53 @@ organizations (is_platform_owner=true → Giubilesi, vede tutto)
                                       └── corrective_actions
 ```
 
-Seed: organization id `4ed14a8b-a5b5-4933-b83f-a940b4993707`, admin id `c6cc8a13-6e0d-47fd-ab44-8c4093679bd2`
+Seed: organization id `4ed14a8b-a5b5-4933-b83f-a940b4993707`  
+Admin id: `c6cc8a13-6e0d-47fd-ab44-8c4093679bd2`
 
 ---
 
 ## 3. Schema DB — Colonne Importanti
 
 ### `audits`
-id, title, status, scheduled_date, organization_id, client_id, location_id, **score numeric(5,2)**
+id, title, status, scheduled_date, organization_id, client_id, location_id, score numeric(5,2)  
+⚠️ NON ha updated_at — non passarla mai negli update
 
 ### `checklists`
 id, audit_id, title, organization_id, created_at  
-✅ Ha organization_id — inserirla sempre negli INSERT
+✅ HA organization_id (correzione rispetto a doc precedente)
 
 ### `checklist_items`
-id, checklist_id, question, outcome, notes, evidence_url, audio_url, organization_id, source_question_id, version, created_at, updated_at, sort_order integer, audit_id uuid (denormalizzato)  
-⚠️ `audit_id` è denormalizzato — NON usare per JOIN, usare sempre checklist_id → checklists.audit_id
+id, checklist_id, question, outcome, notes, evidence_url, audio_url,  
+organization_id, source_question_id, version, sort_order, updated_at, audit_id (denormalizzato)  
+⚠️ audit_id è denormalizzato — non usarlo per JOIN → usa checklist_id → checklists.audit_id
 
 ### `non_conformities`
-id, audit_id, checklist_item_id, organization_id, title, description, severity, status, closed_at, created_at, updated_at, deleted_at, evidence_url
+id, audit_id, checklist_item_id, organization_id, title, description,  
+severity, status, closed_at, created_at, updated_at, deleted_at, evidence_url
 
 ### `corrective_actions`
-id, non_conformity_id, organization_id, description, due_date, status, closed_at, completed_at, deleted_at, responsible_person_name, responsible_person_email, root_cause, action_plan, owner_id, target_completion_date, created_at, updated_at  
-- Una NC può avere più AC (1:N), di solito 1:1 nella pratica  
-- due_date: opzionale, con reminder visivo UI quando scaduta  
-- status: open → in_progress → closed → verified (verifica avviene al prossimo audit)  
-- ⚠️ NON ha colonne `title` o `assigned_to` — usa `responsible_person_name` e `action_plan`
+id, non_conformity_id, organization_id, description, root_cause, action_plan,  
+responsible_person_name, responsible_person_email,  
+due_date (date), target_completion_date (date),  
+status (default 'pending'), updated_at, completed_at, closed_at, deleted_at  
+⚠️ NON esistono: title, assigned_to  
+⚠️ Status values reali: `pending` | `in_progress` | `completed`  
+⚠️ NON esistono status: "closed", "verified", "open"
 
-### `corrective_actions` — colonne reali complete
-action_plan, closed_at, completed_at, created_at, deleted_at, description, due_date, id, non_conformity_id, organization_id, owner_id, responsible_person_email, responsible_person_name, root_cause, status, target_completion_date, updated_at
+### `checklist_templates`
+id, title, description, organization_id, created_at
 
-### Tabelle secondarie presenti nel DB
-- `action_evidence` — allegati alle AC (file_url, file_name, file_type, notes)
-- `audit_logs` — log di sistema (action, table_name, record_id, old_data, new_data)
-- `audit_trail` — storico cambi status audit (old_status, new_status, changed_by)
-- `checklist_templates` + `template_questions` — template riutilizzabili
-- `documents` + `document_versions` — gestione documentale (RLS da abilitare)
-- `risks` — gestione rischi (RLS da abilitare)
-- `personnel` + `training_courses` + `training_records` — formazione (RLS da abilitare)
-- `samplings` + `lab_results` — campionamenti futuri
+### `template_questions`
+id, template_id, question, sort_order, weight, deleted_at  
+⚠️ Soft delete via deleted_at — mai DELETE fisico
 
 ---
 
-## 4. Infrastruttura Media (evidence_url / audio_url)
+## 4. Infrastruttura Media
 
-`checklist_items` ha già due colonne dedicate ai media:
-- `evidence_url` → foto/video (una URL Supabase Storage)
-- `audio_url` → nota audio (una URL Supabase Storage)
-
-### Bucket Supabase Storage
-- Nome bucket: `checklist-media`
-- Path convention: `{organizationId}/{auditId}/{itemId}/evidence.{ext}`
-- Path convention: `{organizationId}/{auditId}/{itemId}/audio.webm`
-- Accesso: bucket privato, URL firmati con scadenza 1h
-
-### Pattern upload
-```typescript
-// Upload file su Supabase Storage
-const { data, error } = await supabase.storage
-  .from('checklist-media')
-  .upload(path, file, { upsert: true })
-
-// Ottieni URL firmato
-const { data: { signedUrl } } = await supabase.storage
-  .from('checklist-media')
-  .createSignedUrl(path, 3600)
-```
-
-### Aggiornamento item dopo upload
-```typescript
-await supabase
-  .from('checklist_items')
-  .update({ evidence_url: signedUrl }) // o audio_url
-  .eq('id', itemId)
-```
+Bucket Supabase Storage: `checklist-media` (privato)  
+Path convention: `{organizationId}/{auditId}/{itemId}/evidence.{ext}` o `audio.webm`  
+URL firmati con scadenza 1h via createSignedUrl()
 
 ---
 
@@ -129,25 +105,40 @@ await supabase
 ```
 src/
   app/(dashboard)/
-    dashboard/          ← centro di controllo con filtri
+    dashboard/
     audits/[id]/
-      page.tsx          ← tab: checklist (default)
-      non-conformities/ ← tab: NC/AC
-      templates/        ← tab: template checklist
+      page.tsx          ← tab via query param: ?tab=checklist (default) | ?tab=nc | ?tab=templates
     clients/[id]/
   features/
     audits/
-      actions/    → createAuditFromTemplate, updateChecklistItem, updateAuditStatus, autoCreateNC
-      queries/    → getAudit, getAudits, getAuditSummary, getNonConformities, getCorrectiveActions
-      schemas/    → audit-schema.ts, non-conformity-schema.ts
-      components/ → ChecklistManager, AuditStats, NonConformitiesList, AuditStatusBadge,
-                    MediaCapture, AudioRecorder, NCAutoCreate
+      actions/
+        actions.ts                    ← updateChecklistItem (con NC auto-create)
+        corrective-action-actions.ts  ← createCorrectiveAction, updateCorrectiveAction
+        template-actions.ts           ← CRUD template + reorder + import bulk
+        audit-completion-actions.ts   ← completeAudit, updateAuditStatus
+        export-actions.ts             ← exportAuditToExcel
+      queries/
+        get-audit.ts
+        get-audits.ts
+        get-non-conformities.ts
+        get-corrective-actions.ts
+      schemas/
+        audit-schema.ts
+        non-conformity-schema.ts
+        template-schema.ts            ← Zod + CSV/Excel parser
+      components/
+        checklist-manager.tsx
+        checklist-row.tsx
+        nc-ac-tab.tsx                 ← refactored Sprint 4 (subtab NC + AC)
+        template-editor.tsx           ← refactored Sprint 4 (reorder + import)
+        audit-completion-section.tsx
+        export-excel-button.tsx
       constants.ts
     clients/
-    dashboard/          ← nuovo modulo
-      queries/    → getDashboardStats, getNCGlobal, getACAudit
+    dashboard/
+      queries/    → getDashboardStats, getNCGlobal
       components/ → DashboardFilters, NCGlobalTable, AuditTrendChart
-    quality/            ← mantenuto solo per nc-ac.schema.ts
+    quality/
       schemas/    → nc-ac.schema.ts (ncSeverityEnum, ncStatusEnum)
       constants.ts
   lib/supabase/
@@ -168,11 +159,11 @@ if (!ctx) return { success: false, error: 'Not authenticated.' }
 const { supabase, organizationId, userId } = ctx
 ```
 
-### Supabase joins
+### Supabase joins (sintassi corretta)
 ```typescript
-// CORRETTO
+// ✅ CORRETTO
 .select("..., client:client_id(name), location:location_id(name)")
-// SBAGLIATO — non funziona
+// ❌ SBAGLIATO — non funziona con Supabase
 .select("..., clients(name), locations(name)")
 ```
 
@@ -185,20 +176,19 @@ NON importare da database.types.ts. Schemas Zod → `features/{nome}/schemas/`
 
 | Errore | Causa | Fix |
 |--------|-------|-----|
-| `auth.uid()` in RLS non funziona | Manca cast | `auth.uid()::uuid` |
-| profiles non trovato | Colonna sbagliata | usa `id` non `user_id` |
-| Loop ricorsivo createClient | Conflitto nome import | `import { createClient as createSupabaseClient }` |
-| 404 su nuova route | Middleware non aggiornato | aggiungere a `isDashboardRoute` in middleware.ts |
+| RLS blocca INSERT corrective_actions | Policy usava get_user_organization_id() che legge JWT (ritorna NULL) | ✅ FIXATO Sprint 4: policy usa profiles lookup |
+| auth.uid() in RLS non funziona | Manca subquery e cast | `(select auth.uid()::uuid)` |
+| AC status "closed"/"verified" non esiste | Enum sbagliato | usare: pending, in_progress, completed |
+| audits non ha updated_at | Colonna inesistente | rimuovere updated_at dagli update su audits |
+| checklist_items.audit_id = null | Campo denormalizzato non affidabile | recuperare audit_id da checklists table |
 | PGRST204 colonna non trovata | Schema cache vecchia | `NOTIFY pgrst, 'reload schema';` |
-| INSERT bloccato da RLS | Manca WITH CHECK | aggiungere `WITH CHECK (...)` alla policy |
-| `ncSeveritySchema is not defined` | Nome sbagliato | usare `ncSeverityEnum` da nc-ac.schema |
-| checklist_items.audit_id in JOIN | audit_id è denormalizzato | usare checklist_id → checklists.audit_id |
-| corrective_actions INSERT fallisce | Colonne title/assigned_to non esistono | usare action_plan e responsible_person_name |
-| RLS lenta su query grandi | auth.uid() rivalutato per ogni riga | usare `(select auth.uid()::uuid)` con parentesi |
+| Loop ricorsivo createClient | Conflitto nome import | `import { createClient as createSupabaseClient }` |
+| 404 su nuova route | Middleware non aggiornato | aggiungere a isDashboardRoute in middleware.ts |
+| INSERT bloccato RLS | Manca WITH CHECK | aggiungere WITH CHECK alla policy |
+| ncSeveritySchema is not defined | Nome sbagliato | usare ncSeverityEnum da nc-ac.schema |
 
-### RLS policy corretta per INSERT/ALL — pattern ottimizzato
+### RLS policy pattern corretto (usare sempre questo)
 ```sql
--- CORRETTO (performante — auth.uid() valutato una sola volta)
 CREATE POLICY "nome" ON tabella FOR ALL
   USING (organization_id IN (
     SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
@@ -206,49 +196,70 @@ CREATE POLICY "nome" ON tabella FOR ALL
   WITH CHECK (organization_id IN (
     SELECT organization_id FROM profiles WHERE id = (select auth.uid()::uuid)
   ));
-
--- SBAGLIATO (lento — rivalutato per ogni riga)
-CREATE POLICY "nome" ON tabella FOR ALL
-  USING (organization_id IN (SELECT organization_id FROM profiles WHERE id = auth.uid()::uuid));
 ```
 
 ---
 
-## 8. Regole per Agenti
+## 8. nc-ac-tab.tsx — Architettura Attuale
 
-1. Leggi CLAUDE.md e TODO.md prima di iniziare
+### Subtab [Non Conformità]
+- Tabella NcRow espandibile con badge severità/stato
+- Form inline AddCaForm per aggiungere AC a ogni NC
+- Filtro AC per non_conformity_id
+
+### Subtab [Azioni Correttive]
+- Tabella AcTable con TUTTE le AC dell'audit
+- Colonne: Descrizione | NC Collegata | Responsabile | Scadenza | Stato | Azioni
+- Badge scadenza: rosso se due_date < oggi, giallo se entro 7gg (solo se status != completed)
+- Dropdown stato inline: pending → in_progress → completed
+- Bottone "✕" chiude AC (status=completed, setta completed_at)
+- Bottone "✏️" apre EditCaForm inline (6 campi: description, action_plan, root_cause, responsible_person_name, responsible_person_email, due_date)
+
+### Bottone "Genera Report NC-AC"
+- Client-side, nessuna API call
+- Testo strutturato: audit info + lista NC con AC collegate
+- Modal Dialog con textarea readonly + "Copia negli appunti"
+
+---
+
+## 9. Template Management — Implementato Sprint 4
+
+### Funzionalità
+- Lista template organizzazione con contatore domande
+- Crea/modifica template (titolo, descrizione)
+- Aggiunta/rimozione domande (soft delete via deleted_at)
+- Reorder domande con frecce ↑↓
+- Import bulk da CSV o Excel
+
+### Import CSV/Excel
+- CSV: parser manuale, colonna "question" o "domanda" (case-insensitive)
+- Excel: SheetJS, fallback su errore
+- Flusso: seleziona file → anteprima domande → conferma → salva → reload
+
+### File chiave
+- `template-schema.ts`: Zod validation + parseImportedQuestions()
+- `template-actions.ts`: addTemplateQuestion, reorderTemplateQuestion, importTemplateQuestions
+- `template-editor.tsx`: UI completa
+
+---
+
+## 10. Regole per Agenti
+
+1. Leggi CLAUDE.md e TODO.md prima di iniziare qualsiasi task
 2. Un task alla volta — esegui → testa → marca [x] → fermati
-3. Prima di modificare il DB, verifica colonne esistenti:
+3. Prima di modificare il DB, verifica colonne:
    ```sql
    SELECT column_name, data_type FROM information_schema.columns 
    WHERE table_name = 'nome' AND table_schema = 'public' ORDER BY ordinal_position;
    ```
 4. Dopo ogni ALTER TABLE → `NOTIFY pgrst, 'reload schema';`
 5. Non aggiungere migration per colonne già esistenti
-6. Commit dopo ogni P0 completato
+6. npx tsc --noEmit dopo ogni modifica TypeScript
+7. Commit dopo ogni milestone completata
 
 ---
 
-## 9. Workflow Agenti
-
-### Un task
-```
-Leggi CLAUDE.md e TODO.md.
-Prendi il primo task [ ] nel CURRENT SPRINT, eseguilo,
-marcalo [x] con note, poi fermati e aspetta.
-```
-
-### Sprint completo autonomo
-```
-Leggi CLAUDE.md e TODO.md.
-Esegui tutti i task [ ] del CURRENT SPRINT in sequenza.
-Per ogni task: esegui → testa → marca [x] → commit → prossimo.
-Fermati solo se trovi un errore bloccante.
-```
-
----
-
-## 10. Comandi Utili
+## 11. Comandi Utili
 
 ```bash
 # Rigenera tipi TypeScript
@@ -257,58 +268,30 @@ supabase gen types typescript --linked --schema public > src/types/database.type
 # Dev server
 npm run dev
 
-# Kill processi
+# Kill processi porta
 kill $(lsof -t -i:3000) && kill $(lsof -t -i:3010)
 
-# Test e2e
-npm run test:e2e
+# TypeScript check
+npx tsc --noEmit
 ```
 
 ```sql
--- Verifica colonne
+-- Verifica colonne tabella
 SELECT column_name, data_type FROM information_schema.columns 
 WHERE table_name = 'nome' AND table_schema = 'public' ORDER BY ordinal_position;
 
--- Reload schema cache
+-- Reload schema cache PostgREST
 NOTIFY pgrst, 'reload schema';
 ```
 
 ---
 
-## 11. Issues DB Noti (da fixare in sprint dedicato)
-
-### Sicurezza — RLS mancante
-Queste tabelle sono pubbliche senza protezione e vanno fixate:
-```sql
-ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.risks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.training_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.training_courses ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.personnel ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.document_versions ENABLE ROW LEVEL SECURITY;
--- action_evidence: RLS abilitata ma zero policies — aggiungere policy
-```
-
-### Performance — FK senza indici
-Le FK più usate nelle query sono prive di indice. Da aggiungere su:
-- `audits(organization_id, client_id, location_id)`
-- `checklist_items(checklist_id, organization_id, audit_id)`
-- `non_conformities(audit_id, organization_id)`
-- `corrective_actions(non_conformity_id, organization_id)`
-- `checklists(audit_id, organization_id)`
-
-### Policy duplicate su `audits`
-Esistono due policies sovrapposte per INSERT: `"Users can create audits"` e `audits_insert_policy`. Rimuovere una delle due.
-
----
-
 ## 12. Backlog Tecnico
 
-- [ ] Rigenera database.types.ts dopo ogni migrazione DB significativa
-- [ ] Fix RLS su documents, risks, personnel, training_records, training_courses, document_versions
-- [ ] Fix RLS performance: sostituire `auth.uid()` con `(select auth.uid())` in tutte le policies
-- [ ] Aggiungere indici sulle FK principali
-- [ ] Rimuovere policy duplicate su audits INSERT
-- [ ] Portale cliente (fase 2): accesso dashboard filtrata per il proprio client_id
+- [ ] Fix 5 errori TypeScript pre-esistenti in routes.d.ts e audit-workflow.spec.ts
+- [ ] Rigenera database.types.ts dopo migrazioni significative
+- [ ] Fix search_path su funzioni DB (WARN sicurezza — non urgente)
+- [ ] Portale cliente (fase 2): accesso dashboard filtrata per client_id
 - [ ] PDF report audit (nice-to-have, dopo Excel)
-- [ ] Multi-sito avanzato: dashboard aggregata cross-location per gruppo
+- [ ] Compliance Score 0% con 3 NOK — verificare calcolo score
+- [ ] Breadcrumb "Control Panel" generico — mostrare nome cliente/sede

@@ -1,108 +1,94 @@
 # SGIC — TODO.md
-> Aggiornato: 2026-03-09 | Sprint 4
+> Aggiornato: 2026-03-09 | Sprint 5
 
 ---
 
-## CURRENT SPRINT — Stabilizzazione + Deploy Ready
+## CURRENT SPRINT — Test, Pulizia, UX
 
-### P0 — Fix DB e Sicurezza (fare subito) ✅ COMPLETATO
+### P0 — Test funzionali end-to-end (fare subito)
 
-- [x] **DB1** Applicare migration RLS client access: `supabase/migrations/20260309000001_rls_client_access.sql`
-- [x] **DB2** Abilitare RLS su tabelle esposte: `documents`, `risks`, `training_records`, `training_courses`, `personnel`, `document_versions`
-- [x] **DB3** Aggiungere policy su `action_evidence` (RLS abilitata ma zero policies)
-- [x] **DB4** Fix RLS performance: sostituire `auth.uid()` con `(select auth.uid()::uuid)` in tutte le policies
-- [x] **DB5** Rimuovere policy duplicate su `audits` INSERT (`"Users can create audits"` e `audits_insert_policy`)
-- [x] **DB6** Aggiungere indici FK mancanti su: `audits`, `checklist_items`, `non_conformities`, `corrective_actions`, `checklists`
+- [ ] **V1** Test flusso completo audit: crea audit da template → apri → imposta 1 OK + 1 NOK + 1 N/A → verifica score aggiornato + NC auto-creata → tab NC mostra la NC
+- [ ] **V2** Test flusso NC→AC: apri NC → aggiungi AC → verifica AC appare nel subtab AC → cambia stato AC → verifica badge scadenza
+- [ ] **V3** Test "Genera Report NC-AC": clicca bottone → verifica testo generato corretto → copia negli appunti
+- [ ] **V4** Test Template: crea nuovo template → aggiungi domande → reorder ↑↓ → import CSV → import Excel → crea audit da template
+- [ ] **V5** Test Export Excel: completa audit → clicca "Esporta Excel" → verifica file scaricato con 3 fogli
 
-### P1 — Test e Verifica Funzionale
+### P1 — Bug noti da investigare
 
-- [ ] **V1** Test manuale flusso completo: login → crea audit → compila checklist → verifica score e NC
-- [ ] **V2** Test export Excel: verifica 3 fogli (Checklist, NC, AC) con dati reali
-- [ ] **V3** Test cambio stato AC: open → completed → verified → NC chiusa
-- [ ] **V4** Test ruolo client: accesso solo ai propri audit, tab Templates nascosto
-- [ ] **V5** Test Dashboard KPI con dati reali
+- [ ] **B1** Compliance Score mostra 0% anche con 3 NOK — verificare calcolo in audit-completion-section.tsx  
+  Ipotesi: il calcolo conta solo `compliant` e ignora `non_compliant` nel denominatore
+- [ ] **B2** Breadcrumb mostra "Control Panel" invece di nome cliente/sede — trovare e correggere il componente breadcrumb in audits/[id]/page.tsx
 
-### P2 — Errori TypeScript da risolvere
+### P2 — Errori TypeScript pre-esistenti
 
-- [ ] **TS1** Fix 5 errori pre-esistenti in `.next/dev/types/routes.d.ts`
-- [ ] **TS2** Fix errore in `tests/e2e/audit-workflow.spec.ts` (Playwright)
+- [ ] **TS1** Fix 5 errori in routes.d.ts (pre-esistenti, non introdotti da Sprint 4)
+- [ ] **TS2** Fix 1 errore in audit-workflow.spec.ts (Playwright — pre-esistente)
 
-### P3 — Pulizia e Refactoring
+### P3 — UX Miglioramenti
 
-- [ ] **C1** Verificare che i form AC usino campi DB reali: `action_plan`, `responsible_person_name`, `responsible_person_email` (NON `title`/`assigned_to`)
-- [ ] **C2** Verificare che `AddCaForm` in `nc-ac-tab.tsx` mappi correttamente sui campi DB reali
-- [ ] **C3** Commit pulito con tag `v0.3-sprint4` dopo P0+P1 completati
+- [ ] **UX1** Checklist: note salvate ma campo non si svuota visivamente dopo il salvataggio — fix feedback UI
+- [ ] **UX2** Lista audit: aggiungere colonna "Score" e "NC aperte" nella tabella audit
+- [ ] **UX3** Dashboard: KPI "% compliance media ultimi 30 giorni" — verificare che usi dati reali dal DB
+- [ ] **UX4** Tab NC badge contatore non si aggiorna in real-time dopo aggiunta AC — fix con router.refresh() o revalidatePath
+
+### P4 — Commit e Tag
+
+- [ ] **G1** Commit stabile con tutti i fix Sprint 4: `git commit -m "feat: Sprint 4 - NC/AC subtab, template management, RLS fix"` → tag `v0.4-sprint4-complete`
+- [ ] **G2** Rigenera database.types.ts: `supabase gen types typescript --linked --schema public > src/types/database.types.ts`
+
+---
+
+## BACKLOG — Sprint Futuri
+
+### Sprint 6 — Dashboard e Notifiche
+- [ ] Dashboard NC globale: lista tutte le NC aperte di tutti gli audit, filtrabile per cliente/sede
+- [ ] Widget "Audit in scadenza nei prossimi 7 giorni"
+- [ ] KPI reali: audit questo mese, NC aperte totali, % compliance media
+- [ ] Notifiche email NC aperte da più di X giorni (Resend)
+
+### Sprint 7 — Portale Cliente (Fase 2)
+- [ ] Accesso client read-only con ruolo `client`
+- [ ] Dashboard filtrata per client_id
+- [ ] Vista audit e NC del proprio cliente
+
+### Sprint 8 — Qualità e Infrastruttura
+- [ ] PDF report audit (dopo Excel)
+- [ ] CI/CD con GitHub Actions (lint + typecheck + test e2e su PR)
+- [ ] Environment staging separato
+- [ ] Fix search_path su funzioni DB (WARN sicurezza)
+- [ ] Ricerca globale
+- [ ] Filtri avanzati lista audit
+- [ ] Modalità offline base
 
 ---
 
 ## COMPLETATO ✅
 
 ### Sprint 1-3
+- Auth login/logout
+- Struttura feature-based Next.js
+- Multi-tenant organizations + is_platform_owner
+- CRUD Clienti e Sedi
+- Sidebar navigazione + middleware
+- Schema DB completo
+- createAuditFromTemplate
+- Lista audit con join cliente/sede
+- Pagina dettaglio audit con checklist compilabile
+- Score automatico audit
+- Generazione NC automatica da risposta NOK
+- Fix RLS policies
+- Export Excel (3 fogli: checklist, NC, AC)
+- Dashboard KPI base
+- Fase 2 client read-only (struttura)
 
-- [x] Auth login/logout
-- [x] Struttura feature-based Next.js
-- [x] Multi-tenant organizations + is_platform_owner
-- [x] CRUD Clienti e Sedi
-- [x] Sidebar navigazione + middleware
-- [x] Schema DB: clients, locations, checklists, checklist_items
-- [x] createAuditFromTemplate (audits → checklists → checklist_items)
-- [x] Lista audit con join cliente/sede
-- [x] Pagina dettaglio audit con checklist compilabile
-- [x] Score automatico audit
-- [x] Generazione NC automatica da risposta NOK
-- [x] Fix RLS policies core tables
-- [x] Colonne DB: score, organization_id su checklists, sort_order e audit_id su checklist_items
-- [x] Fix 18 errori TypeScript (AuditOutcome type, NCsSeverity alias, importazioni)
-
-### P1 — UX Checklist ✅
-
-- [x] **U1** Layout checklist compatto stile tabella (h-11, bordo sinistro per outcome, media hover)
-- [x] **U2** Progress bar con colore dinamico (rosso/giallo/verde) e label feedback
-- [x] **U3** Badge NC rosso nella riga quando item ha non conformità
-
-### P2 — Flusso NC → AC ✅
-
-- [x] **N1** Risposta NOK genera automaticamente NC (severity=minor, status=open)
-- [x] **N2** Lista NC nella pagina audit: tabella compatta con stato, severità, domanda
-- [x] **N3** Form creazione AC da NC (description, rootCause, actionPlan, responsabile, dueDate)
-- [x] **N4** Cambio stato AC: open → completed → verified
-- [x] **N5** Quando AC verified → NC status=closed
-- [x] **N6** Dashboard NC globale con filtro per cliente
-
-### P3 — Report Excel ✅
-
-- [x] **R1** Setup exceljs
-- [x] **R2** Server Action export con 3 fogli: Checklist + Non Conformità + AC
-- [x] **R3** Bottone "Scarica Excel" nella pagina dettaglio audit
-- [x] **R4** Fogli separati NC e AC nel report
-
-### P4 — Dashboard Homepage ✅
-
-- [x] **D1** KPI reali: audit questo mese, NC aperte, % compliance 30gg
-- [x] **D2** Lista ultimi 5 audit con link diretto
-- [x] **D3** Widget audit in scadenza 7 giorni (alert rosso/giallo)
-
-### Extra (non pianificato ma implementato)
-
-- [x] Fase 2 foundation: ruolo client con accesso read-only ai propri audit
-- [x] Role-based routing (client → /client-dashboard)
-- [x] Storico audit con timeline visuale
-- [x] CI/CD GitHub Actions (lint + build + E2E)
-- [x] Sidebar con Organization + Settings ripristinata
-
----
-
-## BACKLOG — Sprint Futuri
-
-- [ ] Notifiche email NC aperte da più di X giorni (Resend)
-- [ ] Import checklist da Excel (già sviluppato, da testare)
-- [ ] Personalizzazione template per cliente (già sviluppato, da testare)
-- [ ] Trascrizione vocale note (Web Speech API)
-- [ ] Upload foto allegati (Supabase Storage)
-- [ ] Modalità offline base
-- [ ] Ricerca globale
-- [ ] Filtri avanzati lista audit
-- [ ] PDF report audit (nice-to-have)
-- [ ] Multi-sito avanzato: dashboard aggregata cross-location per gruppo
-- [ ] Portale cliente Fase 2 completo (dopo test Fase 2 foundation)
-- [ ] Environment staging separato
+### Sprint 4
+- [x] **DB** Fix RLS corrective_actions (policy usava get_user_organization_id() → NULL)
+- [x] **BUG-1** Fix audit-completion-actions.ts: rimosso updated_at da update su audits (colonna inesistente)
+- [x] **BUG-2** Fix updateChecklistItem: errore NC creation ora visibile al frontend invece di swallowato
+- [x] **BUG-3** Fix checklist-row.tsx: toast mostra result.error specifico invece di messaggio generico
+- [x] **NC/AC Tab** Refactor completo nc-ac-tab.tsx:
+  - Subtab interni [Non Conformità] e [Azioni Correttive]
+  - AcTable con dropdown stato, badge scadenza, bottone chiudi, form edit inline
+  - Bottone "Genera Report NC-AC" con modal e copia negli appunti
+- [x] **Template** Refactor template-editor.tsx con reorder frecce + import CSV/Excel
+- [x] **DB Security** RLS abilitata su documents, risks, personnel, training_courses, training_records, document_versions + 13 indici FK aggiunti

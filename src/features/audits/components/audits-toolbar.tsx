@@ -201,10 +201,23 @@ export function AuditsToolbar({
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
               {SAVED_VIEWS.map((savedView) => {
-                const isActive = Object.entries(savedView.params).every(([key, value]) => {
-                  const paramValue = currentSearchParams.get(key);
-                  return (paramValue ?? "") === value;
-                });
+                const defaults = getDefaultAuditsListState();
+                const isActive =
+                  savedView.id === "all"
+                    ? state.search === defaults.search &&
+                      state.status === defaults.status &&
+                      state.clientId === defaults.clientId &&
+                      state.locationId === defaults.locationId &&
+                      state.period === defaults.period &&
+                      state.hasOpenNc === defaults.hasOpenNc &&
+                      state.scoreBand === defaults.scoreBand &&
+                      state.sort === defaults.sort &&
+                      state.groupBy === defaults.groupBy &&
+                      state.viewMode === defaults.viewMode
+                    : Object.entries(savedView.params).every(([key, value]) => {
+                        const paramValue = currentSearchParams.get(key);
+                        return (paramValue ?? "") === value;
+                      });
 
                 return (
                   <Button

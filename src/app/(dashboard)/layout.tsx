@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { UserNav } from "@/features/auth/components/user-nav";
+import { GlobalSearchLauncher } from "@/features/search/components/global-search-launcher";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -223,7 +224,8 @@ export default async function DashboardLayout({
             </div>
 
             {/* User menu desktop */}
-            <div className="hidden md:flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-3 flex-1 justify-end">
+              <GlobalSearchLauncher />
               <Separator orientation="vertical" className="h-6" />
               <UserNav user={dashboardUser} />
             </div>

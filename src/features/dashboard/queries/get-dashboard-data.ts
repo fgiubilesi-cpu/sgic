@@ -61,6 +61,28 @@ export interface MonthlyKPIs {
   complianceAvg: number | null;
 }
 
+export interface DashboardNotification {
+  id: string;
+  title: string;
+  description: string;
+  href: string;
+  tone: "default" | "warning" | "danger";
+}
+
+export interface DashboardTodoItem {
+  id: string;
+  title: string;
+  description: string;
+  href: string;
+  badge?: string;
+  priority: "normal" | "high" | "urgent";
+}
+
+export interface DashboardActionCenter {
+  notifications: DashboardNotification[];
+  todos: DashboardTodoItem[];
+}
+
 export interface ClientOption {
   id: string;
   name: string;
@@ -116,6 +138,26 @@ function applyAuditFilters(
   if (filters.dateFrom) query = query.gte("scheduled_date", filters.dateFrom);
   if (filters.dateTo) query = query.lte("scheduled_date", filters.dateTo);
   return query;
+}
+
+function getStartOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function formatDateLabel(dateString: string | null) {
+  if (!dateString) return "Senza data";
+  return new Intl.DateTimeFormat("it-IT", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(dateString));
 }
 
 // ─── Dashboard Metrics ─────────────────────────────────────────────────────
@@ -414,5 +456,295 @@ export async function getMonthlyKPIs(): Promise<MonthlyKPIs> {
     auditsThisMonth: auditsThisMonth ?? 0,
     openNCsTotal: openNCsTotal ?? 0,
     complianceAvg,
+  };
+}
+
+export async function getDashboardActionCenter(
+  filters: DashboardFilters
+): Promise<DashboardActionCenter> {
+  const ctx = await getOrganizationContext();
+  if (!ctx) return { notifications: [], todos: [] };
+  const { supabase, organizationId } = ctx;
+
+  const today = getStartOfToday();
+  const sevenDaysOut = addDays(today, 7);
+  const thirtyDaysOut = addDays(today, 30);
+  const todayIso = today.toISOString().split("T")[0];
+  const sevenDaysOutIso = sevenDaysOut.toISOString().split("T")[0];
+
+  const { data: audits } = await applyAuditFilters(
+    supabase
+      .from("audits")
+      .select(
+        "id, title, scheduled_date, status, client_id, location_id, client:client_id(name), location:location_id(name)"
+      ),
+    organizationId,
+    filters
+  )
+    .order("scheduled_date", { ascending: true })
+    .limit(80);
+
+  const auditIds = (audits ?? []).map((audit: any) => audit.id as string);
+  const auditsById = new Map<string, any>((audits ?? []).map((audit: any) => [audit.id as string, audit]));
+
+  const { data: openNCs } = auditIds.length
+    ? await supabase
+        .from("non_conformities")
+        .select("id, title, severity, status, audit_id")
+        .in("audit_id", auditIds)
+        .eq("status", "open")
+        .order("created_at", { ascending: false })
+    : { data: [] as any[] };
+
+  const ncIds = (openNCs ?? []).map((nc: any) => nc.id as string);
+  const { data: correctiveActions } = ncIds.length
+    ? await supabase
+        .from("corrective_actions")
+        .select("id, non_conformity_id, status, target_completion_date, responsible_person_name")
+        .in("non_conformity_id", ncIds)
+        .order("target_completion_date", { ascending: true, nullsFirst: false })
+    : { data: [] as any[] };
+
+  let documentsQuery = supabase
+    .from("documents")
+    .select("id, title, expiry_date, status, client_id, location_id, personnel_id")
+    .eq("organization_id", organizationId)
+    .not("expiry_date", "is", null)
+    .order("expiry_date", { ascending: true });
+
+  if (filters.clientId) {
+    documentsQuery = documentsQuery.eq("client_id", filters.clientId);
+  }
+  if (filters.locationId) {
+    documentsQuery = documentsQuery.eq("location_id", filters.locationId);
+  }
+
+  let personnelQuery = supabase
+    .from("personnel")
+    .select("id, first_name, last_name, is_active, client_id, location_id")
+    .eq("organization_id", organizationId)
+    .eq("is_active", true)
+    .order("last_name")
+    .order("first_name");
+
+  if (filters.clientId) {
+    personnelQuery = personnelQuery.eq("client_id", filters.clientId);
+  }
+  if (filters.locationId) {
+    personnelQuery = personnelQuery.eq("location_id", filters.locationId);
+  }
+
+  const [{ data: documents }, { data: personnel }] = await Promise.all([
+    documentsQuery,
+    personnelQuery,
+  ]);
+
+  const personnelIds = (personnel ?? []).map((person: any) => person.id as string);
+  const { data: trainingRecords } = personnelIds.length
+    ? await supabase
+        .from("training_records")
+        .select("id, personnel_id, expiry_date, completion_date, course:course_id(title)")
+        .eq("organization_id", organizationId)
+        .in("personnel_id", personnelIds)
+        .not("expiry_date", "is", null)
+        .order("expiry_date", { ascending: true })
+    : { data: [] as any[] };
+
+  const overdueAudits = (audits ?? []).filter((audit: any) => {
+    if (!audit.scheduled_date) return false;
+    const status = (audit.status ?? "").toLowerCase();
+    if (["closed", "completed", "cancelled"].includes(status)) return false;
+    return new Date(audit.scheduled_date) < today;
+  });
+
+  const upcomingAudits = (audits ?? []).filter((audit: any) => {
+    if (!audit.scheduled_date) return false;
+    const status = (audit.status ?? "").toLowerCase();
+    if (["closed", "completed", "cancelled"].includes(status)) return false;
+    const scheduledDate = new Date(audit.scheduled_date);
+    return scheduledDate >= today && scheduledDate <= sevenDaysOut;
+  });
+
+  const criticalNCs = (openNCs ?? []).filter((nc: any) =>
+    ["critical", "major"].includes((nc.severity ?? "").toLowerCase())
+  );
+
+  const overdueCorrectiveActions = (correctiveActions ?? []).filter((action: any) => {
+    const status = (action.status ?? "").toLowerCase();
+    if (["verified", "completed", "closed"].includes(status)) return false;
+    if (!action.target_completion_date) return false;
+    return new Date(action.target_completion_date) < today;
+  });
+
+  const overdueDocuments = (documents ?? []).filter((document: any) => {
+    if (!document.expiry_date) return false;
+    return new Date(document.expiry_date) < today;
+  });
+
+  const expiringDocuments = (documents ?? []).filter((document: any) => {
+    if (!document.expiry_date) return false;
+    const expiryDate = new Date(document.expiry_date);
+    return expiryDate >= today && expiryDate <= thirtyDaysOut;
+  });
+
+  const personNameById = new Map<string, string>(
+    (personnel ?? []).map((person: any) => [
+      person.id as string,
+      `${person.first_name ?? ""} ${person.last_name ?? ""}`.trim() || "Collaboratore",
+    ])
+  );
+
+  const expiredTraining = (trainingRecords ?? []).filter((record: any) => {
+    if (!record.expiry_date) return false;
+    return new Date(record.expiry_date) < today;
+  });
+
+  const expiringTraining = (trainingRecords ?? []).filter((record: any) => {
+    if (!record.expiry_date) return false;
+    const expiryDate = new Date(record.expiry_date);
+    return expiryDate >= today && expiryDate <= thirtyDaysOut;
+  });
+
+  const notifications: DashboardNotification[] = [];
+
+  if (overdueCorrectiveActions.length > 0) {
+    notifications.push({
+      id: "overdue-corrective-actions",
+      title: `${overdueCorrectiveActions.length} azioni correttive scadute`,
+      description: "Richiedono follow-up immediato e riallineamento con il responsabile.",
+      href: "/non-conformities",
+      tone: "danger",
+    });
+  }
+
+  if (criticalNCs.length > 0) {
+    notifications.push({
+      id: "critical-ncs",
+      title: `${criticalNCs.length} non conformita prioritarie`,
+      description: "Sono presenti NC critiche o maggiori ancora aperte nel perimetro filtrato.",
+      href: "/non-conformities",
+      tone: "warning",
+    });
+  }
+
+  if (overdueDocuments.length > 0 || expiringDocuments.length > 0) {
+    notifications.push({
+      id: "document-deadlines",
+      title:
+        overdueDocuments.length > 0
+          ? `${overdueDocuments.length} documenti scaduti`
+          : `${expiringDocuments.length} documenti in scadenza`,
+      description:
+        overdueDocuments.length > 0
+          ? "Aggiornare o archiviare i documenti scaduti collegati a clienti, sedi o collaboratori."
+          : "Verificare i documenti in scadenza nei prossimi 30 giorni.",
+      href: "/clients",
+      tone: overdueDocuments.length > 0 ? "danger" : "warning",
+    });
+  }
+
+  if (expiredTraining.length > 0 || expiringTraining.length > 0) {
+    notifications.push({
+      id: "training-deadlines",
+      title:
+        expiredTraining.length > 0
+          ? `${expiredTraining.length} corsi formazione scaduti`
+          : `${expiringTraining.length} corsi in scadenza`,
+      description:
+        expiredTraining.length > 0
+          ? "Alcuni collaboratori hanno formazione non piu valida."
+          : "Ci sono rinnovi formativi da pianificare entro 30 giorni.",
+      href: "/clients",
+      tone: expiredTraining.length > 0 ? "danger" : "warning",
+    });
+  }
+
+  if (upcomingAudits.length > 0) {
+    notifications.push({
+      id: "upcoming-audits",
+      title: `${upcomingAudits.length} audit nei prossimi 7 giorni`,
+      description: "Conviene confermare disponibilita, sede e checklist operative prima della settimana.",
+      href: "/audits",
+      tone: "default",
+    });
+  }
+
+  const todos: DashboardTodoItem[] = [];
+
+  for (const audit of overdueAudits.slice(0, 3)) {
+    todos.push({
+      id: `audit-${audit.id}`,
+      title: audit.title ?? "Audit da riallineare",
+      description: `Audit pianificato per ${formatDateLabel(audit.scheduled_date)} presso ${audit.client?.name ?? "cliente"}.`,
+      href: `/audits/${audit.id}`,
+      badge: "Audit scaduto",
+      priority: "urgent",
+    });
+  }
+
+  for (const action of overdueCorrectiveActions.slice(0, 3)) {
+    todos.push({
+      id: `ac-${action.id}`,
+      title: action.responsible_person_name
+        ? `Riallinea AC con ${action.responsible_person_name}`
+        : "Aggiorna azione correttiva scaduta",
+      description: `Target ${formatDateLabel(action.target_completion_date)}. Serve un avanzamento o una nuova data.`,
+      href: `/non-conformities/${action.non_conformity_id}`,
+      badge: "AC scaduta",
+      priority: "urgent",
+    });
+  }
+
+  for (const document of [...overdueDocuments, ...expiringDocuments].slice(0, 3)) {
+    const href =
+      document.personnel_id
+        ? `/personnel/${document.personnel_id}`
+        : document.client_id
+          ? `/clients/${document.client_id}`
+          : "/clients";
+
+    todos.push({
+      id: `document-${document.id}`,
+      title: document.title ?? "Documento da aggiornare",
+      description: `Scadenza ${formatDateLabel(document.expiry_date)}. Verificare validita e versioning.`,
+      href,
+      badge: new Date(document.expiry_date).getTime() < today.getTime() ? "Documento scaduto" : "Documento in scadenza",
+      priority: new Date(document.expiry_date).getTime() < today.getTime() ? "high" : "normal",
+    });
+  }
+
+  for (const record of [...expiredTraining, ...expiringTraining].slice(0, 3)) {
+    todos.push({
+      id: `training-${record.id}`,
+      title: personNameById.get(record.personnel_id) ?? "Collaboratore da riallineare",
+      description: `${record.course?.title ?? "Formazione"} con scadenza ${formatDateLabel(record.expiry_date)}.`,
+      href: `/personnel/${record.personnel_id}`,
+      badge: new Date(record.expiry_date).getTime() < today.getTime() ? "Formazione scaduta" : "Formazione in scadenza",
+      priority: new Date(record.expiry_date).getTime() < today.getTime() ? "high" : "normal",
+    });
+  }
+
+  if (todos.length === 0) {
+    for (const audit of upcomingAudits.slice(0, 3)) {
+      todos.push({
+        id: `upcoming-audit-${audit.id}`,
+        title: `Conferma audit: ${audit.title}`,
+        description: `Previsto per ${formatDateLabel(audit.scheduled_date)} presso ${audit.client?.name ?? "cliente"}.`,
+        href: `/audits/${audit.id}`,
+        badge: "Prossimo audit",
+        priority: "normal",
+      });
+    }
+  }
+
+  const priorityRank: Record<DashboardTodoItem["priority"], number> = {
+    urgent: 0,
+    high: 1,
+    normal: 2,
+  };
+
+  return {
+    notifications: notifications.slice(0, 4),
+    todos: todos.sort((left, right) => priorityRank[left.priority] - priorityRank[right.priority]).slice(0, 8),
   };
 }

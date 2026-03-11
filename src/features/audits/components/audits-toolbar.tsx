@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AuditsExportButton } from "@/features/audits/components/audits-export-button";
+import type { AuditWithNCCount } from "@/features/audits/queries/get-audits";
 import type {
   AuditsListOptions,
   AuditsListState,
@@ -31,6 +33,7 @@ type AuditsToolbarProps = {
   options: AuditsListOptions;
   totalCount: number;
   filteredCount: number;
+  audits: AuditWithNCCount[];
 };
 
 const STATUS_OPTIONS: Array<{ value: "all" | AuditStatus; label: string }> = [
@@ -112,6 +115,7 @@ export function AuditsToolbar({
   options,
   totalCount,
   filteredCount,
+  audits,
 }: AuditsToolbarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -264,6 +268,8 @@ export function AuditsToolbar({
             >
               Reset all
             </Button>
+
+            <AuditsExportButton audits={audits} />
           </div>
         </div>
 

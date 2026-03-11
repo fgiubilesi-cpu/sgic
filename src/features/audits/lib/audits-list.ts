@@ -40,10 +40,38 @@ export type AuditsListKpis = {
   averageScore: number | null;
 };
 
+export type AuditRiskSignal = {
+  key: "overdue" | "open_nc" | "low_score" | "unscored" | "review";
+  label: string;
+  tone: string;
+};
+
 export type AuditsListSection = {
   id: string;
   label: string;
   audits: AuditWithNCCount[];
+};
+
+export type AuditsListInsights = {
+  attentionCount: number;
+  overdueCount: number;
+  lowScoreCount: number;
+  unscoredCount: number;
+  upcoming: AuditWithNCCount[];
+  clientTrends: Array<{
+    id: string;
+    label: string;
+    audits: number;
+    avgScore: number | null;
+    openNc: number;
+  }>;
+  locationTrends: Array<{
+    id: string;
+    label: string;
+    audits: number;
+    avgScore: number | null;
+    openNc: number;
+  }>;
 };
 
 type SearchParamValue = string | string[] | undefined;
@@ -84,7 +112,7 @@ function isValidValue<T extends string>(value: string | undefined, validValues: 
   return Boolean(value) && validValues.includes(value as T);
 }
 
-function parseDate(value: string | null): Date | null {
+export function parseDate(value: string | null): Date | null {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -313,6 +341,174 @@ export function getAuditsListKpis(audits: AuditWithNCCount[]): AuditsListKpis {
           )
         : null,
   };
+}
+
+export function getAuditRiskSignals(audit: AuditWithNCCount): AuditRiskSignal[] {
+  const signals: AuditRiskSignal[] = [];
+  const auditDate = parseDate(audit.scheduled_date);
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  if (auditDate && auditDate < todayStart && audit.status !== "Closed") {
+    signals.push({
+      key: "overdue",
+      label: "Overdue",
+      tone: "bg-rose-100 text-rose-700 border-rose-200",
+    });
+  }
+
+  if (audit.nc_count > 0) {
+    signals.push({
+      key: "open_nc",
+      label: `${audit.nc_count} open NC`,
+      tone: "bg-amber-100 text-amber-800 border-amber-200",
+    });
+  }
+
+  if (audit.score !== null && audit.score < 70) {
+    signals.push({
+      key: "low_score",
+      label: "Low score",
+      tone: "bg-orange-100 text-orange-800 border-orange-200",
+    });
+  }
+
+  if (audit.score === null && audit.status !== "Scheduled") {
+    signals.push({
+      key: "unscored",
+      label: "Unscored",
+      tone: "bg-zinc-100 text-zinc-700 border-zinc-200",
+    });
+  }
+
+  if (audit.status === "Review") {
+    signals.push({
+      key: "review",
+      label: "Needs review",
+      tone: "bg-blue-100 text-blue-700 border-blue-200",
+    });
+  }
+
+  return signals;
+}
+
+export function getAuditNextStep(audit: AuditWithNCCount): string {
+  const auditDate = parseDate(audit.scheduled_date);
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  if (audit.status === "Scheduled" && auditDate && auditDate >= todayStart) {
+    return "Prepare checklist and launch audit";
+  }
+
+  if (audit.status === "Scheduled" && auditDate && auditDate < todayStart) {
+    return "Reschedule or start immediately";
+  }
+
+  if (audit.status === "In Progress") {
+    return audit.nc_count > 0 ? "Close critical findings and move to review" : "Finish evidence collection";
+  }
+
+  if (audit.status === "Review") {
+    return "Validate findings and close the audit";
+  }
+
+  if (audit.status === "Closed" && audit.nc_count > 0) {
+    return "Track corrective actions linked to this audit";
+  }
+
+  return "Open full audit details";
+}
+
+export function getAuditsListInsights(audits: AuditWithNCCount[]): AuditsListInsights {
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const upcoming = [...audits]
+    .filter((audit) => {
+      const date = parseDate(audit.scheduled_date);
+      return date !== null && date >= todayStart;
+    })
+    .sort((left, right) => {
+      const leftDate = parseDate(left.scheduled_date)?.getTime() ?? 0;
+      const rightDate = parseDate(right.scheduled_date)?.getTime() ?? 0;
+      return leftDate - rightDate;
+    })
+    .slice(0, 5);
+
+  const attentionCount = audits.filter((audit) => getAuditRiskSignals(audit).length > 0).length;
+  const overdueCount = audits.filter((audit) =>
+    getAuditRiskSignals(audit).some((signal) => signal.key === "overdue")
+  ).length;
+  const lowScoreCount = audits.filter((audit) =>
+    getAuditRiskSignals(audit).some((signal) => signal.key === "low_score")
+  ).length;
+  const unscoredCount = audits.filter((audit) =>
+    getAuditRiskSignals(audit).some((signal) => signal.key === "unscored")
+  ).length;
+
+  return {
+    attentionCount,
+    overdueCount,
+    lowScoreCount,
+    unscoredCount,
+    upcoming,
+    clientTrends: buildTrendList(audits, "client"),
+    locationTrends: buildTrendList(audits, "location"),
+  };
+}
+
+function buildTrendList(
+  audits: AuditWithNCCount[],
+  mode: "client" | "location"
+): AuditsListInsights["clientTrends"] {
+  const grouped = new Map<
+    string,
+    {
+      label: string;
+      audits: number;
+      scoredTotal: number;
+      scoredCount: number;
+      openNc: number;
+    }
+  >();
+
+  for (const audit of audits) {
+    const id = mode === "client" ? audit.client_id ?? "no-client" : audit.location_id ?? "no-location";
+    const label =
+      mode === "client" ? audit.client_name ?? "No Client" : audit.location_name ?? "No Location";
+
+    const current = grouped.get(id) ?? {
+      label,
+      audits: 0,
+      scoredTotal: 0,
+      scoredCount: 0,
+      openNc: 0,
+    };
+
+    current.audits += 1;
+    current.openNc += audit.nc_count;
+
+    if (audit.score !== null) {
+      current.scoredTotal += audit.score;
+      current.scoredCount += 1;
+    }
+
+    grouped.set(id, current);
+  }
+
+  return Array.from(grouped.entries())
+    .map(([id, entry]) => ({
+      id,
+      label: entry.label,
+      audits: entry.audits,
+      avgScore: entry.scoredCount > 0 ? Math.round(entry.scoredTotal / entry.scoredCount) : null,
+      openNc: entry.openNc,
+    }))
+    .sort((left, right) => {
+      if (right.openNc !== left.openNc) return right.openNc - left.openNc;
+      return (left.avgScore ?? 101) - (right.avgScore ?? 101);
+    })
+    .slice(0, 4);
 }
 
 export function getActiveFilterLabels(

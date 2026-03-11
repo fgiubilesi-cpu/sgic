@@ -1,11 +1,13 @@
 import { getAudits } from "@/features/audits/queries/get-audits";
 import { CreateAuditSheet } from "@/features/audits/components/create-audit-sheet";
 import { AuditsKpiStrip } from "@/features/audits/components/audits-kpi-strip";
+import { AuditsInsightsPanel } from "@/features/audits/components/audits-insights-panel";
 import { AuditsToolbar } from "@/features/audits/components/audits-toolbar";
 import { AuditsResults } from "@/features/audits/components/audits-results";
 import {
   buildAuditsSections,
   filterAndSortAudits,
+  getAuditsListInsights,
   getAuditsListKpis,
   getAuditsListOptions,
   parseAuditsListState,
@@ -23,6 +25,7 @@ export default async function AuditsPage({
   const options = getAuditsListOptions(audits);
   const filteredAudits = filterAndSortAudits(audits, state);
   const kpis = getAuditsListKpis(filteredAudits);
+  const insights = getAuditsListInsights(filteredAudits);
   const sections = buildAuditsSections(filteredAudits, state.groupBy);
 
   return (
@@ -46,7 +49,9 @@ export default async function AuditsPage({
         options={options}
         totalCount={audits.length}
         filteredCount={filteredAudits.length}
+        audits={filteredAudits}
       />
+      <AuditsInsightsPanel insights={insights} />
       <AuditsResults sections={sections} viewMode={state.viewMode} groupBy={state.groupBy} />
     </section>
   );

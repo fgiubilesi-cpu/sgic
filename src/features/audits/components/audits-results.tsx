@@ -3,17 +3,17 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, MoreHorizontal, Table2 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  DropdownMenuCheckboxItem,
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -22,10 +22,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import type { AuditWithNCCount, AuditStatus } from "@/features/audits/queries/get-audits";
-import type { AuditsListSection, AuditsListViewMode, AuditsListGroupBy } from "@/features/audits/lib/audits-list";
+import { AuditsExportButton } from "@/features/audits/components/audits-export-button";
 import { updateAuditStatus } from "@/features/audits/actions";
+import type { AuditWithNCCount, AuditStatus } from "@/features/audits/queries/get-audits";
+import type {
+  AuditRiskSignal,
+  AuditsListGroupBy,
+  AuditsListSection,
+  AuditsListViewMode,
+} from "@/features/audits/lib/audits-list";
+import { getAuditNextStep, getAuditRiskSignals } from "@/features/audits/lib/audits-list";
+import { cn } from "@/lib/utils";
 
 type AuditsResultsProps = {
   sections: AuditsListSection[];
@@ -78,15 +85,18 @@ function formatDate(value: string | null): string {
 export function AuditsResults({ sections, viewMode, groupBy }: AuditsResultsProps) {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(DEFAULT_VISIBLE_COLUMNS);
   const [collapsedSections, setCollapsedSections] = useState<string[]>([]);
   const [isBulkPending, startBulkTransition] = useTransition();
   const allAudits = sections.flatMap((section) => section.audits);
   const allAuditIds = allAudits.map((audit) => audit.id);
-  const allSelected = allAuditIds.length > 0 && allAuditIds.every((id) => selectedIds.includes(id));
+  const allSelected =
+    allAuditIds.length > 0 && allAuditIds.every((id) => selectedIds.includes(id));
 
   useEffect(() => {
     setSelectedIds((current) => current.filter((id) => allAuditIds.includes(id)));
+    setExpandedIds((current) => current.filter((id) => allAuditIds.includes(id)));
   }, [allAuditIds.join("|")]);
 
   if (sections.every((section) => section.audits.length === 0)) {
@@ -118,19 +128,25 @@ export function AuditsResults({ sections, viewMode, groupBy }: AuditsResultsProp
               <Badge variant="outline" className="h-9 rounded-full px-3 text-sm">
                 {selectedIds.length} selected
               </Badge>
-              {(["Scheduled", "In Progress", "Review", "Closed"] as AuditStatus[]).map((status) => (
-                <Button
-                  key={status}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9"
-                  disabled={isBulkPending}
-                  onClick={() => applyBulkStatus(selectedIds, status)}
-                >
-                  Mark {status}
-                </Button>
-              ))}
+              <AuditsExportButton
+                audits={allAudits.filter((audit) => selectedIds.includes(audit.id))}
+                label="Export selected"
+              />
+              {(["Scheduled", "In Progress", "Review", "Closed"] as AuditStatus[]).map(
+                (status) => (
+                  <Button
+                    key={status}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9"
+                    disabled={isBulkPending}
+                    onClick={() => applyBulkStatus(selectedIds, status)}
+                  >
+                    Mark {status}
+                  </Button>
+                )
+              )}
             </>
           )}
 
@@ -203,6 +219,7 @@ export function AuditsResults({ sections, viewMode, groupBy }: AuditsResultsProp
                 setSelectedIds([]);
                 return;
               }
+
               setSelectedIds(allAuditIds);
             }}
           >
@@ -246,8 +263,10 @@ export function AuditsResults({ sections, viewMode, groupBy }: AuditsResultsProp
                   key={audit.id}
                   audit={audit}
                   selected={selectedIds.includes(audit.id)}
+                  expanded={expandedIds.includes(audit.id)}
                   onOpen={() => router.push(`/audits/${audit.id}`)}
                   onToggleSelected={() => toggleSelection(audit.id)}
+                  onToggleExpanded={() => toggleExpanded(audit.id)}
                 />
               ))}
             </div>
@@ -263,7 +282,9 @@ export function AuditsResults({ sections, viewMode, groupBy }: AuditsResultsProp
                           section.audits.length > 0 &&
                           section.audits.every((audit) => selectedIds.includes(audit.id))
                         }
-                        onChange={() => toggleSectionSelection(section.audits.map((audit) => audit.id))}
+                        onChange={() =>
+                          toggleSectionSelection(section.audits.map((audit) => audit.id))
+                        }
                         aria-label={`Select ${section.label}`}
                       />
                     </TableHead>
@@ -274,7 +295,7 @@ export function AuditsResults({ sections, viewMode, groupBy }: AuditsResultsProp
                     {visibleColumns.score && <TableHead>Score</TableHead>}
                     {visibleColumns.nc && <TableHead>Open NC</TableHead>}
                     {visibleColumns.scheduled && <TableHead>Scheduled</TableHead>}
-                    <TableHead className="w-[50px] text-right">Actions</TableHead>
+                    <TableHead className="w-[120px] text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -284,8 +305,10 @@ export function AuditsResults({ sections, viewMode, groupBy }: AuditsResultsProp
                       audit={audit}
                       visibleColumns={visibleColumns}
                       selected={selectedIds.includes(audit.id)}
+                      expanded={expandedIds.includes(audit.id)}
                       onOpen={() => router.push(`/audits/${audit.id}`)}
                       onToggleSelected={() => toggleSelection(audit.id)}
+                      onToggleExpanded={() => toggleExpanded(audit.id)}
                     />
                   ))}
                 </TableBody>
@@ -299,9 +322,13 @@ export function AuditsResults({ sections, viewMode, groupBy }: AuditsResultsProp
 
   function toggleSelection(auditId: string) {
     setSelectedIds((current) =>
-      current.includes(auditId)
-        ? current.filter((id) => id !== auditId)
-        : [...current, auditId]
+      current.includes(auditId) ? current.filter((id) => id !== auditId) : [...current, auditId]
+    );
+  }
+
+  function toggleExpanded(auditId: string) {
+    setExpandedIds((current) =>
+      current.includes(auditId) ? current.filter((id) => id !== auditId) : [...current, auditId]
     );
   }
 
@@ -318,7 +345,9 @@ export function AuditsResults({ sections, viewMode, groupBy }: AuditsResultsProp
 
   function applyBulkStatus(auditIds: string[], status: AuditStatus) {
     startBulkTransition(async () => {
-      const results = await Promise.all(auditIds.map((auditId) => updateAuditStatus(auditId, status)));
+      const results = await Promise.all(
+        auditIds.map((auditId) => updateAuditStatus(auditId, status))
+      );
       const failures = results.filter((result) => "error" in result);
 
       if (failures.length > 0) {
@@ -337,105 +366,147 @@ function AuditRow({
   audit,
   visibleColumns,
   selected,
+  expanded,
   onOpen,
   onToggleSelected,
+  onToggleExpanded,
 }: {
   audit: AuditWithNCCount;
   visibleColumns: VisibleColumns;
   selected: boolean;
+  expanded: boolean;
   onOpen: () => void;
   onToggleSelected: () => void;
+  onToggleExpanded: () => void;
 }) {
   const statusInfo = formatStatus(audit.status);
+  const signals = getAuditRiskSignals(audit);
+  const previewColspan =
+    3 +
+    (visibleColumns.client ? 1 : 0) +
+    (visibleColumns.location ? 1 : 0) +
+    (visibleColumns.score ? 1 : 0) +
+    (visibleColumns.nc ? 1 : 0) +
+    (visibleColumns.scheduled ? 1 : 0);
 
   return (
-    <TableRow className="cursor-pointer hover:bg-zinc-50/80" onClick={onOpen}>
-      <TableCell onClick={(event) => event.stopPropagation()}>
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={onToggleSelected}
-          aria-label={`Select ${audit.title ?? "audit"}`}
-        />
-      </TableCell>
-      <TableCell>
-        <div className="space-y-1">
-          <div className="font-medium text-zinc-900">{audit.title ?? "Untitled Audit"}</div>
-          <div className="text-xs text-zinc-500">
-            {audit.score !== null ? `${audit.score.toFixed(1)}% compliance` : "Awaiting score"}
+    <>
+      <TableRow className="cursor-pointer hover:bg-zinc-50/80" onClick={onOpen}>
+        <TableCell onClick={(event) => event.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelected}
+            aria-label={`Select ${audit.title ?? "audit"}`}
+          />
+        </TableCell>
+        <TableCell>
+          <div className="space-y-1">
+            <div className="font-medium text-zinc-900">{audit.title ?? "Untitled Audit"}</div>
+            <div className="flex flex-wrap gap-1">
+              {signals.map((signal) => (
+                <RiskBadge key={signal.key} signal={signal} />
+              ))}
+            </div>
           </div>
-        </div>
-      </TableCell>
-      {visibleColumns.client && (
-        <TableCell className="text-sm text-zinc-600">{audit.client_name ?? "—"}</TableCell>
-      )}
-      {visibleColumns.location && (
-        <TableCell className="text-sm text-zinc-600">{audit.location_name ?? "—"}</TableCell>
-      )}
-      <TableCell>
-        <Badge variant="outline" className={statusInfo.className}>
-          {statusInfo.label}
-        </Badge>
-      </TableCell>
-      {visibleColumns.score && (
-        <TableCell className="text-sm text-zinc-600">
-          {audit.score !== null ? `${audit.score.toFixed(1)}%` : "—"}
         </TableCell>
-      )}
-      {visibleColumns.nc && (
-        <TableCell className="text-sm text-zinc-600">
-          {audit.nc_count > 0 ? (
-            <span className="inline-flex min-w-7 items-center justify-center rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700">
-              {audit.nc_count}
-            </span>
-          ) : (
-            <span className="text-zinc-400">—</span>
-          )}
+        {visibleColumns.client && (
+          <TableCell className="text-sm text-zinc-600">{audit.client_name ?? "—"}</TableCell>
+        )}
+        {visibleColumns.location && (
+          <TableCell className="text-sm text-zinc-600">{audit.location_name ?? "—"}</TableCell>
+        )}
+        <TableCell>
+          <Badge variant="outline" className={statusInfo.className}>
+            {statusInfo.label}
+          </Badge>
         </TableCell>
-      )}
-      {visibleColumns.scheduled && (
-        <TableCell className="text-sm text-zinc-600">{formatDate(audit.scheduled_date)}</TableCell>
-      )}
-      <TableCell className="text-right">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        {visibleColumns.score && (
+          <TableCell className="text-sm text-zinc-600">
+            {audit.score !== null ? `${audit.score.toFixed(1)}%` : "—"}
+          </TableCell>
+        )}
+        {visibleColumns.nc && (
+          <TableCell className="text-sm text-zinc-600">
+            {audit.nc_count > 0 ? (
+              <span className="inline-flex min-w-7 items-center justify-center rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700">
+                {audit.nc_count}
+              </span>
+            ) : (
+              <span className="text-zinc-400">—</span>
+            )}
+          </TableCell>
+        )}
+        {visibleColumns.scheduled && (
+          <TableCell className="text-sm text-zinc-600">{formatDate(audit.scheduled_date)}</TableCell>
+        )}
+        <TableCell className="text-right">
+          <div className="flex items-center justify-end gap-1">
             <Button
+              type="button"
               variant="ghost"
-              size="icon"
-              className="text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onSelect={(event) => {
-                event.preventDefault();
-                onOpen();
+              size="sm"
+              className="h-8 px-2"
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleExpanded();
               }}
             >
-              View details
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </TableCell>
-    </TableRow>
+              {expanded ? "Hide" : "Preview"}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    onOpen();
+                  }}
+                >
+                  View details
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </TableCell>
+      </TableRow>
+      {expanded && (
+        <TableRow className="bg-zinc-50/60">
+          <TableCell colSpan={previewColspan}>
+            <InlinePreview audit={audit} />
+          </TableCell>
+        </TableRow>
+      )}
+    </>
   );
 }
 
 function AuditCard({
   audit,
   selected,
+  expanded,
   onOpen,
   onToggleSelected,
+  onToggleExpanded,
 }: {
   audit: AuditWithNCCount;
   selected: boolean;
+  expanded: boolean;
   onOpen: () => void;
   onToggleSelected: () => void;
+  onToggleExpanded: () => void;
 }) {
   const statusInfo = formatStatus(audit.status);
+  const signals = getAuditRiskSignals(audit);
 
   return (
     <Card
@@ -454,6 +525,11 @@ function AuditCard({
             <div className="text-lg font-semibold tracking-tight text-zinc-900">
               {audit.title ?? "Untitled Audit"}
             </div>
+            <div className="flex flex-wrap gap-1">
+              {signals.map((signal) => (
+                <RiskBadge key={signal.key} signal={signal} />
+              ))}
+            </div>
           </div>
           <div className="flex items-center gap-1">
             <Button
@@ -467,6 +543,18 @@ function AuditCard({
               }}
             >
               {selected ? "Selected" : "Select"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2"
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleExpanded();
+              }}
+            >
+              {expanded ? "Hide" : "Preview"}
             </Button>
             <Button
               type="button"
@@ -504,6 +592,8 @@ function AuditCard({
             {audit.nc_count}
           </span>
         </div>
+
+        {expanded && <InlinePreview audit={audit} compact />}
       </CardContent>
     </Card>
   );
@@ -514,6 +604,69 @@ function AuditCardMetric({ label, value }: { label: string; value: string }) {
     <div className="space-y-1">
       <div className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">{label}</div>
       <div className="font-medium text-zinc-800">{value}</div>
+    </div>
+  );
+}
+
+function RiskBadge({ signal }: { signal: AuditRiskSignal }) {
+  return (
+    <Badge variant="outline" className={`rounded-full ${signal.tone}`}>
+      {signal.label}
+    </Badge>
+  );
+}
+
+function InlinePreview({
+  audit,
+  compact = false,
+}: {
+  audit: AuditWithNCCount;
+  compact?: boolean;
+}) {
+  const nextStep = getAuditNextStep(audit);
+
+  return (
+    <div
+      className={cn(
+        "rounded-xl border border-zinc-200 bg-white p-4",
+        compact && "border-none bg-zinc-50 px-0 py-0"
+      )}
+    >
+      <div className={cn("grid gap-4", compact ? "md:grid-cols-1" : "md:grid-cols-[1fr_0.7fr]")}>
+        <div className="space-y-3">
+          <div>
+            <div className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">
+              Quick preview
+            </div>
+            <div className="mt-1 text-sm text-zinc-600">
+              {audit.client_name ?? "No client"} · {audit.location_name ?? "No location"}
+            </div>
+          </div>
+          <div className="grid gap-2 text-sm text-zinc-600 md:grid-cols-3">
+            <div className="rounded-lg bg-zinc-50 px-3 py-2">
+              <div className="text-xs uppercase tracking-[0.14em] text-zinc-400">Status</div>
+              <div className="mt-1 font-medium text-zinc-900">{audit.status}</div>
+            </div>
+            <div className="rounded-lg bg-zinc-50 px-3 py-2">
+              <div className="text-xs uppercase tracking-[0.14em] text-zinc-400">Score</div>
+              <div className="mt-1 font-medium text-zinc-900">
+                {audit.score !== null ? `${audit.score.toFixed(1)}%` : "Not available"}
+              </div>
+            </div>
+            <div className="rounded-lg bg-zinc-50 px-3 py-2">
+              <div className="text-xs uppercase tracking-[0.14em] text-zinc-400">Scheduled</div>
+              <div className="mt-1 font-medium text-zinc-900">{formatDate(audit.scheduled_date)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-zinc-900 px-4 py-4 text-white">
+          <div className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
+            Suggested next step
+          </div>
+          <div className="mt-2 text-sm font-medium leading-6">{nextStep}</div>
+        </div>
+      </div>
     </div>
   );
 }

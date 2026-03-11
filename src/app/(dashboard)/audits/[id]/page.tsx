@@ -17,6 +17,8 @@ import { AuditCompletionSection } from "@/features/audits/components/audit-compl
 import { ExportExcelButton } from "@/features/audits/components/export-excel-button";
 import { EmailDraftModal } from "@/features/audits/components/email-draft-modal";
 
+export const dynamic = "force-dynamic";
+
 interface TabConfig {
   id: "checklist" | "nc" | "templates";
   label: string;

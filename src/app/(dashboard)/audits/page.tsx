@@ -2,6 +2,8 @@ import { getAudits } from "@/features/audits/queries/get-audits";
 import { AuditTable } from "@/features/audits/components/audit-table";
 import { CreateAuditSheet } from "@/features/audits/components/create-audit-sheet";
 
+export const dynamic = "force-dynamic";
+
 export default async function AuditsPage() {
   const audits = await getAudits();
 

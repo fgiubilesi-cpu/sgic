@@ -4,7 +4,7 @@ import type { AuditStatus, AuditOutcome } from "@/features/audits/schemas/audit-
 
 export type ChecklistItem = {
   id: string;
-  question: string;  // Always required - comes from template or manual entry
+  question: string;
   outcome: AuditOutcome | null;
   notes?: string | null;
   evidence_url?: string | null;
@@ -30,19 +30,31 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
 
   const { supabase, organizationId } = ctx;
 
-  // Step 1: Fetch audit with client and location joins only (no checklists)
   const { data: audit, error: auditError } = await supabase
     .from("audits")
-    .select(
-      "id, title, status, scheduled_date, score, organization_id, client_id, location_id, client:client_id(name), location:location_id(name)"
-    )
+    .select("id, title, status, scheduled_date, score, organization_id, client_id, location_id")
     .eq("id", id)
     .eq("organization_id", organizationId)
     .single();
 
-  if (auditError || !audit) {
-    return null;
-  }
+  if (auditError || !audit) return null;
+
+  const [{ data: client }, { data: location }] = await Promise.all([
+    (audit as { client_id?: string | null }).client_id
+      ? supabase
+          .from("clients")
+          .select("name")
+          .eq("id", (audit as { client_id?: string | null }).client_id!)
+          .maybeSingle()
+      : Promise.resolve({ data: null as { name?: string | null } | null }),
+    (audit as { location_id?: string | null }).location_id
+      ? supabase
+          .from("locations")
+          .select("name")
+          .eq("id", (audit as { location_id?: string | null }).location_id!)
+          .maybeSingle()
+      : Promise.resolve({ data: null as { name?: string | null } | null }),
+  ]);
 
   const rawStatus = (audit as { status?: string | null }).status ?? "Scheduled";
   const allowedStatuses: AuditStatus[] = ["Scheduled", "In Progress", "Review", "Closed"];
@@ -50,13 +62,13 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
     ? (rawStatus as AuditStatus)
     : "Scheduled";
 
-  // Step 2: Fetch checklists with checklist_items separately
-  // If this query fails, return audit with empty checklists array instead of failing completely
   let checklists: Checklist[] = [];
 
   const { data: rawChecklists, error: checklistError } = await supabase
     .from("checklists")
-    .select("id, title, created_at, checklist_items(id, question, outcome, notes, evidence_url, audio_url, created_at)")
+    .select(
+      "id, title, created_at, checklist_items(id, question, outcome, notes, evidence_url, audio_url, created_at)"
+    )
     .eq("audit_id", id);
 
   if (!checklistError && rawChecklists) {
@@ -80,7 +92,12 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
           created_at?: string | null;
         };
 
-        const validOutcomes: AuditOutcome[] = ["compliant", "non_compliant", "not_applicable", "pending"];
+        const validOutcomes: AuditOutcome[] = [
+          "compliant",
+          "non_compliant",
+          "not_applicable",
+          "pending",
+        ];
         const rawOutcome = item.outcome ?? "pending";
         const outcome: AuditOutcome = validOutcomes.includes(rawOutcome as AuditOutcome)
           ? (rawOutcome as AuditOutcome)
@@ -114,8 +131,8 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
     score: (audit as { score?: number | null }).score ?? null,
     client_id: (audit as { client_id?: string | null }).client_id ?? null,
     location_id: (audit as { location_id?: string | null }).location_id ?? null,
-    client_name: (audit as { client?: { name?: string | null } | null }).client?.name ?? null,
-    location_name: (audit as { location?: { name?: string | null } | null }).location?.name ?? null,
+    client_name: client?.name ?? null,
+    location_name: location?.name ?? null,
     checklists: checklists.length > 0 ? checklists : [],
   };
 }

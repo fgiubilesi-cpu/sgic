@@ -532,12 +532,17 @@ export type Database = {
       documents: {
         Row: {
           category: Database["public"]["Enums"]["document_category"] | null
+          client_id: string | null
           created_at: string | null
           created_by: string | null
           description: string | null
+          expiry_date: string | null
           file_url: string | null
           id: string
+          issue_date: string | null
+          location_id: string | null
           organization_id: string
+          personnel_id: string | null
           status: Database["public"]["Enums"]["document_status"] | null
           title: string | null
           updated_at: string | null
@@ -545,12 +550,17 @@ export type Database = {
         }
         Insert: {
           category?: Database["public"]["Enums"]["document_category"] | null
+          client_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          expiry_date?: string | null
           file_url?: string | null
           id?: string
+          issue_date?: string | null
+          location_id?: string | null
           organization_id: string
+          personnel_id?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
           title?: string | null
           updated_at?: string | null
@@ -558,18 +568,30 @@ export type Database = {
         }
         Update: {
           category?: Database["public"]["Enums"]["document_category"] | null
+          client_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          expiry_date?: string | null
           file_url?: string | null
           id?: string
+          issue_date?: string | null
+          location_id?: string | null
           organization_id?: string
+          personnel_id?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
           title?: string | null
           updated_at?: string | null
           version?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "documents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "documents_created_by_fkey"
             columns: ["created_by"]
@@ -578,10 +600,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "documents_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "documents_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
             referencedColumns: ["id"]
           },
         ]

@@ -31,6 +31,13 @@ export async function createTrainingRecord(values: TrainingRecord): Promise<void
 
   const { supabase, organizationId } = ctx;
 
+  const { data: person } = await supabase
+    .from("personnel")
+    .select("client_id")
+    .eq("id", validated.personnel_id)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
   const { error } = await supabase.from("training_records").insert({
     personnel_id: validated.personnel_id,
     course_id: validated.course_id,
@@ -42,4 +49,9 @@ export async function createTrainingRecord(values: TrainingRecord): Promise<void
 
   if (error) throw new Error(error.message);
   revalidatePath("/training");
+  revalidatePath(`/personnel/${validated.personnel_id}`);
+  revalidatePath("/clients");
+  if (person?.client_id) {
+    revalidatePath(`/clients/${person.client_id}`);
+  }
 }

@@ -10,6 +10,15 @@ import { it } from "date-fns/locale";
 import { TrainingRecordTable } from "@/features/training/components/training-record-table";
 import { PersonnelOperationalBadge } from "@/features/personnel/components/personnel-operational-badge";
 import { PersonnelStateToggleButton } from "@/features/personnel/components/personnel-state-toggle-button";
+import { getOrganizationContext } from "@/lib/supabase/get-org-context";
+import { getTrainingCourses } from "@/features/training/queries/get-training-courses";
+import { RegisterTrainingSheet } from "@/features/training/components/register-training-sheet";
+import { CreateCourseSheet } from "@/features/training/components/create-course-sheet";
+import { getClientOptions } from "@/features/clients/queries/get-client-options";
+import { getPersonnelList } from "@/features/personnel/queries/get-personnel";
+import { getDocuments } from "@/features/documents/queries/get-documents";
+import { DocumentsTable } from "@/features/documents/components/documents-table";
+import { ManageDocumentSheet } from "@/features/documents/components/manage-document-sheet";
 
 type PageProps = {
     params: Promise<{ id: string }>;
@@ -17,11 +26,43 @@ type PageProps = {
 
 export default async function PersonnelDetailPage({ params }: PageProps) {
     const { id } = await params;
+    const ctx = await getOrganizationContext();
     const person = await getPersonnelDetail(id);
 
     if (!person) {
         notFound();
     }
+
+    if (!ctx) {
+        notFound();
+    }
+
+    const [courses, clientOptions, personnelOptions, documents] = await Promise.all([
+        getTrainingCourses(ctx.organizationId),
+        getClientOptions(ctx.organizationId),
+        getPersonnelList(ctx.organizationId, person.client_id ?? undefined),
+        getDocuments({
+            organizationId: ctx.organizationId,
+            personnelIds: [person.id],
+        }),
+    ]);
+
+    const personnelSeed = [
+        {
+            id: person.id,
+            organization_id: person.organization_id,
+            first_name: person.first_name,
+            last_name: person.last_name,
+            role: person.role,
+            tax_code: person.tax_code,
+            hire_date: person.hire_date,
+            is_active: person.is_active,
+            created_at: null,
+            email: person.email,
+            client_id: person.client_id,
+            location_id: person.location_id,
+        },
+    ];
 
     return (
         <div className="space-y-6">
@@ -175,7 +216,16 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
                                 Elenco dei corsi completati e delle scadenze che influenzano lo stato operativo.
                             </CardDescription>
                         </div>
-                        <GraduationCap className="h-5 w-5 text-zinc-400" />
+                        <div className="flex items-center gap-2">
+                            <CreateCourseSheet />
+                            <RegisterTrainingSheet
+                                courses={courses}
+                                defaultPersonnelId={person.id}
+                                personnel={personnelSeed}
+                                triggerLabel="Registra Corso"
+                            />
+                            <GraduationCap className="h-5 w-5 text-zinc-400" />
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <TrainingRecordTable records={person.training_records as any} showPerson={false} />
@@ -224,11 +274,21 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
                 </Card>
 
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                        <div>
                         <CardTitle className="text-lg">Sintesi Scadenze</CardTitle>
                         <CardDescription>
                             Lettura rapida per capire se il collaboratore e pronto, da monitorare o da sospendere.
                         </CardDescription>
+                        </div>
+                        <ManageDocumentSheet
+                            clientOptions={clientOptions}
+                            defaultClientId={person.client_id ?? undefined}
+                            defaultLocationId={person.location_id ?? undefined}
+                            defaultPersonnelId={person.id}
+                            personnelOptions={personnelOptions}
+                            triggerLabel="Nuovo Documento"
+                        />
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
                         <div className="rounded-lg border border-zinc-200 p-3">
@@ -258,6 +318,33 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
                     </CardContent>
                 </Card>
             </div>
+
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                    <div>
+                        <CardTitle className="text-lg">Documenti Collaboratore</CardTitle>
+                        <CardDescription>
+                            Certificati, attestati e allegati individuali collegati al collaboratore.
+                        </CardDescription>
+                    </div>
+                    <ManageDocumentSheet
+                        clientOptions={clientOptions}
+                        defaultClientId={person.client_id ?? undefined}
+                        defaultLocationId={person.location_id ?? undefined}
+                        defaultPersonnelId={person.id}
+                        personnelOptions={personnelOptions}
+                        triggerLabel="Nuovo Documento"
+                    />
+                </CardHeader>
+                <CardContent>
+                    <DocumentsTable
+                        clientOptions={clientOptions}
+                        documents={documents}
+                        emptyMessage="Nessun documento personale collegato a questo collaboratore."
+                        personnelOptions={personnelOptions}
+                    />
+                </CardContent>
+            </Card>
         </div>
     );
 }

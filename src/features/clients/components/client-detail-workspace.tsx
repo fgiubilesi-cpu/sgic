@@ -20,6 +20,7 @@ import type { PersonnelListItem } from '@/features/personnel/queries/get-personn
 import { ClientForm } from './client-form';
 import { ManageLocationSheet } from './manage-location-sheet';
 import { ManagePersonnelSheet } from '@/features/personnel/components/manage-personnel-sheet';
+import { CreateAuditSheet } from '@/features/audits/components/create-audit-sheet';
 
 type ClientAuditItem = {
   id: string;
@@ -72,6 +73,12 @@ export function ClientDetailWorkspace({
         : 'Mai',
     },
   ];
+
+  const closedAudits = audits.filter((audit) => audit.status === 'Closed').length;
+  const scheduledAudits = audits.filter((audit) => audit.status === 'Scheduled').length;
+  const averageScore =
+    audits.filter((audit) => typeof audit.score === 'number').reduce((sum, audit) => sum + (audit.score ?? 0), 0) /
+      Math.max(audits.filter((audit) => typeof audit.score === 'number').length, 1);
 
   return (
     <div className="space-y-6">
@@ -288,58 +295,102 @@ export function ClientDetailWorkspace({
           ) : null}
 
           {activeTab === 'audits' ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Audit ({audits.length})</CardTitle>
-                <CardDescription>
-                  Storico audit collegati al cliente. Il prossimo passo sarà creare audit direttamente da qui.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {audits.length === 0 ? (
-                  <p className="text-sm text-zinc-500">Nessun audit collegato a questo cliente.</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Titolo</TableHead>
-                        <TableHead>Sede</TableHead>
-                        <TableHead>Stato</TableHead>
-                        <TableHead>Data</TableHead>
-                        <TableHead>Score</TableHead>
-                        <TableHead>Apri</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {audits.map((audit) => (
-                        <TableRow key={audit.id}>
-                          <TableCell className="font-medium">{audit.title || 'Audit senza titolo'}</TableCell>
-                          <TableCell>{audit.location_name || '-'}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={statusTone(audit.status)}>
-                              {audit.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {audit.scheduled_date
-                              ? new Date(audit.scheduled_date).toLocaleDateString('it-IT')
-                              : '-'}
-                          </TableCell>
-                          <TableCell>
-                            {typeof audit.score === 'number' ? `${audit.score.toFixed(1)}%` : '-'}
-                          </TableCell>
-                          <TableCell>
-                            <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-blue-600">
-                              <Link href={`/audits/${audit.id}`}>Apri audit</Link>
-                            </Button>
-                          </TableCell>
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-3">
+                <Card className="border-zinc-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      Audit chiusi
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-semibold text-emerald-700">{closedAudits}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-zinc-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      Audit pianificati
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-semibold text-sky-700">{scheduledAudits}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-zinc-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      Score medio
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-semibold text-amber-700">
+                      {Number.isFinite(averageScore) ? `${averageScore.toFixed(1)}%` : '-'}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <div>
+                    <CardTitle>Audit ({audits.length})</CardTitle>
+                    <CardDescription>
+                      Storico audit collegati al cliente e punto di accesso per crearne di nuovi.
+                    </CardDescription>
+                  </div>
+                  <CreateAuditSheet
+                    defaultClientId={client.id}
+                    hideClientField
+                    triggerLabel="Nuovo Audit"
+                  />
+                </CardHeader>
+                <CardContent>
+                  {audits.length === 0 ? (
+                    <p className="text-sm text-zinc-500">Nessun audit collegato a questo cliente.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Titolo</TableHead>
+                          <TableHead>Sede</TableHead>
+                          <TableHead>Stato</TableHead>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Score</TableHead>
+                          <TableHead>Apri</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
+                      </TableHeader>
+                      <TableBody>
+                        {audits.map((audit) => (
+                          <TableRow key={audit.id}>
+                            <TableCell className="font-medium">{audit.title || 'Audit senza titolo'}</TableCell>
+                            <TableCell>{audit.location_name || '-'}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={statusTone(audit.status)}>
+                                {audit.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {audit.scheduled_date
+                                ? new Date(audit.scheduled_date).toLocaleDateString('it-IT')
+                                : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {typeof audit.score === 'number' ? `${audit.score.toFixed(1)}%` : '-'}
+                            </TableCell>
+                            <TableCell>
+                              <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-blue-600">
+                                <Link href={`/audits/${audit.id}`}>Apri audit</Link>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           ) : null}
 
           {activeTab === 'documents' ? (

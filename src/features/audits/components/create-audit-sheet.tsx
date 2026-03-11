@@ -66,7 +66,17 @@ type FormValues = z.infer<typeof formSchema>;
 // BUG-3 FIX: singleton supabase client — stable reference, won't re-trigger effects
 const supabase = createClient();
 
-export function CreateAuditSheet() {
+interface CreateAuditSheetProps {
+  defaultClientId?: string;
+  hideClientField?: boolean;
+  triggerLabel?: string;
+}
+
+export function CreateAuditSheet({
+  defaultClientId,
+  hideClientField = false,
+  triggerLabel = "New Audit",
+}: CreateAuditSheetProps = {}) {
   const [open, setOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -81,10 +91,21 @@ export function CreateAuditSheet() {
       title: "",
       scheduled_date: new Date().toISOString().split("T")[0],
       templateId: "",
-      client_id: "",
+      client_id: defaultClientId ?? "",
       location_id: "",
     },
   });
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (defaultClientId) {
+      setSelectedClientId(defaultClientId);
+      form.setValue("client_id", defaultClientId, {
+        shouldValidate: true,
+      });
+    }
+  }, [defaultClientId, form, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -153,8 +174,14 @@ export function CreateAuditSheet() {
       if (result.success) {
         toast.success("Audit created successfully.");
         setOpen(false);
-        setSelectedClientId("");
-        form.reset();
+        setSelectedClientId(defaultClientId ?? "");
+        form.reset({
+          title: "",
+          scheduled_date: new Date().toISOString().split("T")[0],
+          templateId: "",
+          client_id: defaultClientId ?? "",
+          location_id: "",
+        });
         router.push(`/audits/${result.auditId}`);
       } else {
         toast.error(result.error || "Failed to create audit.");
@@ -170,7 +197,7 @@ export function CreateAuditSheet() {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button className="bg-zinc-900 text-white gap-2">
-          <Plus className="h-4 w-4" /> New Audit
+          <Plus className="h-4 w-4" /> {triggerLabel}
         </Button>
       </SheetTrigger>
 
@@ -212,42 +239,43 @@ export function CreateAuditSheet() {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="client_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Client</FormLabel>
-                  {/* BUG-3 FIX: use value= (controlled) instead of defaultValue= */}
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      setSelectedClientId(value);
-                    }}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="w-full bg-white border-zinc-200">
-                        <SelectValue placeholder={isLoading ? "Loading..." : "Select a client..."} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="z-[200] max-h-[200px]">
-                      {clients.map((c) => (
-                        <SelectItem key={c.id} value={c.id} className="cursor-pointer">
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                      {clients.length === 0 && !isLoading && (
-                        <div className="px-2 py-4 text-sm text-center text-zinc-400">
-                          No clients found. Create one first.
-                        </div>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {!hideClientField ? (
+              <FormField
+                control={form.control}
+                name="client_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Client</FormLabel>
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        setSelectedClientId(value);
+                      }}
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-full bg-white border-zinc-200">
+                          <SelectValue placeholder={isLoading ? "Loading..." : "Select a client..."} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="z-[200] max-h-[200px]">
+                        {clients.map((c) => (
+                          <SelectItem key={c.id} value={c.id} className="cursor-pointer">
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                        {clients.length === 0 && !isLoading && (
+                          <div className="px-2 py-4 text-sm text-center text-zinc-400">
+                            No clients found. Create one first.
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : null}
 
             <FormField
               control={form.control}

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, User, GraduationCap, Calendar, CreditCard, Briefcase } from "lucide-react";
+import { ArrowLeft, User, GraduationCap, Calendar, CreditCard, Briefcase, Building2, Mail, MapPin } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -59,17 +59,42 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center gap-3">
+                            <Mail className="h-4 w-4 text-zinc-400" />
+                            <div className="flex flex-col">
+                                <span className="text-xs text-zinc-500 uppercase font-semibold">Email</span>
+                                <span>{person.email || "-"}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <Building2 className="h-4 w-4 text-zinc-400" />
+                            <div className="flex flex-col">
+                                <span className="text-xs text-zinc-500 uppercase font-semibold">Cliente</span>
+                                <span>{person.client_name || "-"}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <MapPin className="h-4 w-4 text-zinc-400" />
+                            <div className="flex flex-col">
+                                <span className="text-xs text-zinc-500 uppercase font-semibold">Sede</span>
+                                <span>{person.location_name || "-"}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
                             <CreditCard className="h-4 w-4 text-zinc-400" />
                             <div className="flex flex-col">
                                 <span className="text-xs text-zinc-500 uppercase font-semibold">Codice Fiscale</span>
-                                <span className="font-mono">{person.tax_code}</span>
+                                <span className="font-mono">{person.tax_code || "-"}</span>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
                             <Calendar className="h-4 w-4 text-zinc-400" />
                             <div className="flex flex-col">
                                 <span className="text-xs text-zinc-500 uppercase font-semibold">Data Assunzione</span>
-                                <span>{format(new Date(person.hire_date), "dd MMMM yyyy", { locale: it })}</span>
+                                <span>
+                                    {person.hire_date
+                                        ? format(new Date(person.hire_date), "dd MMMM yyyy", { locale: it })
+                                        : "-"}
+                                </span>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">

@@ -2,7 +2,9 @@ import { redirect } from 'next/navigation';
 import { getClient } from '@/features/clients/queries/get-client';
 import { getOrganizationContext } from '@/lib/supabase/get-org-context';
 import { ClientForm } from '@/features/clients/components/client-form';
-import { LocationForm } from '@/features/clients/components/location-form';
+import { ManageLocationSheet } from '@/features/clients/components/manage-location-sheet';
+import { ManagePersonnelSheet } from '@/features/personnel/components/manage-personnel-sheet';
+import { getPersonnelList } from '@/features/personnel/queries/get-personnel';
 import {
   Card,
   CardContent,
@@ -19,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 
 export const metadata = {
   title: 'Dettaglio Cliente - SGIC',
@@ -44,6 +47,18 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
   if (!client) {
     redirect('/clients');
   }
+
+  const personnel = await getPersonnelList(orgContext.organizationId, client.id);
+  const clientOptions = [
+    {
+      id: client.id,
+      name: client.name,
+      locations: client.locations.map((location) => ({
+        id: location.id,
+        name: location.name,
+      })),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -101,10 +116,15 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
       {/* Locations Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Sedi ({client.locations.length})</CardTitle>
-          <CardDescription>
-            Elenco delle sedi operative del cliente
-          </CardDescription>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle>Sedi ({client.locations.length})</CardTitle>
+              <CardDescription>
+                Elenco delle sedi operative del cliente
+              </CardDescription>
+            </div>
+            <ManageLocationSheet clientId={client.id} />
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           {client.locations.length === 0 ? (
@@ -131,20 +151,79 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
                         {location.is_active ? 'Attivo' : 'Inattivo'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-blue-600">
-                      <button className="hover:underline">Modifica</button>
+                    <TableCell>
+                      <ManageLocationSheet clientId={client.id} location={location} />
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
+        </CardContent>
+      </Card>
 
-          {/* Add Location Form */}
-          <div className="border-t pt-6">
-            <h3 className="mb-4 font-semibold">Aggiungi Nuova Sede</h3>
-            <LocationForm clientId={client.id} />
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle>Collaboratori ({personnel.length})</CardTitle>
+              <CardDescription>
+                Referenti e operatori collegati a questo cliente.
+              </CardDescription>
+            </div>
+            <ManagePersonnelSheet
+              clientOptions={clientOptions}
+              defaultClientId={client.id}
+            />
           </div>
+        </CardHeader>
+        <CardContent>
+          {personnel.length === 0 ? (
+            <p className="text-sm text-gray-500">Nessun collaboratore registrato.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Ruolo</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Sede</TableHead>
+                  <TableHead>Stato</TableHead>
+                  <TableHead>Azioni</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {personnel.map((person) => (
+                  <TableRow key={person.id}>
+                    <TableCell className="font-medium">
+                      {person.first_name} {person.last_name}
+                    </TableCell>
+                    <TableCell>{person.role || '-'}</TableCell>
+                    <TableCell>{person.email || '-'}</TableCell>
+                    <TableCell>{person.location_name || '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant={person.is_active ? 'default' : 'secondary'}>
+                        {person.is_active ? 'Attivo' : 'Inattivo'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="flex items-center gap-1">
+                      <Link
+                        href={`/personnel/${person.id}`}
+                        className="inline-flex h-8 items-center rounded-md px-2 text-sm text-blue-600 hover:underline"
+                      >
+                        Dettagli
+                      </Link>
+                      <ManagePersonnelSheet
+                        clientOptions={clientOptions}
+                        defaultClientId={client.id}
+                        personnel={person}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

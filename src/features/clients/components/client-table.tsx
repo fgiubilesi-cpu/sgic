@@ -14,11 +14,14 @@ import { Button } from '@/components/ui/button';
 import { ManageLocationSheet } from './manage-location-sheet';
 import { ManagePersonnelSheet } from '@/features/personnel/components/manage-personnel-sheet';
 import type { ClientOption } from '@/features/clients/queries/get-client-options';
+import { ClientStateToggleButton } from './client-state-toggle-button';
 
 type ClientRow = Database['public']['Tables']['clients']['Row'];
 
 interface ClientWithStats extends ClientRow {
+  audit_count: number;
   location_count: number;
+  open_nc_count: number;
   personnel_count: number;
   last_audit_date: string | null;
 }
@@ -38,6 +41,7 @@ export function ClientTable({ clientOptions, clients }: ClientTableProps) {
             <TableHead>Email</TableHead>
             <TableHead className="text-center">Sedi</TableHead>
             <TableHead className="text-center">Collaboratori</TableHead>
+            <TableHead className="text-center">NC Aperte</TableHead>
             <TableHead>Ultimo Audit</TableHead>
             <TableHead>Stato</TableHead>
             <TableHead className="w-[320px]">Gestione</TableHead>
@@ -47,6 +51,7 @@ export function ClientTable({ clientOptions, clients }: ClientTableProps) {
           {clients.map((client) => {
             const clientOption = clientOptions.find((option) => option.id === client.id);
             const singleClientOptions = clientOption ? [clientOption] : [];
+            const isClientActive = client.is_active ?? true;
 
             return (
               <TableRow key={client.id}>
@@ -69,14 +74,25 @@ export function ClientTable({ clientOptions, clients }: ClientTableProps) {
                     {client.personnel_count}
                   </span>
                 </TableCell>
+                <TableCell className="text-center">
+                  <span
+                    className={
+                      client.open_nc_count > 0
+                        ? 'inline-flex min-w-8 items-center justify-center rounded-full bg-rose-100 px-2 py-1 text-xs font-medium text-rose-700'
+                        : 'inline-flex min-w-8 items-center justify-center rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-500'
+                    }
+                  >
+                    {client.open_nc_count}
+                  </span>
+                </TableCell>
                 <TableCell>
                   {client.last_audit_date
                     ? new Date(client.last_audit_date).toLocaleDateString('it-IT')
                     : 'Mai'}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={client.is_active ? 'default' : 'secondary'}>
-                    {client.is_active ? 'Attivo' : 'Inattivo'}
+                  <Badge variant={isClientActive ? 'default' : 'secondary'}>
+                    {isClientActive ? 'Attivo' : 'Inattivo'}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -92,6 +108,7 @@ export function ClientTable({ clientOptions, clients }: ClientTableProps) {
                       clientOptions={singleClientOptions}
                       defaultClientId={client.id}
                     />
+                    <ClientStateToggleButton clientId={client.id} isActive={isClientActive} />
                   </div>
                 </TableCell>
               </TableRow>

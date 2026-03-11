@@ -107,6 +107,7 @@ export async function createLocation(
 
     if (error) throw error;
 
+    revalidatePath('/clients');
     revalidatePath(`/clients/${clientId}`);
     return { success: true, data };
   } catch (error) {
@@ -143,10 +144,67 @@ export async function updateLocation(
 
     if (error) throw error;
 
-    revalidatePath(`/clients`);
+    revalidatePath('/clients');
+    if (data?.client_id) {
+      revalidatePath(`/clients/${data.client_id}`);
+    }
     return { success: true, data };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Errore aggiornamento sede';
+    return { success: false, error: message };
+  }
+}
+
+export async function setClientActiveState(clientId: string, isActive: boolean) {
+  try {
+    const orgContext = await getOrganizationContext();
+    if (!orgContext) throw new Error('Unauthorized');
+
+    const supabase = await createSupabaseClient();
+
+    const { data, error } = await supabase
+      .from('clients')
+      .update({ is_active: isActive })
+      .eq('id', clientId)
+      .eq('organization_id', orgContext.organizationId)
+      .select('id')
+      .single();
+
+    if (error) throw error;
+
+    revalidatePath('/clients');
+    revalidatePath(`/clients/${clientId}`);
+    return { success: true, data };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Errore aggiornamento stato cliente';
+    return { success: false, error: message };
+  }
+}
+
+export async function setLocationActiveState(locationId: string, isActive: boolean) {
+  try {
+    const orgContext = await getOrganizationContext();
+    if (!orgContext) throw new Error('Unauthorized');
+
+    const supabase = await createSupabaseClient();
+
+    const { data, error } = await supabase
+      .from('locations')
+      .update({ is_active: isActive })
+      .eq('id', locationId)
+      .eq('organization_id', orgContext.organizationId)
+      .select('id, client_id')
+      .single();
+
+    if (error) throw error;
+
+    revalidatePath('/clients');
+    if (data?.client_id) {
+      revalidatePath(`/clients/${data.client_id}`);
+    }
+    return { success: true, data };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Errore aggiornamento stato sede';
     return { success: false, error: message };
   }
 }

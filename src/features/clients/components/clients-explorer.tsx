@@ -12,8 +12,13 @@ import { ClientsKpiStrip } from './clients-kpi-strip';
 import { ClientTable } from './client-table';
 
 type StatusFilter = 'all' | 'active' | 'inactive';
-type StructureFilter = 'all' | 'missing-locations' | 'missing-personnel' | 'complete';
-type SortBy = 'name' | 'last-audit' | 'locations' | 'personnel' | 'audits';
+type StructureFilter =
+  | 'all'
+  | 'missing-locations'
+  | 'missing-personnel'
+  | 'complete'
+  | 'open-nc';
+type SortBy = 'name' | 'last-audit' | 'locations' | 'personnel' | 'audits' | 'open-nc';
 
 interface ClientsExplorerProps {
   clientOptions: ClientOption[];
@@ -41,6 +46,7 @@ export function ClientsExplorer({ clientOptions, clients }: ClientsExplorerProps
       ) {
         return false;
       }
+      if (structure === 'open-nc' && client.open_nc_count === 0) return false;
 
       if (!normalizedSearch) return true;
 
@@ -70,6 +76,10 @@ export function ClientsExplorer({ clientOptions, clients }: ClientsExplorerProps
 
       if (sortBy === 'audits') {
         return right.audit_count - left.audit_count || left.name.localeCompare(right.name, 'it');
+      }
+
+      if (sortBy === 'open-nc') {
+        return right.open_nc_count - left.open_nc_count || left.name.localeCompare(right.name, 'it');
       }
 
       const leftDate = left.last_audit_date ? new Date(left.last_audit_date).getTime() : 0;
@@ -150,6 +160,7 @@ export function ClientsExplorer({ clientOptions, clients }: ClientsExplorerProps
               <SelectItem value="missing-locations">Senza sedi</SelectItem>
               <SelectItem value="missing-personnel">Senza collaboratori</SelectItem>
               <SelectItem value="complete">Struttura completa</SelectItem>
+              <SelectItem value="open-nc">Con NC aperte</SelectItem>
             </SelectContent>
           </Select>
 
@@ -163,6 +174,7 @@ export function ClientsExplorer({ clientOptions, clients }: ClientsExplorerProps
               <SelectItem value="locations">Numero sedi</SelectItem>
               <SelectItem value="personnel">Numero collaboratori</SelectItem>
               <SelectItem value="audits">Numero audit</SelectItem>
+              <SelectItem value="open-nc">NC aperte</SelectItem>
             </SelectContent>
           </Select>
 

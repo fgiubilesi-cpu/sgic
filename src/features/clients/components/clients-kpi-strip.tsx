@@ -16,6 +16,7 @@ export function ClientsKpiStrip({ clients }: ClientsKpiStripProps) {
   const totalLocations = clients.reduce((sum, client) => sum + client.location_count, 0);
   const totalPersonnel = clients.reduce((sum, client) => sum + client.personnel_count, 0);
   const totalAudits = clients.reduce((sum, client) => sum + client.audit_count, 0);
+  const totalOpenNc = clients.reduce((sum, client) => sum + client.open_nc_count, 0);
   const clientsWithoutStructure = clients.filter(
     (client) => client.location_count === 0 || client.personnel_count === 0
   ).length;
@@ -52,15 +53,21 @@ export function ClientsKpiStrip({ clients }: ClientsKpiStripProps) {
       tone: 'text-amber-700',
     },
     {
+      label: 'NC Aperte',
+      value: formatValue(totalOpenNc),
+      icon: TriangleAlert,
+      tone: 'text-rose-700',
+    },
+    {
       label: 'Clienti Da Completare',
       value: formatValue(clientsWithoutStructure),
       icon: TriangleAlert,
-      tone: 'text-rose-700',
+      tone: 'text-orange-700',
     },
   ];
 
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
       {items.map((item) => {
         const Icon = item.icon;
 

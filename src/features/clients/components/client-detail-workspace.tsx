@@ -21,9 +21,12 @@ import { ClientForm } from './client-form';
 import { ManageLocationSheet } from './manage-location-sheet';
 import { ManagePersonnelSheet } from '@/features/personnel/components/manage-personnel-sheet';
 import { CreateAuditSheet } from '@/features/audits/components/create-audit-sheet';
+import { ClientStateToggleButton } from './client-state-toggle-button';
+import { LocationStateToggleButton } from './location-state-toggle-button';
 
 type ClientAuditItem = {
   id: string;
+  nc_count: number;
   title: string | null;
   status: string;
   scheduled_date: string | null;
@@ -37,6 +40,7 @@ interface ClientDetailWorkspaceProps {
   audits: ClientAuditItem[];
   client: ClientDetail;
   clientOptions: ClientOption[];
+  openNcCount: number;
   personnel: PersonnelListItem[];
 }
 
@@ -58,14 +62,17 @@ export function ClientDetailWorkspace({
   audits,
   client,
   clientOptions,
+  openNcCount,
   personnel,
 }: ClientDetailWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<ClientTab>('overview');
+  const isClientActive = client.is_active ?? true;
 
   const stats = [
     { label: 'Sedi operative', value: client.locations.length },
     { label: 'Collaboratori', value: personnel.length },
     { label: 'Audit storici', value: audits.length },
+    { label: 'NC aperte', value: openNcCount },
     {
       label: 'Ultimo audit',
       value: audits[0]?.scheduled_date
@@ -99,12 +106,13 @@ export function ClientDetailWorkspace({
         </div>
 
         <div className="flex items-center gap-2">
+          <ClientStateToggleButton clientId={client.id} isActive={isClientActive} />
           <ManageLocationSheet clientId={client.id} />
           <ManagePersonnelSheet clientOptions={clientOptions} defaultClientId={client.id} />
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {stats.map((stat) => (
           <Card key={stat.label} className="border-zinc-200 bg-white/90 shadow-sm">
             <CardHeader className="pb-2">
@@ -177,10 +185,18 @@ export function ClientDetailWorkspace({
                   <div>
                     <span className="font-medium">Stato</span>
                     <div className="mt-2">
-                      <Badge variant={client.is_active ? 'default' : 'secondary'}>
-                        {client.is_active ? 'Attivo' : 'Inattivo'}
+                      <Badge variant={isClientActive ? 'default' : 'secondary'}>
+                        {isClientActive ? 'Attivo' : 'Inattivo'}
                       </Badge>
                     </div>
+                  </div>
+                  <div>
+                    <span className="font-medium">Audit con NC aperte</span>
+                    <p className="mt-1 text-zinc-600">
+                      {openNcCount > 0
+                        ? `${openNcCount} non conformita da seguire in questa scheda cliente.`
+                        : 'Nessuna non conformita aperta al momento.'}
+                    </p>
                   </div>
                   <div>
                     <span className="font-medium">Note</span>
@@ -221,12 +237,18 @@ export function ClientDetailWorkspace({
                           <TableCell>{location.city || '-'}</TableCell>
                           <TableCell>{location.type || '-'}</TableCell>
                           <TableCell>
-                            <Badge variant={location.is_active ? 'default' : 'secondary'}>
-                              {location.is_active ? 'Attivo' : 'Inattivo'}
+                            <Badge variant={(location.is_active ?? true) ? 'default' : 'secondary'}>
+                              {(location.is_active ?? true) ? 'Attivo' : 'Inattivo'}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <ManageLocationSheet clientId={client.id} location={location} />
+                            <div className="flex items-center gap-1">
+                              <ManageLocationSheet clientId={client.id} location={location} />
+                              <LocationStateToggleButton
+                                isActive={location.is_active ?? true}
+                                locationId={location.id}
+                              />
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -329,6 +351,16 @@ export function ClientDetailWorkspace({
                     </div>
                   </CardContent>
                 </Card>
+                <Card className="border-zinc-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      NC aperte
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-semibold text-rose-700">{openNcCount}</div>
+                  </CardContent>
+                </Card>
               </div>
 
               <Card>
@@ -357,6 +389,7 @@ export function ClientDetailWorkspace({
                           <TableHead>Stato</TableHead>
                           <TableHead>Data</TableHead>
                           <TableHead>Score</TableHead>
+                          <TableHead>NC aperte</TableHead>
                           <TableHead>Apri</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -379,6 +412,17 @@ export function ClientDetailWorkspace({
                               {typeof audit.score === 'number' ? `${audit.score.toFixed(1)}%` : '-'}
                             </TableCell>
                             <TableCell>
+                              <span
+                                className={
+                                  audit.nc_count > 0
+                                    ? 'inline-flex min-w-8 items-center justify-center rounded-full bg-rose-100 px-2 py-1 text-xs font-medium text-rose-700'
+                                    : 'inline-flex min-w-8 items-center justify-center rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-500'
+                                }
+                              >
+                                {audit.nc_count}
+                              </span>
+                            </TableCell>
+                            <TableCell>
                               <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-blue-600">
                                 <Link href={`/audits/${audit.id}`}>Apri audit</Link>
                               </Button>
@@ -394,25 +438,124 @@ export function ClientDetailWorkspace({
           ) : null}
 
           {activeTab === 'documents' ? (
-            <Card className="border-dashed">
-              <CardHeader>
-                <CardTitle>Documenti</CardTitle>
-                <CardDescription>
-                  Placeholder pronto per la Fase 4: documenti cliente, sede e collaboratore con scadenze e versioni.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-zinc-600">
-                <p>
-                  Qui confluiranno contratti, certificazioni, documenti operativi e allegati legati al cliente.
-                </p>
-                <ul className="list-disc space-y-1 pl-5">
-                  <li>documenti generali del cliente</li>
-                  <li>documenti per sede</li>
-                  <li>documenti per collaboratore</li>
-                  <li>scadenze e versioning</li>
-                </ul>
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <Card className="border-zinc-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      Documenti Cliente
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-semibold text-zinc-900">0</div>
+                    <p className="mt-2 text-sm text-zinc-500">Archivio cliente non ancora attivato.</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-zinc-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      Sedi da coprire
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-semibold text-sky-700">{client.locations.length}</div>
+                    <p className="mt-2 text-sm text-zinc-500">
+                      Ogni sede potra avere documenti operativi e certificazioni dedicate.
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-zinc-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      Collaboratori da coprire
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-semibold text-violet-700">{personnel.length}</div>
+                    <p className="mt-2 text-sm text-zinc-500">
+                      Qui confluiranno documenti personali, scadenze e formazione.
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-zinc-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      Audit con evidenze
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-semibold text-amber-700">{audits.length}</div>
+                    <p className="mt-2 text-sm text-zinc-500">
+                      La cronologia audit e gia pronta a diventare base dell&apos;archivio documentale.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <Card className="border-dashed">
+                  <CardHeader>
+                    <CardTitle>Roadmap Documentale</CardTitle>
+                    <CardDescription>
+                      Preparazione della Fase 4 con archivio per cliente, sedi e collaboratori.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4 text-sm text-zinc-600">
+                    <div>
+                      <p className="font-medium text-zinc-900">Cosa entrera qui</p>
+                      <ul className="mt-2 list-disc space-y-1 pl-5">
+                        <li>contratti, visure e allegati amministrativi del cliente</li>
+                        <li>manuali, autorizzazioni e certificazioni di sede</li>
+                        <li>documenti individuali, formazione e scadenze collaboratori</li>
+                        <li>versioning, data scadenza e stato validazione</li>
+                      </ul>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="font-medium text-zinc-900">Stato attuale</p>
+                      <p className="mt-1">
+                        La scheda cliente e gia pronta a raccogliere i tre livelli del futuro archivio:
+                        cliente, sede e collaboratore.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Checklist preparatoria</CardTitle>
+                    <CardDescription>
+                      Passi consigliati prima di attivare il modulo documenti.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="rounded-lg border border-zinc-200 p-3">
+                      <p className="font-medium text-zinc-900">1. Struttura cliente</p>
+                      <p className="mt-1 text-zinc-600">
+                        {client.locations.length > 0
+                          ? 'Le sedi sono gia censite e pronte per documenti dedicati.'
+                          : 'Aggiungi almeno una sede per organizzare correttamente i documenti operativi.'}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-zinc-200 p-3">
+                      <p className="font-medium text-zinc-900">2. Referenti operativi</p>
+                      <p className="mt-1 text-zinc-600">
+                        {personnel.length > 0
+                          ? 'I collaboratori sono gia presenti e potranno ricevere documenti e scadenze.'
+                          : 'Aggiungi collaboratori per preparare la gestione di documenti individuali e formazione.'}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-zinc-200 p-3">
+                      <p className="font-medium text-zinc-900">3. Audit e priorita</p>
+                      <p className="mt-1 text-zinc-600">
+                        {openNcCount > 0
+                          ? `Sono presenti ${openNcCount} NC aperte: la futura area documenti potra ospitare anche evidenze di risoluzione.`
+                          : 'Nessuna NC aperta: la scheda e pronta per introdurre archivio e scadenze senza criticita correnti.'}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           ) : null}
         </div>
       </div>

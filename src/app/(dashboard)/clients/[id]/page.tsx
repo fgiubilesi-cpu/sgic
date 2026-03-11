@@ -39,7 +39,23 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
       .order('scheduled_date', { ascending: false }),
   ]);
 
+  const auditIds = (audits.data ?? []).map((audit) => audit.id);
+  const { data: nonConformities } =
+    auditIds.length > 0
+      ? await orgContext.supabase
+          .from('non_conformities')
+          .select('audit_id, status')
+          .eq('organization_id', orgContext.organizationId)
+          .in('audit_id', auditIds)
+          .neq('status', 'closed')
+      : { data: [] };
+
   const locationMap = new Map(client.locations.map((location) => [location.id, location.name]));
+  const openNcCountByAuditId = (nonConformities ?? []).reduce<Record<string, number>>((acc, nc) => {
+    acc[nc.audit_id] = (acc[nc.audit_id] ?? 0) + 1;
+    return acc;
+  }, {});
+  const openNcCount = Object.values(openNcCountByAuditId).reduce((sum, count) => sum + count, 0);
   const clientOptions = [
     {
       id: client.id,
@@ -60,9 +76,11 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
         scheduled_date: audit.scheduled_date,
         score: audit.score,
         location_name: audit.location_id ? locationMap.get(audit.location_id) ?? null : null,
+        nc_count: openNcCountByAuditId[audit.id] ?? 0,
       }))}
       client={client}
       clientOptions={clientOptions}
+      openNcCount={openNcCount}
       personnel={personnel}
     />
   );

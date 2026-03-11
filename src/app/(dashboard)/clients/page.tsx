@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getClients } from '@/features/clients/queries/get-clients';
 import { getClientOptions } from '@/features/clients/queries/get-client-options';
 import { getOrganizationContext } from '@/lib/supabase/get-org-context';
-import { ClientTable } from '@/features/clients/components/client-table';
+import { ClientsExplorer } from '@/features/clients/components/clients-explorer';
 import { CreateClientSheet } from '@/features/clients/components/create-client-sheet';
 
 export const metadata = {
@@ -42,7 +42,7 @@ export default async function ClientsPage() {
           </p>
         </div>
       ) : (
-        <ClientTable clientOptions={clientOptions} clients={clients} />
+        <ClientsExplorer clientOptions={clientOptions} clients={clients} />
       )}
     </div>
   );

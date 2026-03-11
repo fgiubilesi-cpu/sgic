@@ -5,12 +5,32 @@ import { createClient as createSupabaseClient } from '@/lib/supabase/server';
 import { getOrganizationContext } from '@/lib/supabase/get-org-context';
 import { personnelSchema, type PersonnelFormInput } from '../schemas/personnel-schema';
 import type { Tables } from '@/types/database.types';
+import {
+  buildPersonnelTimeline,
+  getPersonnelOperationalStatus,
+  getTrainingWindowSummary,
+  type OperationalStatus,
+} from '@/features/personnel/lib/personnel-status';
 
 type TrainingRecordRow = Tables<'training_records'> & {
   training_courses?: Pick<
     Tables<'training_courses'>,
     'title' | 'duration_hours' | 'category'
   > | null;
+};
+
+type SelectedTrainingRecord = {
+  certificate_url: string | null;
+  completion_date: string;
+  course_id: string;
+  expiry_date: string | null;
+  id: string;
+  organization_id: string;
+  personnel_id: string;
+  training_courses?: Pick<
+    Tables<'training_courses'>,
+    'title' | 'duration_hours' | 'category'
+  >[] | null;
 };
 
 export interface PersonnelDetail {
@@ -24,10 +44,15 @@ export interface PersonnelDetail {
   last_name: string;
   location_id: string | null;
   location_name: string | null;
+  next_expiry_date: string | null;
+  operational_status: OperationalStatus;
   organization_id: string;
   role: string | null;
   tax_code: string | null;
+  training_expired_count: number;
+  training_expiring_count: number;
   training_records: TrainingRecordRow[];
+  timeline: ReturnType<typeof buildPersonnelTimeline>;
 }
 
 async function ensurePersonnelRelations(
@@ -91,6 +116,8 @@ export async function createPersonnel(input: PersonnelFormInput) {
         email: validated.email.trim(),
         client_id: validated.client_id,
         location_id: locationId,
+        tax_code: validated.tax_code.trim() || null,
+        hire_date: validated.hire_date.trim() || null,
         is_active: validated.is_active,
       })
       .select()
@@ -139,6 +166,8 @@ export async function updatePersonnel(personnelId: string, input: PersonnelFormI
         email: validated.email.trim(),
         client_id: validated.client_id,
         location_id: locationId,
+        tax_code: validated.tax_code.trim() || null,
+        hire_date: validated.hire_date.trim() || null,
         is_active: validated.is_active,
       })
       .eq('id', personnelId)
@@ -198,9 +227,82 @@ export async function getPersonnelDetail(id: string): Promise<PersonnelDetail | 
       : Promise.resolve({ data: null, error: null }),
   ]);
 
+  const normalizedTrainingRecords = ((data.training_records ?? []) as unknown as SelectedTrainingRecord[]).map(
+    (record) => ({
+      ...record,
+      created_at: null,
+      training_courses: Array.isArray(record.training_courses)
+        ? record.training_courses[0] ?? null
+        : (record.training_courses ?? null),
+    })
+  ) as TrainingRecordRow[];
+
+  const trainingSummary = getTrainingWindowSummary(
+    normalizedTrainingRecords.map((record) => ({
+      completion_date: record.completion_date,
+      expiry_date: record.expiry_date,
+    }))
+  );
+
   return {
-    ...(data as unknown as Omit<PersonnelDetail, 'client_name' | 'location_name'>),
+    ...(data as unknown as Omit<
+      PersonnelDetail,
+      | 'client_name'
+      | 'location_name'
+      | 'next_expiry_date'
+      | 'operational_status'
+      | 'timeline'
+      | 'training_expired_count'
+      | 'training_expiring_count'
+    >),
     client_name: clientResult.data?.name ?? null,
     location_name: locationResult.data?.name ?? null,
+    next_expiry_date: trainingSummary.nextExpiryDate,
+    operational_status: getPersonnelOperationalStatus({
+      isActive: data.is_active,
+      trainingSummary,
+    }),
+    timeline: buildPersonnelTimeline({
+      firstName: data.first_name,
+      hireDate: data.hire_date,
+      trainingSummary,
+      trainingRecords: normalizedTrainingRecords.map((record) => ({
+        completion_date: record.completion_date,
+        expiry_date: record.expiry_date,
+      })),
+    }),
+    training_expired_count: trainingSummary.expiredCount,
+    training_expiring_count: trainingSummary.expiringSoonCount,
+    training_records: normalizedTrainingRecords,
   };
+}
+
+export async function setPersonnelActiveState(personnelId: string, isActive: boolean) {
+  try {
+    const orgContext = await getOrganizationContext();
+    if (!orgContext) throw new Error('Unauthorized');
+
+    const supabase = await createSupabaseClient();
+
+    const { data, error } = await supabase
+      .from('personnel')
+      .update({ is_active: isActive })
+      .eq('id', personnelId)
+      .eq('organization_id', orgContext.organizationId)
+      .select('id, client_id')
+      .single();
+
+    if (error) throw error;
+
+    revalidatePath('/clients');
+    revalidatePath(`/personnel/${personnelId}`);
+    if (data?.client_id) {
+      revalidatePath(`/clients/${data.client_id}`);
+    }
+    return { success: true, data };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Errore aggiornamento stato collaboratore';
+    return { success: false, error: message };
+  }
 }

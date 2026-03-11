@@ -23,6 +23,8 @@ import { ManagePersonnelSheet } from '@/features/personnel/components/manage-per
 import { CreateAuditSheet } from '@/features/audits/components/create-audit-sheet';
 import { ClientStateToggleButton } from './client-state-toggle-button';
 import { LocationStateToggleButton } from './location-state-toggle-button';
+import { PersonnelOperationalBadge } from '@/features/personnel/components/personnel-operational-badge';
+import { PersonnelStateToggleButton } from '@/features/personnel/components/personnel-state-toggle-button';
 
 type ClientAuditItem = {
   id: string;
@@ -277,9 +279,9 @@ export function ClientDetailWorkspace({
                       <TableRow>
                         <TableHead>Nome</TableHead>
                         <TableHead>Ruolo</TableHead>
-                        <TableHead>Email</TableHead>
                         <TableHead>Sede</TableHead>
-                        <TableHead>Stato</TableHead>
+                        <TableHead>Formazione</TableHead>
+                        <TableHead>Stato operativo</TableHead>
                         <TableHead>Azioni</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -287,15 +289,43 @@ export function ClientDetailWorkspace({
                       {personnel.map((person) => (
                         <TableRow key={person.id}>
                           <TableCell className="font-medium">
-                            {person.first_name} {person.last_name}
+                            <div className="flex flex-col">
+                              <span>
+                                {person.first_name} {person.last_name}
+                              </span>
+                              <span className="text-xs text-zinc-500">{person.email || '-'}</span>
+                            </div>
                           </TableCell>
                           <TableCell>{person.role || '-'}</TableCell>
-                          <TableCell>{person.email || '-'}</TableCell>
                           <TableCell>{person.location_name || '-'}</TableCell>
                           <TableCell>
-                            <Badge variant={person.is_active ? 'default' : 'secondary'}>
-                              {person.is_active ? 'Attivo' : 'Inattivo'}
-                            </Badge>
+                            <div className="flex flex-col gap-1 text-xs">
+                              <span className="text-zinc-700">
+                                {person.training_record_count} corsi registrati
+                              </span>
+                              {person.training_expired_count > 0 ? (
+                                <span className="text-rose-700">
+                                  {person.training_expired_count} scaduti
+                                </span>
+                              ) : person.training_expiring_count > 0 ? (
+                                <span className="text-amber-700">
+                                  {person.training_expiring_count} in scadenza
+                                </span>
+                              ) : (
+                                <span className="text-zinc-500">Nessuna criticita</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <PersonnelOperationalBadge status={person.operational_status} />
+                              {person.next_expiry_date ? (
+                                <div className="text-xs text-zinc-500">
+                                  Prossima scadenza{' '}
+                                  {new Date(person.next_expiry_date).toLocaleDateString('it-IT')}
+                                </div>
+                              ) : null}
+                            </div>
                           </TableCell>
                           <TableCell className="flex items-center gap-1">
                             <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-blue-600">
@@ -305,6 +335,10 @@ export function ClientDetailWorkspace({
                               clientOptions={clientOptions}
                               defaultClientId={client.id}
                               personnel={person}
+                            />
+                            <PersonnelStateToggleButton
+                              isActive={person.is_active}
+                              personnelId={person.id}
                             />
                           </TableCell>
                         </TableRow>

@@ -55,6 +55,8 @@ export function PersonnelForm({
       email: personnel?.email || '',
       client_id: personnel?.client_id || defaultClientId || '',
       location_id: personnel?.location_id || 'none',
+      tax_code: personnel?.tax_code || '',
+      hire_date: personnel?.hire_date || '',
       is_active: personnel?.is_active ?? true,
     },
   });
@@ -189,6 +191,36 @@ export function PersonnelForm({
             </FormItem>
           )}
         />
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="tax_code"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Codice fiscale</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Es. RSSMRA80A01H501U" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="hire_date"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Data ingresso</FormLabel>
+                <FormControl>
+                  <Input {...field} type="date" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <FormField
           control={form.control}

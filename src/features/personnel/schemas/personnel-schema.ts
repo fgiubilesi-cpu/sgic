@@ -7,6 +7,8 @@ export const personnelSchema = z.object({
   email: z.string().trim().min(1, 'Email obbligatoria').email('Email non valida'),
   client_id: z.string().uuid('Cliente non valido'),
   location_id: z.string().trim(),
+  tax_code: z.string().trim(),
+  hire_date: z.string().trim(),
   is_active: z.boolean().default(true),
 });
 

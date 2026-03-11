@@ -2,9 +2,9 @@ import { createClient } from '@/lib/supabase/server';
 import { Database } from '@/types/database.types';
 
 type ClientRow = Database['public']['Tables']['clients']['Row'];
-type LocationRow = Database['public']['Tables']['locations']['Row'];
 
-interface ClientWithStats extends ClientRow {
+export interface ClientWithStats extends ClientRow {
+  audit_count: number;
   location_count: number;
   personnel_count: number;
   last_audit_date: string | null;
@@ -31,7 +31,6 @@ export async function getClients(
     .from('clients')
     .select('*')
     .eq('organization_id', organizationId)
-    .eq('is_active', true)
     .order('name');
 
   if (clientsError) throw clientsError;
@@ -67,6 +66,7 @@ export async function getClients(
 
     return {
       ...client,
+      audit_count: allAudits.length,
       location_count: clientStats.length,
       personnel_count: personnelCount,
       last_audit_date: lastAudit?.created_at || null,

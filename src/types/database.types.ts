@@ -802,39 +802,62 @@ export type Database = {
       }
       personnel: {
         Row: {
+          client_id: string | null
           created_at: string | null
+          email: string | null
           first_name: string
           hire_date: string | null
           id: string
           is_active: boolean
           last_name: string
+          location_id: string | null
           organization_id: string
           role: string | null
           tax_code: string | null
         }
         Insert: {
+          client_id?: string | null
           created_at?: string | null
+          email?: string | null
           first_name?: string
           hire_date?: string | null
           id?: string
           is_active?: boolean
           last_name?: string
+          location_id?: string | null
           organization_id: string
           role?: string | null
           tax_code?: string | null
         }
         Update: {
+          client_id?: string | null
           created_at?: string | null
+          email?: string | null
           first_name?: string
           hire_date?: string | null
           id?: string
           is_active?: boolean
           last_name?: string
+          location_id?: string | null
           organization_id?: string
           role?: string | null
           tax_code?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "personnel_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personnel_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "personnel_organization_id_fkey"
             columns: ["organization_id"]

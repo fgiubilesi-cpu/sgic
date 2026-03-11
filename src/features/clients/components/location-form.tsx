@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { locationSchema, type LocationFormInput, type LocationForm } from '../schemas/client-schema';
+import { locationSchema, type LocationFormInput } from '../schemas/client-schema';
 import { createLocation, updateLocation } from '../actions/client-actions';
 import {
   Form,
@@ -30,7 +30,7 @@ interface LocationFormProps {
 export function LocationForm({ clientId, location, onSuccess }: LocationFormProps) {
   const [loading, setLoading] = useState(false);
 
-  const form = useForm<LocationFormInput, unknown, LocationForm>({
+  const form = useForm<LocationFormInput>({
     resolver: zodResolver(locationSchema),
     defaultValues: {
       name: location?.name || '',
@@ -42,7 +42,7 @@ export function LocationForm({ clientId, location, onSuccess }: LocationFormProp
     },
   });
 
-  async function onSubmit(values: LocationForm) {
+  async function onSubmit(values: LocationFormInput) {
     setLoading(true);
     try {
       const result = location

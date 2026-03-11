@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { clientSchema, type ClientFormInput, type ClientForm } from '../schemas/client-schema';
+import { clientSchema, type ClientFormInput } from '../schemas/client-schema';
 import { createClient, updateClient } from '../actions/client-actions';
 import {
   Form,
@@ -29,7 +29,7 @@ interface ClientFormProps {
 export function ClientForm({ client, onSuccess }: ClientFormProps) {
   const [loading, setLoading] = useState(false);
 
-  const form = useForm<ClientFormInput, unknown, ClientForm>({
+  const form = useForm<ClientFormInput>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
       name: client?.name || '',
@@ -41,7 +41,7 @@ export function ClientForm({ client, onSuccess }: ClientFormProps) {
     },
   });
 
-  async function onSubmit(values: ClientForm) {
+  async function onSubmit(values: ClientFormInput) {
     setLoading(true);
     try {
       const result = client

@@ -5,6 +5,11 @@ import { createClient as createSupabaseClient } from '@/lib/supabase/server';
 import { getOrganizationContext } from '@/lib/supabase/get-org-context';
 import { clientSchema, locationSchema, type ClientFormInput, type LocationFormInput } from '../schemas/client-schema';
 
+function normalizeOptionalString(value: string) {
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
 export async function createClient(input: ClientFormInput) {
   try {
     const orgContext = await getOrganizationContext();
@@ -17,7 +22,12 @@ export async function createClient(input: ClientFormInput) {
       .from('clients')
       .insert({
         organization_id: orgContext.organizationId,
-        ...validated,
+        name: validated.name,
+        vat_number: normalizeOptionalString(validated.vat_number),
+        email: normalizeOptionalString(validated.email),
+        phone: normalizeOptionalString(validated.phone),
+        notes: normalizeOptionalString(validated.notes),
+        is_active: validated.is_active,
       })
       .select()
       .single();
@@ -45,7 +55,14 @@ export async function updateClient(
 
     const { data, error } = await supabase
       .from('clients')
-      .update(validated)
+      .update({
+        name: validated.name,
+        vat_number: normalizeOptionalString(validated.vat_number),
+        email: normalizeOptionalString(validated.email),
+        phone: normalizeOptionalString(validated.phone),
+        notes: normalizeOptionalString(validated.notes),
+        is_active: validated.is_active,
+      })
       .eq('id', clientId)
       .eq('organization_id', orgContext.organizationId)
       .select()
@@ -78,7 +95,12 @@ export async function createLocation(
       .insert({
         organization_id: orgContext.organizationId,
         client_id: clientId,
-        ...validated,
+        name: validated.name,
+        address: normalizeOptionalString(validated.address),
+        city: normalizeOptionalString(validated.city),
+        type: normalizeOptionalString(validated.type),
+        notes: normalizeOptionalString(validated.notes),
+        is_active: validated.is_active,
       })
       .select()
       .single();
@@ -106,7 +128,14 @@ export async function updateLocation(
 
     const { data, error } = await supabase
       .from('locations')
-      .update(validated)
+      .update({
+        name: validated.name,
+        address: normalizeOptionalString(validated.address),
+        city: normalizeOptionalString(validated.city),
+        type: normalizeOptionalString(validated.type),
+        notes: normalizeOptionalString(validated.notes),
+        is_active: validated.is_active,
+      })
       .eq('id', locationId)
       .eq('organization_id', orgContext.organizationId)
       .select()

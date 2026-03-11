@@ -1,6 +1,6 @@
 import { Suspense } from "react";
-import { SlidersHorizontal, BarChart2, AlertTriangle } from "lucide-react";
-import { getDashboardFilterOptions, getDashboardMetrics, getGlobalNCs, getAuditScoreTrend, getRecentAudits, getUpcomingAudits, getMonthlyKPIs } from "@/features/dashboard/queries/get-dashboard-data";
+import { SlidersHorizontal, BarChart2, AlertTriangle, Sparkles } from "lucide-react";
+import { getDashboardFilterOptions, getDashboardMetrics, getGlobalNCs, getAuditScoreTrend, getRecentAudits, getUpcomingAudits, getMonthlyKPIs, getDashboardActionCenter } from "@/features/dashboard/queries/get-dashboard-data";
 import { DashboardFilters } from "@/features/dashboard/components/dashboard-filters";
 import { DashboardMetricsGrid } from "@/features/dashboard/components/dashboard-metrics";
 import { GlobalNCTable } from "@/features/dashboard/components/global-nc-table";
@@ -8,6 +8,10 @@ import { AuditTrendChart } from "@/features/dashboard/components/audit-trend-cha
 import { RecentAudits } from "@/features/dashboard/components/recent-audits";
 import { UpcomingAuditsWidget } from "@/features/dashboard/components/upcoming-audits-widget";
 import { MonthlyKPIs } from "@/features/dashboard/components/monthly-kpis";
+import { DashboardSavedViews } from "@/features/dashboard/components/dashboard-saved-views";
+import { DashboardNotificationCenter } from "@/features/dashboard/components/dashboard-notification-center";
+import { DashboardTodoList } from "@/features/dashboard/components/dashboard-todo-list";
+import { DashboardQuickActions } from "@/features/dashboard/components/dashboard-quick-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +29,7 @@ export default async function DashboardPage({
 
   const filters = { clientId, locationId, dateFrom, dateTo };
 
-  const [filterOptions, metrics, globalNCs, trendData, recentAudits, upcomingAudits, monthlyKPIs] = await Promise.all([
+  const [filterOptions, metrics, globalNCs, trendData, recentAudits, upcomingAudits, monthlyKPIs, actionCenter] = await Promise.all([
     getDashboardFilterOptions(),
     getDashboardMetrics(filters),
     getGlobalNCs(filters),
@@ -33,6 +37,7 @@ export default async function DashboardPage({
     getRecentAudits(),
     getUpcomingAudits(),
     getMonthlyKPIs(),
+    getDashboardActionCenter(filters),
   ]);
 
   return (
@@ -44,6 +49,17 @@ export default async function DashboardPage({
           Centro di controllo — filtri attivi: {[clientId, locationId, dateFrom, dateTo].filter(Boolean).length} / 4
         </p>
       </div>
+
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="w-4 h-4 text-zinc-400" />
+          <h2 className="text-sm font-semibold text-zinc-700">Viste salvate</h2>
+          <p className="text-xs text-zinc-400 ml-auto">Preset veloci per lavorare per periodo</p>
+        </div>
+        <Suspense>
+          <DashboardSavedViews activeDateFrom={dateFrom} activeDateTo={dateTo} />
+        </Suspense>
+      </section>
 
       {/* Filters */}
       <section>
@@ -79,6 +95,13 @@ export default async function DashboardPage({
       <section>
         <DashboardMetricsGrid metrics={metrics} />
       </section>
+
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_1fr]">
+        <DashboardNotificationCenter notifications={actionCenter.notifications} />
+        <DashboardTodoList todos={actionCenter.todos} />
+      </div>
+
+      <DashboardQuickActions />
 
       {/* Trend chart + NC table */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

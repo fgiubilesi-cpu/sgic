@@ -6,10 +6,15 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { getOrganization } from "@/features/organization/queries/get-organization";
+import { getOrganizationAccessOverview } from "@/features/organization/queries/get-organization-access";
 import { OrgSettingsForm } from "@/features/organization/components/org-settings-form";
+import { OrganizationAccessPanel } from "@/features/organization/components/organization-access-panel";
 
 export default async function OrganizationPage() {
-  const organization = await getOrganization();
+  const [organization, accessOverview] = await Promise.all([
+    getOrganization(),
+    getOrganizationAccessOverview(),
+  ]);
 
   if (!organization) {
     return (
@@ -47,6 +52,7 @@ export default async function OrganizationPage() {
       </div>
 
       <OrgSettingsForm organization={organization} />
+      {accessOverview ? <OrganizationAccessPanel overview={accessOverview} /> : null}
     </section>
   );
 }

@@ -37,11 +37,12 @@ export function useSpeechRecognition() {
   const [transcript, setTranscript] = useState("");
   // Use a ref for the recognition instance — no re-render needed when it initialises
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-  // isSupported is computed once at mount via lazy initializer — no setState needed in effect
-  const [isSupported] = useState<boolean>(() => !!detectSpeechRecognition());
+  // Keep initial server and client render identical to avoid hydration mismatches.
+  const [isSupported, setIsSupported] = useState(false);
 
   useEffect(() => {
     const SpeechRecognitionConstructor = detectSpeechRecognition();
+    setIsSupported(Boolean(SpeechRecognitionConstructor));
     if (!SpeechRecognitionConstructor) return;
 
     const instance = new SpeechRecognitionConstructor();

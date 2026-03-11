@@ -27,6 +27,9 @@ import { PersonnelOperationalBadge } from '@/features/personnel/components/perso
 import { PersonnelStateToggleButton } from '@/features/personnel/components/personnel-state-toggle-button';
 import type { AuditTimelineEvent } from '@/features/audits/queries/get-audit-timeline';
 import { ClientAuditInsights } from './client-audit-insights';
+import type { DocumentListItem } from '@/features/documents/queries/get-documents';
+import { ManageDocumentSheet } from '@/features/documents/components/manage-document-sheet';
+import { DocumentsTable } from '@/features/documents/components/documents-table';
 
 type ClientAuditItem = {
   id: string;
@@ -44,6 +47,7 @@ interface ClientDetailWorkspaceProps {
   audits: ClientAuditItem[];
   client: ClientDetail;
   clientOptions: ClientOption[];
+  documents: DocumentListItem[];
   openNcCount: number;
   personnel: PersonnelListItem[];
   timelineEvents: AuditTimelineEvent[];
@@ -67,6 +71,7 @@ export function ClientDetailWorkspace({
   audits,
   client,
   clientOptions,
+  documents,
   openNcCount,
   personnel,
   timelineEvents,
@@ -89,6 +94,18 @@ export function ClientDetailWorkspace({
 
   const closedAudits = audits.filter((audit) => audit.status === 'Closed').length;
   const scheduledAudits = audits.filter((audit) => audit.status === 'Scheduled').length;
+  const documentExpiringSoonCount = documents.filter((document) => {
+    if (!document.expiry_date) return false;
+    const expiry = new Date(document.expiry_date);
+    const today = new Date();
+    const inThirtyDays = new Date();
+    inThirtyDays.setDate(today.getDate() + 30);
+    return expiry >= today && expiry <= inThirtyDays;
+  }).length;
+  const documentExpiredCount = documents.filter((document) => {
+    if (!document.expiry_date) return false;
+    return new Date(document.expiry_date) < new Date();
+  }).length;
   const averageScore =
     audits.filter((audit) => typeof audit.score === 'number').reduce((sum, audit) => sum + (audit.score ?? 0), 0) /
       Math.max(audits.filter((audit) => typeof audit.score === 'number').length, 1);
@@ -487,8 +504,8 @@ export function ClientDetailWorkspace({
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-semibold text-zinc-900">0</div>
-                    <p className="mt-2 text-sm text-zinc-500">Archivio cliente non ancora attivato.</p>
+                    <div className="text-2xl font-semibold text-zinc-900">{documents.length}</div>
+                    <p className="mt-2 text-sm text-zinc-500">Archivio documentale complessivo del cliente.</p>
                   </CardContent>
                 </Card>
                 <Card className="border-zinc-200">
@@ -520,13 +537,13 @@ export function ClientDetailWorkspace({
                 <Card className="border-zinc-200">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
-                      Audit con evidenze
+                      Documenti in scadenza
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-semibold text-amber-700">{audits.length}</div>
+                    <div className="text-2xl font-semibold text-amber-700">{documentExpiringSoonCount}</div>
                     <p className="mt-2 text-sm text-zinc-500">
-                      La cronologia audit e gia pronta a diventare base dell&apos;archivio documentale.
+                      Documenti che scadono entro i prossimi 30 giorni.
                     </p>
                   </CardContent>
                 </Card>
@@ -561,11 +578,18 @@ export function ClientDetailWorkspace({
                 </Card>
 
                 <Card>
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                    <div>
                     <CardTitle>Checklist preparatoria</CardTitle>
                     <CardDescription>
                       Passi consigliati prima di attivare il modulo documenti.
                     </CardDescription>
+                    </div>
+                    <ManageDocumentSheet
+                      clientOptions={clientOptions}
+                      defaultClientId={client.id}
+                      personnelOptions={personnel}
+                    />
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
                     <div className="rounded-lg border border-zinc-200 p-3">
@@ -592,9 +616,43 @@ export function ClientDetailWorkspace({
                           : 'Nessuna NC aperta: la scheda e pronta per introdurre archivio e scadenze senza criticita correnti.'}
                       </p>
                     </div>
+                    <div className="rounded-lg border border-zinc-200 p-3">
+                      <p className="font-medium text-zinc-900">4. Scadenze documentali</p>
+                      <p className="mt-1 text-zinc-600">
+                        {documentExpiredCount > 0
+                          ? `${documentExpiredCount} documenti sono gia scaduti e richiedono rinnovo.`
+                          : documentExpiringSoonCount > 0
+                          ? `${documentExpiringSoonCount} documenti sono in scadenza nel breve periodo.`
+                          : 'Nessuna criticita documentale immediata registrata.'}
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <div>
+                    <CardTitle>Archivio Documenti ({documents.length})</CardTitle>
+                    <CardDescription>
+                      Documenti cliente, sede e collaboratore raccolti in un unico registro operativo.
+                    </CardDescription>
+                  </div>
+                  <ManageDocumentSheet
+                    clientOptions={clientOptions}
+                    defaultClientId={client.id}
+                    personnelOptions={personnel}
+                  />
+                </CardHeader>
+                <CardContent>
+                  <DocumentsTable
+                    clientOptions={clientOptions}
+                    documents={documents}
+                    emptyMessage="Nessun documento ancora collegato a questo cliente."
+                    personnelOptions={personnel}
+                  />
+                </CardContent>
+              </Card>
             </div>
           ) : null}
         </div>

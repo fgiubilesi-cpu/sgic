@@ -17,9 +17,16 @@ import type { Tables } from "@/types/database.types";
 type RegisterTrainingSheetProps = {
     personnel: Tables<"personnel">[];
     courses: Tables<"training_courses">[];
+    defaultPersonnelId?: string;
+    triggerLabel?: string;
 };
 
-export function RegisterTrainingSheet({ personnel, courses }: RegisterTrainingSheetProps) {
+export function RegisterTrainingSheet({
+    personnel,
+    courses,
+    defaultPersonnelId,
+    triggerLabel,
+}: RegisterTrainingSheetProps) {
     const [open, setOpen] = useState(false);
 
     return (
@@ -27,7 +34,7 @@ export function RegisterTrainingSheet({ personnel, courses }: RegisterTrainingSh
             <SheetTrigger asChild>
                 <Button>
                     <Plus className="mr-2 h-4 w-4" />
-                    Registra Formazione
+                    {triggerLabel ?? "Registra Formazione"}
                 </Button>
             </SheetTrigger>
             <SheetContent className="sm:max-w-md">
@@ -41,6 +48,7 @@ export function RegisterTrainingSheet({ personnel, courses }: RegisterTrainingSh
                     <TrainingRecordForm
                         personnel={personnel}
                         courses={courses}
+                        defaultPersonnelId={defaultPersonnelId}
                         onSuccess={() => setOpen(false)}
                     />
                 </div>

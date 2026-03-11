@@ -25,6 +25,8 @@ import { ClientStateToggleButton } from './client-state-toggle-button';
 import { LocationStateToggleButton } from './location-state-toggle-button';
 import { PersonnelOperationalBadge } from '@/features/personnel/components/personnel-operational-badge';
 import { PersonnelStateToggleButton } from '@/features/personnel/components/personnel-state-toggle-button';
+import type { AuditTimelineEvent } from '@/features/audits/queries/get-audit-timeline';
+import { ClientAuditInsights } from './client-audit-insights';
 
 type ClientAuditItem = {
   id: string;
@@ -44,6 +46,7 @@ interface ClientDetailWorkspaceProps {
   clientOptions: ClientOption[];
   openNcCount: number;
   personnel: PersonnelListItem[];
+  timelineEvents: AuditTimelineEvent[];
 }
 
 const tabs: Array<{ id: ClientTab; label: string; icon: React.ElementType }> = [
@@ -66,6 +69,7 @@ export function ClientDetailWorkspace({
   clientOptions,
   openNcCount,
   personnel,
+  timelineEvents,
 }: ClientDetailWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<ClientTab>('overview');
   const isClientActive = client.is_active ?? true;
@@ -352,7 +356,7 @@ export function ClientDetailWorkspace({
 
           {activeTab === 'audits' ? (
             <div className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <Card className="border-zinc-200">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
@@ -396,6 +400,8 @@ export function ClientDetailWorkspace({
                   </CardContent>
                 </Card>
               </div>
+
+              <ClientAuditInsights audits={audits} timelineEvents={timelineEvents} />
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">

@@ -3,6 +3,7 @@ import { getClient } from '@/features/clients/queries/get-client';
 import { getOrganizationContext } from '@/lib/supabase/get-org-context';
 import { getPersonnelList } from '@/features/personnel/queries/get-personnel';
 import { ClientDetailWorkspace } from '@/features/clients/components/client-detail-workspace';
+import { getAuditTimeline } from '@/features/audits/queries/get-audit-timeline';
 
 export const metadata = {
   title: 'Dettaglio Cliente - SGIC',
@@ -29,7 +30,7 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
     redirect('/clients');
   }
 
-  const [personnel, audits] = await Promise.all([
+  const [personnel, audits, timelineEvents] = await Promise.all([
     getPersonnelList(orgContext.organizationId, client.id),
     orgContext.supabase
       .from('audits')
@@ -37,6 +38,7 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
       .eq('organization_id', orgContext.organizationId)
       .eq('client_id', client.id)
       .order('scheduled_date', { ascending: false }),
+    getAuditTimeline(client.id),
   ]);
 
   const auditIds = (audits.data ?? []).map((audit) => audit.id);
@@ -82,6 +84,7 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
       clientOptions={clientOptions}
       openNcCount={openNcCount}
       personnel={personnel}
+      timelineEvents={timelineEvents}
     />
   );
 }

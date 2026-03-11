@@ -1,57 +1,55 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getAuditTimeline } from "@/features/audits/queries/get-audit-timeline";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { AuditTimeline } from "@/features/audits/components/audit-timeline";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
-import type { AuditTimelineEvent } from "@/features/audits/queries/get-audit-timeline";
 
-export default function AuditHistoryPage() {
-  const [events, setEvents] = useState<AuditTimelineEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [clientName, setClientName] = useState<string>("");
-  const [totalAudits, setTotalAudits] = useState(0);
+export const dynamic = "force-dynamic";
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const ctx = await getOrganizationContext();
+export default async function AuditHistoryPage() {
+  const [ctx, timelineData] = await Promise.all([
+    getOrganizationContext(),
+    getAuditTimeline(),
+  ]);
 
-        // Get client name if available
-        if (ctx?.supabase && ctx?.clientId) {
-          const { data: client } = await ctx.supabase
-            .from("clients")
-            .select("name")
-            .eq("id", ctx.clientId)
-            .single();
+  let clientName = "";
 
-          if (client?.name) {
-            setClientName(client.name);
-          }
-        }
+  if (ctx?.supabase && ctx.clientId) {
+    const { data: client } = await ctx.supabase
+      .from("clients")
+      .select("name")
+      .eq("id", ctx.clientId)
+      .single();
 
-        const timelineData = await getAuditTimeline();
-        setEvents(timelineData);
-        setTotalAudits(timelineData.length);
-      } catch (error) {
-        console.error("Failed to fetch audit history:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    if (client?.name) {
+      clientName = client.name;
+    }
+  }
 
-    fetchData();
-  }, []);
+  const totalAudits = timelineData.length;
+  const closedAudits = timelineData.filter((event) => event.status === "Closed").length;
+  const inProgressAudits = timelineData.filter(
+    (event) => event.status === "In Progress"
+  ).length;
+  const scoredEvents = timelineData.filter((event) => event.score !== null);
+  const averageCompliance =
+    scoredEvents.length > 0
+      ? Math.round(
+          scoredEvents.reduce((sum, event) => sum + (event.score || 0), 0) /
+            scoredEvents.length
+        )
+      : 0;
 
   return (
     <div className="space-y-6">
-      {/* Header with back button */}
       <div className="flex items-center justify-between">
         <div>
           <Link href="/client-dashboard">
@@ -69,7 +67,6 @@ export default function AuditHistoryPage() {
         </div>
       </div>
 
-      {/* Summary stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -89,9 +86,7 @@ export default function AuditHistoryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-600">
-              {events.filter((e) => e.status === "Closed").length}
-            </div>
+            <div className="text-3xl font-bold text-green-600">{closedAudits}</div>
           </CardContent>
         </Card>
 
@@ -102,9 +97,7 @@ export default function AuditHistoryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-yellow-600">
-              {events.filter((e) => e.status === "In Progress").length}
-            </div>
+            <div className="text-3xl font-bold text-yellow-600">{inProgressAudits}</div>
           </CardContent>
         </Card>
 
@@ -116,19 +109,12 @@ export default function AuditHistoryPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-emerald-600">
-              {events.length > 0
-                ? Math.round(
-                    events.reduce((sum, e) => sum + (e.score || 0), 0) /
-                      events.filter((e) => e.score !== null).length
-                  )
-                : 0}
-              %
+              {averageCompliance}%
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Timeline */}
       <Card>
         <CardHeader>
           <CardTitle>Timeline</CardTitle>
@@ -137,20 +123,10 @@ export default function AuditHistoryPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i}>
-                  <Skeleton className="h-32 w-full" />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <AuditTimeline
-              events={events}
-              emptyMessage="No audit history available"
-            />
-          )}
+          <AuditTimeline
+            events={timelineData}
+            emptyMessage="No audit history available"
+          />
         </CardContent>
       </Card>
     </div>

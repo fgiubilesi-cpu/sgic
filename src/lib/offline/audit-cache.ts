@@ -14,8 +14,22 @@ export interface OfflineAuditRecord {
 }
 
 type ChecklistItemPatch = Partial<
-  Pick<ChecklistItem, 'audio_url' | 'evidence_url' | 'notes' | 'outcome'>
+  Pick<ChecklistItem, 'media' | 'notes' | 'outcome'>
 >;
+
+function updateAuditChecklistItem(
+  audit: AuditWithChecklists,
+  itemId: string,
+  updater: (item: ChecklistItem) => ChecklistItem
+) {
+  return {
+    ...audit,
+    checklists: audit.checklists.map((checklist) => ({
+      ...checklist,
+      items: checklist.items.map((item) => (item.id === itemId ? updater(item) : item)),
+    })),
+  } satisfies AuditWithChecklists;
+}
 
 function getOfflineAuditKey(auditId: string) {
   return `${OFFLINE_AUDIT_PREFIX}${auditId}`;
@@ -64,20 +78,59 @@ export async function patchOfflineAuditChecklistItem(options: {
   const current = await getOfflineAuditRecord(options.auditId);
   if (!current) return null;
 
-  const nextAudit: AuditWithChecklists = {
-    ...current.audit,
-    checklists: current.audit.checklists.map((checklist) => ({
-      ...checklist,
-      items: checklist.items.map((item) =>
-        item.id === options.itemId
-          ? {
-              ...item,
-              ...options.patch,
-            }
-          : item
-      ),
-    })),
+  const nextAudit = updateAuditChecklistItem(current.audit, options.itemId, (item) => ({
+    ...item,
+    ...options.patch,
+  }));
+
+  const nextRecord: OfflineAuditRecord = {
+    ...current,
+    audit: nextAudit,
+    savedAt: Date.now(),
   };
+
+  await saveOfflineAuditRecord(nextRecord);
+  return nextRecord;
+}
+
+export async function replaceOfflineAuditChecklistItemMedia(options: {
+  auditId: string;
+  itemId: string;
+  mediaId: string;
+  replacement: ChecklistItem['media'][number];
+}) {
+  const current = await getOfflineAuditRecord(options.auditId);
+  if (!current) return null;
+
+  const nextAudit = updateAuditChecklistItem(current.audit, options.itemId, (item) => ({
+    ...item,
+    media: (item.media ?? [])
+      .map((media) => (media.id === options.mediaId ? options.replacement : media))
+      .filter((media) => Boolean(media.access_url)),
+  }));
+
+  const nextRecord: OfflineAuditRecord = {
+    ...current,
+    audit: nextAudit,
+    savedAt: Date.now(),
+  };
+
+  await saveOfflineAuditRecord(nextRecord);
+  return nextRecord;
+}
+
+export async function removeOfflineAuditChecklistItemMedia(options: {
+  auditId: string;
+  itemId: string;
+  mediaId: string;
+}) {
+  const current = await getOfflineAuditRecord(options.auditId);
+  if (!current) return null;
+
+  const nextAudit = updateAuditChecklistItem(current.audit, options.itemId, (item) => ({
+    ...item,
+    media: (item.media ?? []).filter((media) => media.id !== options.mediaId),
+  }));
 
   const nextRecord: OfflineAuditRecord = {
     ...current,

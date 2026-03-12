@@ -153,7 +153,7 @@ export function ChecklistManager({
                   question={item.question}
                   initialOutcome={(item.outcome as AuditOutcome) ?? "pending"}
                   initialNotes={item.notes ?? null}
-                  initialEvidenceUrl={item.evidence_url ?? null}
+                  initialMedia={item.media ?? []}
                   auditId={audit.id}
                   isSelected={selectedItemId === item.id}
                   hasNc={ncItemIds.has(item.id) || item.outcome === "non_compliant"}
@@ -221,7 +221,7 @@ export function ChecklistManager({
                         question={item.question}
                         initialOutcome={(item.outcome as AuditOutcome) ?? "pending"}
                         initialNotes={item.notes ?? null}
-                        initialEvidenceUrl={item.evidence_url ?? null}
+                        initialMedia={item.media ?? []}
                         auditId={audit.id}
                         isSelected={selectedItemId === item.id}
                         hasNc={ncItemIds.has(item.id) || item.outcome === "non_compliant"}

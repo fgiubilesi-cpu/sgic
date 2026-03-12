@@ -4,7 +4,9 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, SyncQueueItem } from './db';
 import { createClient } from '../supabase/client';
-import { patchOfflineAuditChecklistItem } from '@/lib/offline/audit-cache';
+import {
+    replaceOfflineAuditChecklistItemMedia,
+} from '@/lib/offline/audit-cache';
 
 interface SyncContextType {
     isOnline: boolean;
@@ -146,18 +148,20 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                 formData.append("file", item.payload.file);
                 formData.append("auditId", item.payload.auditId);
                 formData.append("itemId", item.payload.itemId);
-                formData.append("type", item.payload.type);
                 formData.append("path", item.payload.path);
 
                 const res = await uploadChecklistMedia(formData);
                 if (!res.success) throw new Error(res.error ?? 'Errore sync media offline.');
 
-                if (item.payload.type === 'evidence') {
-                    await patchOfflineAuditChecklistItem({
+                if (item.payload.localMediaId) {
+                    await replaceOfflineAuditChecklistItemMedia({
                         auditId: item.payload.auditId,
                         itemId: item.payload.itemId,
-                        patch: {
-                            evidence_url: res.url ?? null,
+                        mediaId: item.payload.localMediaId,
+                        replacement: {
+                            ...res.media,
+                            pending_sync: false,
+                            source: 'current',
                         },
                     });
                 }

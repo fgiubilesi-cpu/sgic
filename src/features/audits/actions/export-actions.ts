@@ -2,6 +2,7 @@
 
 import ExcelJS from "exceljs";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
+import { getAudit } from "@/features/audits/queries/get-audit";
 
 /**
  * Genera un file Excel completo per un audit.
@@ -15,6 +16,7 @@ export async function generateAuditExcel(
   if (!ctx) return { success: false, error: "Non autenticato." };
 
   const { supabase, organizationId } = ctx;
+  const detailedAudit = await getAudit(auditId);
 
   // 1. Fetch audit info
   const { data: audit, error: auditError } = await supabase
@@ -27,21 +29,22 @@ export async function generateAuditExcel(
   if (auditError || !audit) {
     return { success: false, error: "Audit non trovato." };
   }
+  if (!detailedAudit) {
+    return { success: false, error: "Dettagli audit non disponibili." };
+  }
 
-  // 2. Fetch checklist items via checklists
-  const { data: checklists } = await supabase
-    .from("checklists")
-    .select("id, title, checklist_items(id, question, outcome, notes, evidence_url, audio_url)")
-    .eq("audit_id", auditId);
-
-  const checklistItems = (checklists ?? []).flatMap((c: any) =>
-    (c.checklist_items ?? []).map((item: any, idx: number) => ({
+  // 2. Fetch checklist items via resolved audit model
+  const checklistItems = detailedAudit.checklists.flatMap((checklist) =>
+    (checklist.items ?? []).map((item, idx) => ({
       n: idx + 1,
-      checklistTitle: c.title ?? "Checklist",
+      checklistTitle: checklist.title ?? "Checklist",
       question: item.question ?? "",
       outcome: item.outcome ?? "pending",
       notes: item.notes ?? "",
-      evidenceUrl: item.evidence_url ?? "",
+      evidenceUrl: item.media
+        .map((media) => media.access_url)
+        .filter((value): value is string => Boolean(value))
+        .join("\n"),
       audioUrl: item.audio_url ?? "",
     }))
   );

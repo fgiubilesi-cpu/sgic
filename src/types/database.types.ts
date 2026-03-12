@@ -290,6 +290,67 @@ export type Database = {
           },
         ]
       }
+      checklist_item_media: {
+        Row: {
+          audit_id: string
+          checklist_item_id: string
+          created_at: string
+          id: string
+          media_kind: string
+          mime_type: string | null
+          organization_id: string
+          original_name: string | null
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          audit_id: string
+          checklist_item_id: string
+          created_at?: string
+          id?: string
+          media_kind?: string
+          mime_type?: string | null
+          organization_id: string
+          original_name?: string | null
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          audit_id?: string
+          checklist_item_id?: string
+          created_at?: string
+          id?: string
+          media_kind?: string
+          mime_type?: string | null
+          organization_id?: string
+          original_name?: string | null
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_item_media_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_item_media_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_item_media_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_templates: {
         Row: {
           client_id: string | null

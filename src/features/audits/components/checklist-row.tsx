@@ -9,6 +9,7 @@ import { updateChecklistItem } from "@/features/audits/actions";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { MediaCapture } from "./media-capture";
 import type { AuditOutcome } from "@/features/audits/schemas/audit-schema";
+import type { ChecklistItemMedia } from "@/features/audits/lib/checklist-media";
 
 interface ChecklistRowProps {
   id: string;
@@ -16,7 +17,7 @@ interface ChecklistRowProps {
   question: string;
   initialOutcome: AuditOutcome;
   initialNotes: string | null;
-  initialEvidenceUrl: string | null;
+  initialMedia: ChecklistItemMedia[];
   auditId: string;
   isSelected: boolean;
   hasNc?: boolean;
@@ -42,7 +43,7 @@ export function ChecklistRow({
   question,
   initialOutcome,
   initialNotes,
-  initialEvidenceUrl,
+  initialMedia,
   auditId,
   isSelected,
   hasNc = false,
@@ -57,7 +58,7 @@ export function ChecklistRow({
 
   const [localNotes, setLocalNotes] = useState(initialNotes ?? "");
   const [localOutcome, setLocalOutcome] = useState(initialOutcome);
-  const [localEvidenceUrl, setLocalEvidenceUrl] = useState(initialEvidenceUrl);
+  const [localMedia, setLocalMedia] = useState(initialMedia);
 
   useEffect(() => {
     setLocalNotes(initialNotes ?? "");
@@ -68,8 +69,8 @@ export function ChecklistRow({
   }, [initialOutcome]);
 
   useEffect(() => {
-    setLocalEvidenceUrl(initialEvidenceUrl);
-  }, [initialEvidenceUrl]);
+    setLocalMedia(initialMedia);
+  }, [initialMedia]);
 
   const localNotesRef = useRef(localNotes);
   useEffect(() => {
@@ -307,21 +308,19 @@ export function ChecklistRow({
         </div>
       </td>
 
-      {/* Media actions: camera + audio recorder */}
+      {/* Media actions */}
       <td className="px-3 py-0">
         <div
-          className={cn(
-            "flex items-center gap-1 transition-opacity",
-            readOnly ? "hidden" : "opacity-0 group-hover:opacity-100 group-hover:group-focus:opacity-100"
-          )}
+          className="flex items-center justify-center"
           onClick={(e) => e.stopPropagation()}
         >
           <MediaCapture
             itemId={id}
             auditId={auditId}
-            currentUrl={localEvidenceUrl}
+            currentMedia={localMedia}
             path={path}
-            onUrlChange={setLocalEvidenceUrl}
+            onMediaChange={setLocalMedia}
+            readOnly={readOnly}
           />
         </div>
       </td>

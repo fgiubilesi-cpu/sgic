@@ -30,10 +30,11 @@ import type { Organization } from "@/features/organization/queries/get-organizat
 import { updateOrganization } from "@/features/organization/actions/org-actions";
 
 type OrgSettingsFormProps = {
+  canManage?: boolean;
   organization: Organization;
 };
 
-export function OrgSettingsForm({ organization }: OrgSettingsFormProps) {
+export function OrgSettingsForm({ canManage = true, organization }: OrgSettingsFormProps) {
   const [isPending, startTransition] = useTransition();
 
   const form = useForm<OrganizationUpdateInput>({
@@ -87,6 +88,7 @@ export function OrgSettingsForm({ organization }: OrgSettingsFormProps) {
                       {...field}
                       placeholder="e.g. ACME Ltd."
                       autoComplete="organization"
+                      disabled={!canManage || isPending}
                     />
                   </FormControl>
                   <FormDescription>
@@ -108,6 +110,7 @@ export function OrgSettingsForm({ organization }: OrgSettingsFormProps) {
                       {...field}
                       placeholder="e.g. GB123456789"
                       inputMode="numeric"
+                      disabled={!canManage || isPending}
                     />
                   </FormControl>
                   <FormDescription>
@@ -130,6 +133,7 @@ export function OrgSettingsForm({ organization }: OrgSettingsFormProps) {
                       placeholder="e.g. acme-audit"
                       autoCapitalize="none"
                       autoCorrect="off"
+                      disabled={!canManage || isPending}
                     />
                   </FormControl>
                   <FormDescription>
@@ -142,7 +146,7 @@ export function OrgSettingsForm({ organization }: OrgSettingsFormProps) {
             />
 
             <div className="flex justify-end gap-3">
-              <Button type="submit" disabled={isPending}>
+              <Button type="submit" disabled={!canManage || isPending}>
                 {isPending ? "Saving..." : "Save changes"}
               </Button>
             </div>

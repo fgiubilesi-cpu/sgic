@@ -79,47 +79,26 @@ function MetricCard({
   );
 }
 
-function FutureTabCard({
-  title,
-  items,
-}: {
-  title: string;
-  items: string[];
-}) {
-  return (
-    <Card className="border-zinc-200 shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold">{title}</CardTitle>
-        <CardDescription>
-          Questa area entra nelle milestone successive della console admin.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ul className="space-y-2 text-sm text-zinc-600">
-          {items.map((item) => (
-            <li key={item} className="flex items-start gap-2">
-              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-zinc-400" />
-              <span>{item}</span>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
-  );
-}
-
 export function OrganizationConsoleShell({
   accessContent,
   activeTab,
+  brandingContent,
+  notificationsContent,
   overview,
   organization,
   profileContent,
+  rulesContent,
+  systemContent,
 }: {
   accessContent: React.ReactNode;
   activeTab: OrganizationConsoleTab;
+  brandingContent: React.ReactNode;
+  notificationsContent: React.ReactNode;
   overview: OrganizationConsoleOverview;
   organization: Organization;
   profileContent: React.ReactNode;
+  rulesContent: React.ReactNode;
+  systemContent: React.ReactNode;
 }) {
   const activeTabMeta = TAB_META.find((tab) => tab.value === activeTab) ?? TAB_META[0];
   const doneCount = overview.setupItems.filter((item) => item.done).length;
@@ -276,49 +255,10 @@ export function OrganizationConsoleShell({
       {activeTab === "profile" ? profileContent : null}
       {activeTab === "access" ? accessContent : null}
 
-      {activeTab === "rules" ? (
-        <FutureTabCard
-          title="Regole operative"
-          items={[
-            "Soglie score audit e stati di attenzione.",
-            "Finestre di preavviso per audit, documenti e formazione.",
-            "Default operativi per liste, ordinamenti e viste amministrative.",
-          ]}
-        />
-      ) : null}
-
-      {activeTab === "branding" ? (
-        <FutureTabCard
-          title="Branding e output"
-          items={[
-            "Logo tenant, intestazioni e footer standard dei report.",
-            "Testi standard per export, documenti ed email.",
-            "Preview degli output amministrativi e documentali.",
-          ]}
-        />
-      ) : null}
-
-      {activeTab === "notifications" ? (
-        <FutureTabCard
-          title="Notifiche"
-          items={[
-            "Reminder e digest per audit, NC, documenti e formazione.",
-            "Scelta dei destinatari per categoria di evento.",
-            "Configurazione della finestra di alert del tenant.",
-          ]}
-        />
-      ) : null}
-
-      {activeTab === "system" ? (
-        <FutureTabCard
-          title="Sistema"
-          items={[
-            "Salute del tenant, versione app e stato dell'ambiente.",
-            "Contesto di rilascio e checklist tecnica amministrativa.",
-            "Warning utili per capire se la piattaforma e pronta al rilascio.",
-          ]}
-        />
-      ) : null}
+      {activeTab === "rules" ? rulesContent : null}
+      {activeTab === "branding" ? brandingContent : null}
+      {activeTab === "notifications" ? notificationsContent : null}
+      {activeTab === "system" ? systemContent : null}
     </section>
   );
 }

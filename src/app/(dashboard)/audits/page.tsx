@@ -12,6 +12,7 @@ import {
   getAuditsListOptions,
   parseAuditsListState,
 } from "@/features/audits/lib/audits-list";
+import { getOrganization } from "@/features/organization/queries/get-organization";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +21,18 @@ export default async function AuditsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const audits = await getAudits();
-  const state = parseAuditsListState(await searchParams);
+  const [audits, organization, params] = await Promise.all([
+    getAudits(),
+    getOrganization(),
+    searchParams,
+  ]);
+  const state = parseAuditsListState(params, organization?.config.rules
+    ? {
+        groupBy: organization.config.rules.defaultAuditGroupBy,
+        sort: organization.config.rules.defaultAuditSort,
+        viewMode: organization.config.rules.defaultAuditView,
+      }
+    : undefined);
   const options = getAuditsListOptions(audits);
   const filteredAudits = filterAndSortAudits(audits, state);
   const kpis = getAuditsListKpis(filteredAudits);

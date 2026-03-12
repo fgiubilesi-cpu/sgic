@@ -8,9 +8,14 @@ import {
 import { getOrganization } from "@/features/organization/queries/get-organization";
 import { getOrganizationAccessOverview } from "@/features/organization/queries/get-organization-access";
 import { getOrganizationConsoleOverview } from "@/features/organization/queries/get-organization-console";
+import { getOrganizationSystemSnapshot } from "@/features/organization/queries/get-organization-system-snapshot";
 import { OrganizationConsoleShell } from "@/features/organization/components/organization-console-shell";
-import { OrgSettingsForm } from "@/features/organization/components/org-settings-form";
 import { OrganizationAccessPanel } from "@/features/organization/components/organization-access-panel";
+import { OrganizationProfilePanel } from "@/features/organization/components/organization-profile-panel";
+import { OrganizationRulesPanel } from "@/features/organization/components/organization-rules-panel";
+import { OrganizationBrandingPanel } from "@/features/organization/components/organization-branding-panel";
+import { OrganizationNotificationsPanel } from "@/features/organization/components/organization-notifications-panel";
+import { OrganizationSystemPanel } from "@/features/organization/components/organization-system-panel";
 
 type OrganizationPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -24,10 +29,11 @@ export default async function OrganizationPage({ searchParams }: OrganizationPag
       ? (params.tab as "profile" | "access" | "rules" | "branding" | "notifications" | "system")
       : "profile";
 
-  const [organization, accessOverview, consoleOverview] = await Promise.all([
+  const [organization, accessOverview, consoleOverview, systemSnapshot] = await Promise.all([
     getOrganization(),
     getOrganizationAccessOverview(),
     getOrganizationConsoleOverview(),
+    getOrganizationSystemSnapshot(),
   ]);
 
   if (!organization) {
@@ -53,9 +59,30 @@ export default async function OrganizationPage({ searchParams }: OrganizationPag
     );
   }
 
+  const canManage = accessOverview?.canManageAccess ?? false;
+
   return (
     <OrganizationConsoleShell
       activeTab={activeTab}
+      accessContent={accessOverview ? <OrganizationAccessPanel overview={accessOverview} /> : null}
+      brandingContent={
+        <OrganizationBrandingPanel
+          canManage={canManage}
+          initialValues={{
+            emailSignature: organization.config.branding.emailSignature,
+            logoUrl: organization.logo_url ?? "",
+            primaryColor: organization.config.branding.primaryColor,
+            reportSubtitle: organization.config.branding.reportSubtitle,
+            reportTitle: organization.config.branding.reportTitle,
+          }}
+        />
+      }
+      notificationsContent={
+        <OrganizationNotificationsPanel
+          canManage={canManage}
+          initialValues={organization.config.notifications}
+        />
+      }
       organization={organization}
       overview={
         consoleOverview ?? {
@@ -70,8 +97,16 @@ export default async function OrganizationPage({ searchParams }: OrganizationPag
           statusLabel: "Tenant da configurare",
         }
       }
-      profileContent={<OrgSettingsForm organization={organization} />}
-      accessContent={accessOverview ? <OrganizationAccessPanel overview={accessOverview} /> : null}
+      profileContent={<OrganizationProfilePanel canManage={canManage} organization={organization} />}
+      rulesContent={
+        <OrganizationRulesPanel
+          canManage={canManage}
+          initialValues={organization.config.rules}
+        />
+      }
+      systemContent={
+        systemSnapshot ? <OrganizationSystemPanel snapshot={systemSnapshot} /> : null
+      }
     />
   );
 }

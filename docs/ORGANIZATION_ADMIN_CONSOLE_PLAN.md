@@ -70,7 +70,7 @@ Done when:
 
 Stato:
 
-- [ ] da fare
+- [x] completata
 
 ### M3 - Access
 
@@ -87,7 +87,7 @@ Done when:
 
 Stato:
 
-- [ ] in backlog
+- [x] completata
 
 ### M4 - Rules
 
@@ -105,7 +105,7 @@ Done when:
 
 Stato:
 
-- [ ] da fare
+- [x] completata
 
 ### M5 - Branding
 
@@ -121,7 +121,7 @@ Done when:
 
 Stato:
 
-- [ ] da fare
+- [x] completata
 
 ### M6 - Notifications
 
@@ -137,7 +137,7 @@ Done when:
 
 Stato:
 
-- [ ] da fare
+- [x] completata
 
 ### M7 - System
 
@@ -154,7 +154,7 @@ Done when:
 
 Stato:
 
-- [ ] da fare
+- [x] completata
 
 ## Out of scope per M1
 
@@ -171,8 +171,13 @@ Stato:
 - checklist leggibile
 - tab navigation funzionante
 - `npm run verify:release`
+- regole operative influenzano audit explorer e dashboard
+- branding e notifiche sono modificabili dalla console
+- system snapshot leggibile
 
 ## Progress log
 
 - 2026-03-12: creato piano e avviata M1 sul branch `codex/organization-admin-console`
 - 2026-03-12: completata M1 con shell console, header tenant, KPI overview, setup checklist e tab navigation
+- 2026-03-12: completate M2-M6 con profilo tenant, accessi contestualizzati, regole operative, branding, notifiche e persistenza su `organizations.settings`
+- 2026-03-12: completata M7 con system snapshot tenant, hygiene release e integrazione delle regole in dashboard/audit explorer

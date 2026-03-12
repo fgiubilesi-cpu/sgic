@@ -808,7 +808,9 @@ export type Database = {
           created_at: string | null
           id: string
           is_platform_owner: boolean | null
+          logo_url: string | null
           name: string
+          settings: Json
           slug: string
           updated_at: string | null
           vat_number: string | null
@@ -818,7 +820,9 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_platform_owner?: boolean | null
+          logo_url?: string | null
           name: string
+          settings?: Json
           slug: string
           updated_at?: string | null
           vat_number?: string | null
@@ -828,7 +832,9 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_platform_owner?: boolean | null
+          logo_url?: string | null
           name?: string
+          settings?: Json
           slug?: string
           updated_at?: string | null
           vat_number?: string | null

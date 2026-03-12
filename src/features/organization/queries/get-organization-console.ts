@@ -1,4 +1,5 @@
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
+import { parseOrganizationConsoleConfig } from "@/features/organization/lib/organization-console-config";
 
 export type OrganizationConsoleMetric = {
   label: string;
@@ -31,8 +32,6 @@ export async function getOrganizationConsoleOverview(): Promise<OrganizationCons
   if (!ctx) return null;
 
   const { organizationId, supabase } = ctx;
-
-  const todayIso = new Date().toISOString().split("T")[0];
 
   const [
     { count: usersCount },
@@ -79,7 +78,7 @@ export async function getOrganizationConsoleOverview(): Promise<OrganizationCons
       .eq("organization_id", organizationId),
     supabase
       .from("organizations")
-      .select("name, slug, vat_number")
+      .select("name, slug, vat_number, logo_url, settings")
       .eq("id", organizationId)
       .single(),
     supabase
@@ -90,13 +89,20 @@ export async function getOrganizationConsoleOverview(): Promise<OrganizationCons
 
   const adminCount = (roleSummaryRows ?? []).filter((row) => row.role === "admin").length;
   const operatorCount = (roleSummaryRows ?? []).filter((row) => row.role && row.role !== "admin").length;
+  const config = parseOrganizationConsoleConfig(organization?.settings);
 
   const setupItems: OrganizationSetupItem[] = [
     {
       key: "profile",
       title: "Profilo organizzazione",
       description: "Nome, slug e P.IVA definiti per report e intestazioni.",
-      done: Boolean(organization?.name && organization?.slug && organization?.vat_number),
+      done: Boolean(
+        organization?.name &&
+          organization?.slug &&
+          organization?.vat_number &&
+          config.profile.officialEmail &&
+          config.profile.qualityLeadName
+      ),
       href: "/organization?tab=profile",
     },
     {
@@ -124,7 +130,9 @@ export async function getOrganizationConsoleOverview(): Promise<OrganizationCons
       key: "documents",
       title: "Workspace documentale",
       description: "Almeno un documento pubblicato o un corso formazione configurato.",
-      done: (documentsCount ?? 0) > 0 || (trainingCoursesCount ?? 0) > 0,
+      done:
+        ((documentsCount ?? 0) > 0 || (trainingCoursesCount ?? 0) > 0) &&
+        Boolean(organization?.logo_url || config.branding.reportTitle),
       href: "/organization?tab=branding",
     },
     {
@@ -133,6 +141,15 @@ export async function getOrganizationConsoleOverview(): Promise<OrganizationCons
       description: "Esiste almeno un utente non admin che usera il sistema.",
       done: operatorCount > 0,
       href: "/organization?tab=access",
+    },
+    {
+      key: "notifications",
+      title: "Notifiche tenant",
+      description: "Esiste almeno un destinatario digest o una policy notifiche definita.",
+      done:
+        config.notifications.digestFrequency === "off" ||
+        config.notifications.recipients.trim().length > 0,
+      href: "/organization?tab=notifications",
     },
   ];
 

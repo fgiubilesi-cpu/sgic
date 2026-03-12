@@ -54,6 +54,20 @@ export const deadlineProposalSchema = z.object({
   title: textOptional,
 });
 
+export const serviceLineProposalSchema = z.object({
+  billing_phase: textOptional,
+  code: textOptional,
+  frequency_label: textOptional,
+  is_recurring: z.boolean().optional(),
+  notes: textOptional,
+  quantity: textOptional,
+  section: textOptional,
+  title: textOptional,
+  total_price: textOptional,
+  unit: textOptional,
+  unit_price: textOptional,
+});
+
 export const documentIntakeProposalSchema = z.object({
   confidence: z.enum(['low', 'medium', 'high']).default('medium'),
   contract: contractProposalSchema.optional(),
@@ -67,6 +81,7 @@ export const documentIntakeProposalSchema = z.object({
       revision: textOptional,
     })
     .optional(),
+  service_lines: z.array(serviceLineProposalSchema).optional(),
   parser: z.string().trim().default('manual'),
   summary: z.string().trim().default(''),
 });

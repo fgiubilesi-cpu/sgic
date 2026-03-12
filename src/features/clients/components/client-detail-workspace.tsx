@@ -50,7 +50,7 @@ import { ManageDocumentSheet } from '@/features/documents/components/manage-docu
 import { DocumentsTable } from '@/features/documents/components/documents-table';
 import { DocumentIntakeReviewSheet } from '@/features/documents/components/document-intake-review-sheet';
 import { reprocessDocumentIntake } from '@/features/documents/actions/document-actions';
-import type { ContractProposal } from '@/features/documents/lib/document-intelligence';
+import type { ContractProposal, ServiceLineProposal } from '@/features/documents/lib/document-intelligence';
 import {
   ManageContactSheet,
   ManageDeadlineSheet,
@@ -67,6 +67,7 @@ import type {
   ClientContractRecord,
   ClientManualDeadlineRecord,
   ClientNoteRecord,
+  ClientServiceLineRecord,
   ClientTaskPriority,
   ClientTaskRecord,
   ClientTaskStatus,
@@ -106,6 +107,7 @@ interface ClientDetailWorkspaceProps {
   notes: ClientNoteRecord[];
   openNcCount: number;
   personnel: PersonnelListItem[];
+  serviceLines: ClientServiceLineRecord[];
   tasks: ClientTaskRecord[];
   timelineEvents: AuditTimelineEvent[];
 }
@@ -137,6 +139,15 @@ const tabs: Array<{ id: ClientTab; label: string; icon: React.ElementType }> = [
 function toDateLabel(value: string | null | undefined) {
   if (!value) return '-';
   return new Date(value).toLocaleDateString('it-IT');
+}
+
+function toCurrencyLabel(value: number | null | undefined) {
+  if (value === null || value === undefined) return '-';
+  return new Intl.NumberFormat('it-IT', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 function toDateStart(value: string) {
@@ -209,6 +220,13 @@ function getContractProposal(document: DocumentListItem) {
   return asObject(proposal?.contract) as ContractProposal | null;
 }
 
+function getServiceLinesProposal(document: DocumentListItem) {
+  const proposal = getDocumentProposal(document);
+  const serviceLines = proposal?.service_lines;
+  if (!Array.isArray(serviceLines)) return [];
+  return serviceLines as ServiceLineProposal[];
+}
+
 function preferredDocumentAccessUrl(document: DocumentListItem | null) {
   if (!document) return null;
   return document.access_url ?? document.file_url ?? null;
@@ -225,6 +243,18 @@ function isContractLikeDocument(document: DocumentListItem) {
 
   const keywords = `${document.title ?? ''} ${document.file_name ?? ''} ${document.description ?? ''}`.toLowerCase();
   return keywords.includes('contratt') || keywords.includes('contract');
+}
+
+function isActivityPlanDocument(document: DocumentListItem) {
+  if (getServiceLinesProposal(document).length > 0) return true;
+  const keywords = `${document.title ?? ''} ${document.file_name ?? ''} ${document.description ?? ''}`.toLowerCase();
+  return (
+    keywords.includes('offerta') ||
+    keywords.includes('prospetto costi') ||
+    keywords.includes('attivit') ||
+    keywords.includes('azioni') ||
+    keywords.includes('pagamento')
+  );
 }
 
 function documentFocusLabel(focus: 'all' | 'review' | 'expired' | 'contracts' | 'mismatch' | 'versioned') {
@@ -276,6 +306,7 @@ export function ClientDetailWorkspace({
   notes,
   openNcCount,
   personnel,
+  serviceLines,
   tasks,
   timelineEvents,
 }: ClientDetailWorkspaceProps) {
@@ -324,6 +355,8 @@ export function ClientDetailWorkspace({
   const contractDocuments = documents.filter((document) => isContractLikeDocument(document));
   const latestContractDocument = contractDocuments[0] ?? null;
   const latestContractProposal = latestContractDocument ? getContractProposal(latestContractDocument) : null;
+  const activityPlanDocuments = documents.filter((document) => isActivityPlanDocument(document));
+  const latestActivityPlanDocument = activityPlanDocuments[0] ?? null;
 
   useEffect(() => {
     setContractForm({
@@ -577,6 +610,11 @@ export function ClientDetailWorkspace({
   const taskOwners = Array.from(
     new Set(tasks.map((task) => task.owner_name).filter((owner): owner is string => Boolean(owner)))
   );
+  const activeServiceLines = serviceLines.filter((line) => line.active);
+  const recurringServiceLinesCount = activeServiceLines.filter((line) => line.is_recurring).length;
+  const serviceLineDocumentUrl = preferredDocumentAccessUrl(latestActivityPlanDocument);
+  const serviceLineDocumentName = latestActivityPlanDocument?.title || 'Allegato attività';
+  const serviceLineTotalValue = activeServiceLines.reduce((sum, line) => sum + (line.total_price ?? 0), 0);
 
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
@@ -1001,7 +1039,112 @@ export function ClientDetailWorkspace({
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <div>
-                    <CardTitle>Task operative ({tasks.length})</CardTitle>
+                    <CardTitle>Attività contrattuali ({activeServiceLines.length})</CardTitle>
+                    <CardDescription>
+                      Righe importate da contratto, offerta o allegati attività. Sono il perimetro operativo concordato con il cliente.
+                    </CardDescription>
+                  </div>
+                  <ManageDocumentSheet
+                    clientOptions={clientOptions}
+                    defaultClientId={client.id}
+                    personnelOptions={personnel}
+                    triggerLabel="Importa allegato attività"
+                  />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {latestActivityPlanDocument ? (
+                    <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-3 text-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <p className="font-medium text-zinc-900">Documento attività rilevato</p>
+                          <p className="text-zinc-700">{serviceLineDocumentName}</p>
+                          <p className="text-xs text-zinc-500">
+                            Intake: {latestActivityPlanDocument.ingestion_status || 'manuale'}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {serviceLineDocumentUrl ? (
+                            <Button asChild variant="outline" size="sm">
+                              <a href={serviceLineDocumentUrl} target="_blank" rel="noreferrer">
+                                Apri allegato
+                              </a>
+                            </Button>
+                          ) : null}
+                          <DocumentIntakeReviewSheet document={latestActivityPlanDocument} />
+                          <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab('documents')}>
+                            Vai ai documenti
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50 px-3 py-3 text-sm text-zinc-600">
+                      Nessun allegato attività collegato. Puoi caricare qui un PDF/Word con le azioni, i costi o il piano servizi e poi confermare la review per popolare automaticamente questa sezione.
+                    </div>
+                  )}
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-wide text-zinc-500">Righe attive</p>
+                      <p className="mt-2 text-3xl font-semibold text-zinc-900">{activeServiceLines.length}</p>
+                    </div>
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-wide text-zinc-500">Ricorrenti</p>
+                      <p className="mt-2 text-3xl font-semibold text-sky-700">{recurringServiceLinesCount}</p>
+                    </div>
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-wide text-zinc-500">Valore noto</p>
+                      <p className="mt-2 text-3xl font-semibold text-emerald-700">
+                        {toCurrencyLabel(serviceLineTotalValue)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {activeServiceLines.length === 0 ? (
+                    <p className="text-sm text-zinc-500">
+                      Nessuna attività contrattuale importata. Dopo l’upload, apri la review del documento e applica le righe al workspace cliente.
+                    </p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Attività</TableHead>
+                          <TableHead>Sezione</TableHead>
+                          <TableHead>Frequenza</TableHead>
+                          <TableHead>Q.tà</TableHead>
+                          <TableHead>Fase</TableHead>
+                          <TableHead>Valore</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {activeServiceLines.map((line) => (
+                          <TableRow key={line.id}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium text-zinc-900">{line.title}</p>
+                                <p className="text-xs text-zinc-500">
+                                  {line.code || 'Codice n.d.'}
+                                  {line.notes ? ` · ${line.notes}` : ''}
+                                </p>
+                              </div>
+                            </TableCell>
+                            <TableCell>{line.section || '-'}</TableCell>
+                            <TableCell>{line.frequency_label || '-'}</TableCell>
+                            <TableCell>{line.quantity ? `${line.quantity} ${line.unit || ''}`.trim() : '-'}</TableCell>
+                            <TableCell>{line.billing_phase || '-'}</TableCell>
+                            <TableCell>{toCurrencyLabel(line.total_price ?? line.unit_price)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <div>
+                    <CardTitle>Task operative interne ({tasks.length})</CardTitle>
                     <CardDescription>Lista lavoro interna con priorità, stato e scadenze.</CardDescription>
                   </div>
                   <ManageTaskSheet

@@ -7,6 +7,7 @@ import { documentSchema, type DocumentFormInput } from '@/features/documents/sch
 import {
   buildIntakeProposalFromDocument,
   type DocumentIntakeProposal,
+  type ServiceLineProposal,
 } from '@/features/documents/lib/document-intelligence';
 import { extractTextFromDocumentBuffer } from '@/features/documents/lib/document-parser';
 import {
@@ -38,6 +39,25 @@ function normalizeDateForDb(value: string | null | undefined) {
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString().slice(0, 10);
+}
+
+function normalizeDecimalForDb(value: string | null | undefined) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.replace(/\s+/g, '').replace(/\./g, '').replace(',', '.').replace(/€/g, '');
+  const parsed = Number.parseFloat(normalized);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed;
+}
+
+function normalizeIntegerForDb(value: string | null | undefined) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed;
 }
 
 function normalizeActionError(error: unknown, fallback: string) {
@@ -289,7 +309,69 @@ async function applyProposalToWorkspace(options: {
     linked_table: string | null;
   }> = [];
 
-  if (document.category === 'Contract' && proposal.contract) {
+  if (proposal.service_lines?.length) {
+    const { error: cleanupEntitiesError } = await ctx.supabase
+      .from('document_entities')
+      .delete()
+      .eq('organization_id', ctx.organizationId)
+      .eq('document_id', document.id)
+      .eq('linked_table', 'client_service_lines');
+
+    if (cleanupEntitiesError) throw cleanupEntitiesError;
+
+    const { error: cleanupLinesError } = await ctx.supabase
+      .from('client_service_lines')
+      .delete()
+      .eq('organization_id', ctx.organizationId)
+      .eq('client_id', clientId)
+      .eq('source_document_id', document.id);
+
+    if (cleanupLinesError) throw cleanupLinesError;
+
+    const reviewedServiceLines = proposal.service_lines
+      .filter((line): line is ServiceLineProposal => Boolean(line.title && line.title.trim() !== ''))
+      .map((line, index) => ({
+        organization_id: ctx.organizationId,
+        client_id: clientId,
+        location_id: document.location_id,
+        source_document_id: document.id,
+        code: normalizeOptionalString(line.code ?? ''),
+        title: line.title?.trim() ?? `Attività ${index + 1}`,
+        section: normalizeOptionalString(line.section ?? ''),
+        billing_phase: normalizeOptionalString(line.billing_phase ?? ''),
+        frequency_label: normalizeOptionalString(line.frequency_label ?? ''),
+        quantity: normalizeIntegerForDb(line.quantity),
+        unit: normalizeOptionalString(line.unit ?? ''),
+        unit_price: normalizeDecimalForDb(line.unit_price),
+        total_price: normalizeDecimalForDb(line.total_price),
+        is_recurring: line.is_recurring ?? false,
+        active: true,
+        notes: normalizeOptionalString(line.notes ?? ''),
+        sort_order: index,
+      }));
+
+    if (reviewedServiceLines.length > 0) {
+      const { data: savedLines, error: serviceLinesError } = await ctx.supabase
+        .from('client_service_lines')
+        .insert(reviewedServiceLines)
+        .select('id, title, code, billing_phase, frequency_label, quantity, unit, unit_price, total_price');
+
+      if (serviceLinesError) throw serviceLinesError;
+
+      for (const [index, savedLine] of (savedLines ?? []).entries()) {
+        entityRows.push({
+          confidence: proposal.confidence,
+          entity_payload: (proposal.service_lines.filter((line) => Boolean(line.title && line.title.trim() !== ''))[index] ??
+            {}) as Record<string, unknown>,
+          entity_type: 'service_line',
+          linked_record_id: savedLine.id,
+          linked_table: 'client_service_lines',
+        });
+      }
+    }
+  }
+
+  if (proposal.contract) {
     const contractPayload = proposal.contract;
     const { data: existing } = await ctx.supabase
       .from('client_contracts')
@@ -394,7 +476,7 @@ async function applyProposalToWorkspace(options: {
   const deadlineCandidate =
     proposal.deadline?.due_date ??
     proposal.manual?.review_date ??
-    (document.category === 'Contract' ? proposal.contract?.renewal_date : null) ??
+    (proposal.contract ? proposal.contract.renewal_date : null) ??
     document.expiry_date;
 
   if (deadlineCandidate) {
@@ -411,7 +493,7 @@ async function applyProposalToWorkspace(options: {
       supabase: ctx.supabase,
       title:
         proposal.deadline?.title ??
-        (document.category === 'Contract'
+        (proposal.contract
           ? `Rinnovo contratto ${document.title ?? ''}`.trim()
           : `Scadenza documento ${document.title ?? ''}`.trim()),
       userId: ctx.userId,

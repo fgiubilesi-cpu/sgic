@@ -93,11 +93,35 @@ export interface ClientNoteRecord {
   author_name: string | null;
 }
 
+export interface ClientServiceLineRecord {
+  active: boolean;
+  billing_phase: string | null;
+  client_id: string;
+  code: string | null;
+  created_at: string;
+  frequency_label: string | null;
+  id: string;
+  is_recurring: boolean;
+  location_id: string | null;
+  notes: string | null;
+  organization_id: string;
+  quantity: number | null;
+  section: string | null;
+  sort_order: number;
+  source_document_id: string | null;
+  title: string;
+  total_price: number | null;
+  unit: string | null;
+  unit_price: number | null;
+  updated_at: string;
+}
+
 export interface ClientWorkspaceData {
   contacts: ClientContactRecord[];
   contract: ClientContractRecord | null;
   manualDeadlines: ClientManualDeadlineRecord[];
   notes: ClientNoteRecord[];
+  serviceLines: ClientServiceLineRecord[];
   tasks: ClientTaskRecord[];
   missingTables: string[];
 }
@@ -114,7 +138,7 @@ export async function getClientWorkspaceData(
   const supabase = await createClient();
   const missingTables = new Set<string>();
 
-  const [contractResult, tasksResult, contactsResult, manualDeadlinesResult, notesResult] =
+  const [contractResult, tasksResult, contactsResult, manualDeadlinesResult, notesResult, serviceLinesResult] =
     await Promise.all([
       supabase
         .from('client_contracts')
@@ -153,6 +177,14 @@ export async function getClientWorkspaceData(
         .eq('client_id', clientId)
         .order('pinned', { ascending: false })
         .order('created_at', { ascending: false }),
+      supabase
+        .from('client_service_lines')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('client_id', clientId)
+        .eq('active', true)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true }),
     ]);
 
   if (contractResult.error && !isTableMissingError(contractResult.error)) throw contractResult.error;
@@ -162,6 +194,9 @@ export async function getClientWorkspaceData(
     throw manualDeadlinesResult.error;
   }
   if (notesResult.error && !isTableMissingError(notesResult.error)) throw notesResult.error;
+  if (serviceLinesResult.error && !isTableMissingError(serviceLinesResult.error)) {
+    throw serviceLinesResult.error;
+  }
 
   if (contractResult.error && isTableMissingError(contractResult.error)) missingTables.add('client_contracts');
   if (tasksResult.error && isTableMissingError(tasksResult.error)) missingTables.add('client_tasks');
@@ -170,6 +205,9 @@ export async function getClientWorkspaceData(
     missingTables.add('client_deadlines');
   }
   if (notesResult.error && isTableMissingError(notesResult.error)) missingTables.add('client_notes');
+  if (serviceLinesResult.error && isTableMissingError(serviceLinesResult.error)) {
+    missingTables.add('client_service_lines');
+  }
 
   const notesRows = (notesResult.data ?? []) as ClientNoteRecord[];
   const authorIds = Array.from(new Set(notesRows.map((note) => note.created_by).filter(Boolean)));
@@ -206,6 +244,7 @@ export async function getClientWorkspaceData(
     contacts,
     manualDeadlines: (manualDeadlinesResult.data as ClientManualDeadlineRecord[]) ?? [],
     notes,
+    serviceLines: (serviceLinesResult.data as ClientServiceLineRecord[]) ?? [],
     missingTables: Array.from(missingTables),
   };
 }

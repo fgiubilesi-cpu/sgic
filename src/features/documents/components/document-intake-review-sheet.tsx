@@ -190,6 +190,26 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
     }));
   };
 
+  const updateServiceLine = (index: number, key: string, value: string) => {
+    setProposal((prev) => {
+      const currentLines = prev?.service_lines ? [...prev.service_lines] : [];
+      const currentLine = currentLines[index] ?? {};
+      currentLines[index] = {
+        ...currentLine,
+        [key]: value,
+        is_recurring:
+          key === 'frequency_label'
+            ? value.trim() !== ''
+            : (currentLine.is_recurring ?? Boolean(currentLine.frequency_label)),
+      };
+
+      return {
+        ...(prev ?? { confidence: 'medium', parser: 'manual', summary: '' }),
+        service_lines: currentLines,
+      };
+    });
+  };
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
@@ -254,7 +274,7 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
               />
             </div>
 
-            {category === 'Contract' ? (
+            {proposal.contract ? (
               <div className="space-y-3 rounded-md border border-zinc-200 p-3">
                 <p className="text-sm font-medium text-zinc-900">Dati contratto</p>
                 <div className="grid gap-3 md:grid-cols-2">
@@ -386,6 +406,98 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
                       onChange={(event) => updateManual('review_date', event.target.value)}
                     />
                   </div>
+                </div>
+              </div>
+            ) : null}
+
+            {proposal.service_lines?.length ? (
+              <div className="space-y-3 rounded-md border border-zinc-200 p-3">
+                <div>
+                  <p className="text-sm font-medium text-zinc-900">
+                    Attività / righe contrattuali ({proposal.service_lines.length})
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    Correggi le righe importate dal documento prima di applicarle al workspace cliente.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  {proposal.service_lines.map((line, index) => (
+                    <div key={`${line.code ?? 'line'}-${index}`} className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-1">
+                          <Label>Attività</Label>
+                          <Input
+                            value={line.title ?? ''}
+                            onChange={(event) => updateServiceLine(index, 'title', event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Codice</Label>
+                          <Input
+                            value={line.code ?? ''}
+                            onChange={(event) => updateServiceLine(index, 'code', event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Sezione</Label>
+                          <Input
+                            value={line.section ?? ''}
+                            onChange={(event) => updateServiceLine(index, 'section', event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Fase fatturazione</Label>
+                          <Input
+                            value={line.billing_phase ?? ''}
+                            onChange={(event) => updateServiceLine(index, 'billing_phase', event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Frequenza</Label>
+                          <Input
+                            value={line.frequency_label ?? ''}
+                            onChange={(event) => updateServiceLine(index, 'frequency_label', event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Quantità</Label>
+                          <Input
+                            value={line.quantity ?? ''}
+                            onChange={(event) => updateServiceLine(index, 'quantity', event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Unità</Label>
+                          <Input
+                            value={line.unit ?? ''}
+                            onChange={(event) => updateServiceLine(index, 'unit', event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Prezzo unitario</Label>
+                          <Input
+                            value={line.unit_price ?? ''}
+                            onChange={(event) => updateServiceLine(index, 'unit_price', event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Totale</Label>
+                          <Input
+                            value={line.total_price ?? ''}
+                            onChange={(event) => updateServiceLine(index, 'total_price', event.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-1">
+                        <Label>Note</Label>
+                        <Textarea
+                          rows={2}
+                          value={line.notes ?? ''}
+                          onChange={(event) => updateServiceLine(index, 'notes', event.target.value)}
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ) : null}

@@ -41,23 +41,38 @@ export interface DeadlineProposal {
   title?: string | null;
 }
 
+export interface ServiceLineProposal {
+  billing_phase?: string | null;
+  code?: string | null;
+  frequency_label?: string | null;
+  is_recurring?: boolean;
+  notes?: string | null;
+  quantity?: string | null;
+  section?: string | null;
+  title?: string | null;
+  total_price?: string | null;
+  unit?: string | null;
+  unit_price?: string | null;
+}
+
 export interface DocumentIntakeProposal {
   confidence: ProposalConfidence;
   contract?: ContractProposal;
   contacts?: ContactProposal[];
   deadline?: DeadlineProposal;
   manual?: {
-    applicable_scope?: string | null;
-    owner?: string | null;
-    review_date?: string | null;
-    revision?: string | null;
-  };
+      applicable_scope?: string | null;
+      owner?: string | null;
+      review_date?: string | null;
+      revision?: string | null;
+    };
   parser: string;
+  service_lines?: ServiceLineProposal[];
   summary: string;
 }
 
 const CATEGORY_KEYWORDS: Array<{ category: SupportedDocumentCategory; keywords: string[] }> = [
-  { category: 'Contract', keywords: ['contratto', 'contract', 'accordo'] },
+  { category: 'Contract', keywords: ['contratto', 'contract', 'accordo', 'offerta', 'progetto di consulenza', 'prospetto costi'] },
   { category: 'OrgChart', keywords: ['organigramma', 'orgchart', 'org chart'] },
   { category: 'Manual', keywords: ['manuale', 'manual'] },
   { category: 'Procedure', keywords: ['procedura', 'procedure', 'sop'] },
@@ -214,6 +229,10 @@ function compact(input?: string | null) {
   return (input ?? '').trim();
 }
 
+function normalizeCompactSpaces(input: string) {
+  return input.replace(/\s+/g, ' ').trim();
+}
+
 function addMonths(dateIso: string, months: number) {
   const date = new Date(dateIso);
   if (Number.isNaN(date.getTime())) return null;
@@ -265,6 +284,111 @@ function deriveFrequency(text: string) {
   return null;
 }
 
+function normalizeEuroNumber(input: string | null | undefined) {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  return trimmed.replace(/\s+/g, '').replace(/\./g, '').replace(',', '.').replace(/€/g, '');
+}
+
+function deriveLineFrequency(text: string) {
+  const lower = text.toLowerCase();
+  if (lower.includes('mensile')) return 'mensile';
+  if (lower.includes('trimestrale')) return 'trimestrale';
+  if (lower.includes('semestrale')) return 'semestrale';
+  if (lower.includes('annuale')) return 'annuale';
+  if (lower.includes('settiman')) return 'settimanale';
+  if (lower.includes('giornal')) return 'giornaliera';
+  return null;
+}
+
+function normalizeBillingPhase(section: string | null | undefined) {
+  const lower = compact(section).toLowerCase();
+  if (!lower) return null;
+  if (lower.includes('primo anno')) return 'Primo anno';
+  if (lower.includes('anni successivi')) return 'Anni successivi';
+  if (lower.includes('firma')) return 'Alla firma del contratto';
+  if (lower.includes('fatturazione')) return 'Fatturazione';
+  if (lower.includes('costi accessori')) return 'Costi accessori';
+  return compact(section) || null;
+}
+
+function extractServiceLinesFromText(input: string) {
+  const lines = input
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const serviceLines: ServiceLineProposal[] = [];
+  let currentSection: string | null = null;
+  let currentBillingPhase: string | null = null;
+
+  for (const rawLine of lines) {
+    const line = normalizeCompactSpaces(rawLine);
+    const lower = line.toLowerCase();
+
+    if (
+      /^(azioni|fatturazione|primo anno|anni successivi|costi accessori|alla firma del contratto)$/i.test(
+        line
+      )
+    ) {
+      currentSection = line;
+      const nextBillingPhase = normalizeBillingPhase(line);
+      if (nextBillingPhase) currentBillingPhase = nextBillingPhase;
+      continue;
+    }
+
+    if (/^(offerta|n\.|uni\.|netto|modalita['’]?\s+di\s+pagamento)$/i.test(lower)) {
+      continue;
+    }
+
+    const fullRowMatch = line.match(
+      /^(\d+(?:\.\d+)+)\s+([A-Z]-?\d+)\s+(.+?)\s+(\d+)\s+([A-Z]{1,4})\s+(\d{1,3}(?:\.\d{3})*,\d{2})€?\s+(\d{1,3}(?:\.\d{3})*,\d{2})€?$/i
+    );
+
+    if (fullRowMatch) {
+      const [, lineCode, serviceCode, title, quantity, unit, unitPrice, totalPrice] = fullRowMatch;
+      const cleanedTitle = normalizeCompactSpaces(title);
+      serviceLines.push({
+        billing_phase: currentBillingPhase,
+        code: `${lineCode} ${serviceCode}`.trim(),
+        frequency_label: deriveLineFrequency(cleanedTitle),
+        is_recurring: Boolean(deriveLineFrequency(cleanedTitle)),
+        notes: currentSection,
+        quantity,
+        section: currentSection,
+        title: cleanedTitle,
+        total_price: normalizeEuroNumber(totalPrice),
+        unit,
+        unit_price: normalizeEuroNumber(unitPrice),
+      });
+      continue;
+    }
+
+    const partialRowMatch = line.match(
+      /^(\d+(?:\.\d+)+)\s+([A-Z]-?\d+)\s+(.+?)(?:\s+(\d+)\s+([A-Z]{1,4}))?$/i
+    );
+
+    if (partialRowMatch && line.length > 28) {
+      const [, lineCode, serviceCode, title, quantity, unit] = partialRowMatch;
+      const cleanedTitle = normalizeCompactSpaces(title);
+      serviceLines.push({
+        billing_phase: currentBillingPhase,
+        code: `${lineCode} ${serviceCode}`.trim(),
+        frequency_label: deriveLineFrequency(cleanedTitle),
+        is_recurring: Boolean(deriveLineFrequency(cleanedTitle)),
+        notes: currentSection,
+        quantity: quantity ?? null,
+        section: currentSection,
+        title: cleanedTitle,
+        unit: unit ?? null,
+      });
+    }
+  }
+
+  return serviceLines;
+}
+
 function derivePriorityByDate(dateIso: string | null | undefined): DeadlineProposal['priority'] {
   if (!dateIso) return 'medium';
   const due = new Date(dateIso);
@@ -301,7 +425,24 @@ export function buildIntakeProposalFromDocument(source: DocumentProposalSource):
     summary: summaryBase,
   };
 
-  if (category === 'Contract') {
+  const serviceLines = extractedText ? extractServiceLinesFromText(extractedText) : [];
+  if (serviceLines.length > 0) {
+    payload.service_lines = serviceLines;
+    const serviceLineSummary = `Rilevate ${serviceLines.length} attività / righe economiche dal documento.`;
+    payload.summary = summaryBase
+      ? `${serviceLineSummary}\n\n${summaryBase}`
+      : serviceLineSummary;
+  }
+
+  const shouldBuildContractProposal =
+    category === 'Contract' ||
+    lower.includes('contratt') ||
+    lower.includes('offerta') ||
+    lower.includes('progetto di consulenza') ||
+    lower.includes('corrispettivo') ||
+    lower.includes('condizioni economiche');
+
+  if (shouldBuildContractProposal) {
     const startDate =
       firstLabeledDate(fullText, ['data inizio', 'decorrenza', 'inizio servizio', 'validita dal', 'validità dal']) ??
       issueDate;
@@ -335,6 +476,27 @@ export function buildIntakeProposalFromDocument(source: DocumentProposalSource):
         firstRegexGroup(description, /owner[:\s]+([^,;\n]+)/i),
       notes: extractedText?.slice(0, 500) ?? description ?? null,
     };
+
+    if ((!payload.contract.activity_frequency || payload.contract.activity_frequency === '') && serviceLines.length > 0) {
+      const frequencies = Array.from(
+        new Set(
+          serviceLines
+            .map((line) => compact(line.frequency_label))
+            .filter((value): value is string => Boolean(value))
+        )
+      );
+      if (frequencies.length > 0) {
+        payload.contract.activity_frequency = frequencies.join(', ');
+      }
+    }
+
+    if ((!payload.contract.service_scope || payload.contract.service_scope === '') && serviceLines.length > 0) {
+      payload.contract.service_scope = serviceLines
+        .slice(0, 4)
+        .map((line) => line.title)
+        .filter((value): value is string => Boolean(value))
+        .join('; ');
+    }
 
     if (!payload.deadline && (renewalDate || endDate)) {
       payload.deadline = {

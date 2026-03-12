@@ -99,6 +99,7 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
       notes={workspace.notes}
       openNcCount={openNcCount}
       personnel={personnel}
+      serviceLines={workspace.serviceLines}
       tasks={workspace.tasks}
       timelineEvents={timelineEvents}
       contacts={workspace.contacts}

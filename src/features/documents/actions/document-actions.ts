@@ -8,6 +8,7 @@ import {
   buildIntakeProposalFromDocument,
   type DocumentIntakeProposal,
 } from '@/features/documents/lib/document-intelligence';
+import { extractTextFromDocumentBuffer } from '@/features/documents/lib/document-parser';
 import {
   documentIntakeProposalSchema,
   documentIntakeReviewSchema,
@@ -90,11 +91,123 @@ function buildFallbackProposal(document: DocumentRow) {
   return buildIntakeProposalFromDocument({
     category: document.category,
     description: document.description,
+    extracted_text: null,
     expiry_date: document.expiry_date,
     file_name: document.file_name,
     issue_date: document.issue_date,
     title: document.title,
   });
+}
+
+async function buildDocumentIntakePayload(
+  ctx: NonNullable<Awaited<ReturnType<typeof getOrganizationContext>>>,
+  document: DocumentRow
+) {
+  const nowIso = new Date().toISOString();
+  const fallbackProposal = buildFallbackProposal(document);
+
+  if (!document.storage_path) {
+    return {
+      errorMessage: null as string | null,
+      extractedText: null as string | null,
+      parserType: 'manual_v1',
+      payload: {
+        category_suggested: document.category,
+        confidence: {
+          category: document.category === 'Other' ? 'low' : 'medium',
+          title: document.title ? 'medium' : 'low',
+        },
+        extracted_at: nowIso,
+        extracted_text: null,
+        proposal: fallbackProposal,
+        source: 'manual_v1',
+      },
+      status: 'manual' as const,
+    };
+  }
+
+  try {
+    const { data: fileBlob, error: downloadError } = await ctx.supabase.storage
+      .from('documents')
+      .download(document.storage_path);
+
+    if (downloadError || !fileBlob) {
+      return {
+        errorMessage: downloadError?.message ?? 'Download file non riuscito',
+        extractedText: null as string | null,
+        parserType: 'filename_heuristics_v1',
+        payload: {
+          category_suggested: document.category,
+          confidence: {
+            category: document.category === 'Other' ? 'low' : 'medium',
+            title: document.title ? 'medium' : 'low',
+          },
+          extracted_at: nowIso,
+          extracted_text: null,
+          proposal: fallbackProposal,
+          source: 'filename_heuristics_v1',
+        },
+        status: 'review_required' as const,
+      };
+    }
+
+    const buffer = Buffer.from(await fileBlob.arrayBuffer());
+    const extraction = await extractTextFromDocumentBuffer({
+      buffer,
+      fileName: document.file_name,
+      mimeType: document.mime_type,
+    });
+    const proposal = buildIntakeProposalFromDocument({
+      category: document.category,
+      description: document.description,
+      extracted_text: extraction.text,
+      expiry_date: document.expiry_date,
+      file_name: document.file_name,
+      issue_date: document.issue_date,
+      title: document.title,
+    });
+
+    return {
+      errorMessage: null as string | null,
+      extractedText: extraction.text,
+      parserType: extraction.parserType,
+      payload: {
+        category_suggested: document.category,
+        confidence: {
+          category: document.category === 'Other' ? 'low' : extraction.text ? 'high' : 'medium',
+          title: document.title ? 'medium' : 'low',
+        },
+        extracted_at: nowIso,
+        extracted_text: extraction.text,
+        file: {
+          mime_type: document.mime_type,
+          name: document.file_name,
+          size: document.file_size_bytes,
+        },
+        proposal,
+        source: extraction.parserType,
+      },
+      status: 'review_required' as const,
+    };
+  } catch (error) {
+    return {
+      errorMessage: normalizeActionError(error, 'Parsing documento non riuscito'),
+      extractedText: null as string | null,
+      parserType: 'filename_heuristics_v1',
+      payload: {
+        category_suggested: document.category,
+        confidence: {
+          category: document.category === 'Other' ? 'low' : 'medium',
+          title: document.title ? 'medium' : 'low',
+        },
+        extracted_at: nowIso,
+        extracted_text: null,
+        proposal: fallbackProposal,
+        source: 'filename_heuristics_v1',
+      },
+      status: 'review_required' as const,
+    };
+  }
 }
 
 async function upsertDocumentDeadline(options: {
@@ -402,21 +515,38 @@ export async function createDocument(input: DocumentFormInput) {
 
     if (error) throw error;
 
+    let finalDocument = data;
     if (data.storage_path) {
+      const intake = await buildDocumentIntakePayload(ctx, data);
+      const { data: updatedDocument, error: documentUpdateError } = await ctx.supabase
+        .from('documents')
+        .update({
+          extracted_payload: intake.payload,
+          ingestion_status: intake.status,
+        })
+        .eq('id', data.id)
+        .eq('organization_id', ctx.organizationId)
+        .select()
+        .single();
+      if (documentUpdateError) throw documentUpdateError;
+      finalDocument = updatedDocument;
+
       const { error: ingestionError } = await ctx.supabase.from('document_ingestions').insert({
         organization_id: ctx.organizationId,
         document_id: data.id,
-        parser_type: 'filename_heuristics_v1',
-        status: 'review_required',
-        extracted_payload: validated.extracted_payload ?? null,
+        parser_type: intake.parserType,
+        status: intake.status,
+        extracted_text: intake.extractedText,
+        extracted_payload: intake.payload,
+        error_message: intake.errorMessage,
         created_by: ctx.userId,
       });
       if (ingestionError) throw ingestionError;
     }
 
-    await createDocumentVersionSnapshot(ctx, data).catch(() => undefined);
-    revalidateDocumentScopes(data);
-    return { success: true, data };
+    await createDocumentVersionSnapshot(ctx, finalDocument).catch(() => undefined);
+    revalidateDocumentScopes(finalDocument);
+    return { success: true, data: finalDocument };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Errore creazione documento';
     return { success: false, error: message };
@@ -465,21 +595,38 @@ export async function updateDocument(documentId: string, input: DocumentFormInpu
 
     if (error) throw error;
 
+    let finalDocument = data;
     if (data.storage_path && data.storage_path !== previous?.storage_path) {
+      const intake = await buildDocumentIntakePayload(ctx, data);
+      const { data: updatedDocument, error: documentUpdateError } = await ctx.supabase
+        .from('documents')
+        .update({
+          extracted_payload: intake.payload,
+          ingestion_status: intake.status,
+        })
+        .eq('id', data.id)
+        .eq('organization_id', ctx.organizationId)
+        .select()
+        .single();
+      if (documentUpdateError) throw documentUpdateError;
+      finalDocument = updatedDocument;
+
       const { error: ingestionError } = await ctx.supabase.from('document_ingestions').insert({
         organization_id: ctx.organizationId,
         document_id: data.id,
-        parser_type: 'filename_heuristics_v1',
-        status: 'review_required',
-        extracted_payload: validated.extracted_payload ?? null,
+        parser_type: intake.parserType,
+        status: intake.status,
+        extracted_text: intake.extractedText,
+        extracted_payload: intake.payload,
+        error_message: intake.errorMessage,
         created_by: ctx.userId,
       });
       if (ingestionError) throw ingestionError;
-      await createDocumentVersionSnapshot(ctx, data).catch(() => undefined);
+      await createDocumentVersionSnapshot(ctx, finalDocument).catch(() => undefined);
     }
 
-    revalidateDocumentScopes(data);
-    return { success: true, data };
+    revalidateDocumentScopes(finalDocument);
+    return { success: true, data: finalDocument };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Errore aggiornamento documento';
     return { success: false, error: message };
@@ -595,6 +742,54 @@ export async function getDocumentGovernanceData(documentId: string) {
     return {
       success: false as const,
       error: normalizeActionError(error, 'Errore caricamento governance documento'),
+    };
+  }
+}
+
+export async function reprocessDocumentIntake(documentId: string) {
+  try {
+    const ctx = await getOrganizationContext();
+    if (!ctx) throw new Error('Unauthorized');
+
+    const { data: document, error: documentError } = await ctx.supabase
+      .from('documents')
+      .select('*')
+      .eq('id', documentId)
+      .eq('organization_id', ctx.organizationId)
+      .single();
+
+    if (documentError || !document) throw documentError ?? new Error('Documento non trovato');
+
+    const intake = await buildDocumentIntakePayload(ctx, document);
+
+    const { error: documentUpdateError } = await ctx.supabase
+      .from('documents')
+      .update({
+        extracted_payload: intake.payload,
+        ingestion_status: intake.status,
+      })
+      .eq('id', document.id)
+      .eq('organization_id', ctx.organizationId);
+    if (documentUpdateError) throw documentUpdateError;
+
+    const { error: ingestionError } = await ctx.supabase.from('document_ingestions').insert({
+      organization_id: ctx.organizationId,
+      document_id: document.id,
+      parser_type: intake.parserType,
+      status: intake.status,
+      extracted_text: intake.extractedText,
+      extracted_payload: intake.payload,
+      error_message: intake.errorMessage,
+      created_by: ctx.userId,
+    });
+    if (ingestionError) throw ingestionError;
+
+    revalidateDocumentScopes(document);
+    return { success: true as const };
+  } catch (error) {
+    return {
+      success: false as const,
+      error: normalizeActionError(error, 'Errore rilettura documento'),
     };
   }
 }

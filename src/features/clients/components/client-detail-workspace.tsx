@@ -47,6 +47,9 @@ import { ClientAuditInsights } from './client-audit-insights';
 import type { DocumentListItem } from '@/features/documents/queries/get-documents';
 import { ManageDocumentSheet } from '@/features/documents/components/manage-document-sheet';
 import { DocumentsTable } from '@/features/documents/components/documents-table';
+import { DocumentIntakeReviewSheet } from '@/features/documents/components/document-intake-review-sheet';
+import { reprocessDocumentIntake } from '@/features/documents/actions/document-actions';
+import type { ContractProposal } from '@/features/documents/lib/document-intelligence';
 import {
   ManageContactSheet,
   ManageDeadlineSheet,
@@ -202,7 +205,25 @@ function getDocumentProposal(document: DocumentListItem) {
 
 function getContractProposal(document: DocumentListItem) {
   const proposal = getDocumentProposal(document);
-  return asObject(proposal?.contract);
+  return asObject(proposal?.contract) as ContractProposal | null;
+}
+
+function preferredDocumentAccessUrl(document: DocumentListItem | null) {
+  if (!document) return null;
+  return document.access_url ?? document.file_url ?? null;
+}
+
+function isContractLikeDocument(document: DocumentListItem) {
+  if (document.category === 'Contract') return true;
+
+  const payload = asObject(document.extracted_payload);
+  if (payload?.category_suggested === 'Contract') return true;
+
+  const proposal = getContractProposal(document);
+  if (proposal) return true;
+
+  const keywords = `${document.title ?? ''} ${document.file_name ?? ''} ${document.description ?? ''}`.toLowerCase();
+  return keywords.includes('contratt') || keywords.includes('contract');
 }
 
 function documentFocusLabel(focus: 'all' | 'review' | 'expired' | 'contracts' | 'mismatch' | 'versioned') {
@@ -286,6 +307,7 @@ export function ClientDetailWorkspace({
     attachment_url: contract?.attachment_url ?? '',
   });
   const [savingContract, startSavingContract] = useTransition();
+  const [reprocessingContractDocument, startReprocessingContractDocument] = useTransition();
   const isClientActive = client.is_active ?? true;
   const locationMap = useMemo(
     () => new Map(client.locations.map((location) => [location.id, location.name])),
@@ -427,8 +449,13 @@ export function ClientDetailWorkspace({
   );
   const linkedDocumentCount = documents.filter((document) => document.ingestion_status === 'linked').length;
   const versionedDocumentCount = documents.filter((document) => document.version_count > 1).length;
+  const contractDocuments = documents.filter((document) => isContractLikeDocument(document));
+  const latestContractDocument = contractDocuments[0] ?? null;
+  const latestContractProposal = latestContractDocument ? getContractProposal(latestContractDocument) : null;
+  const contractAttachmentUrl =
+    preferredDocumentAccessUrl(latestContractDocument) ?? contractForm.attachment_url ?? null;
   const contractDocumentMismatches = documents.filter((document) => {
-    if (document.category !== 'Contract' || !contract) return false;
+    if (!isContractLikeDocument(document) || !contract) return false;
     const proposal = getContractProposal(document);
     if (!proposal) return false;
 
@@ -558,7 +585,7 @@ export function ClientDetailWorkspace({
       (docFocus === 'expired' &&
         Boolean(document.expiry_date) &&
         toDateStart(document.expiry_date as string) < today) ||
-      (docFocus === 'contracts' && document.category === 'Contract') ||
+      (docFocus === 'contracts' && isContractLikeDocument(document)) ||
       (docFocus === 'mismatch' && contractDocumentMismatches.some((item) => item.id === document.id)) ||
       (docFocus === 'versioned' && document.version_count > 1);
     return matchesSearch && matchesCategory && matchesStatus && matchesIngestion && matchesScope && matchesFocus;
@@ -619,6 +646,40 @@ export function ClientDetailWorkspace({
         return;
       }
       toast.success('Contratto aggiornato');
+    });
+  };
+
+  const loadLatestContractProposal = () => {
+    if (!latestContractProposal) return;
+
+    setContractForm((prev) => ({
+      ...prev,
+      contract_type: latestContractProposal.contract_type?.trim() || prev.contract_type,
+      start_date: latestContractProposal.start_date?.trim() || prev.start_date,
+      renewal_date: latestContractProposal.renewal_date?.trim() || prev.renewal_date,
+      end_date: latestContractProposal.end_date?.trim() || prev.end_date,
+      activity_frequency:
+        latestContractProposal.activity_frequency?.trim() || prev.activity_frequency,
+      service_scope: latestContractProposal.service_scope?.trim() || prev.service_scope,
+      internal_owner: latestContractProposal.internal_owner?.trim() || prev.internal_owner,
+      notes: latestContractProposal.notes?.trim() || prev.notes,
+      attachment_url: preferredDocumentAccessUrl(latestContractDocument) ?? prev.attachment_url,
+    }));
+
+    toast.success('Proposta documento caricata nel form contratto');
+  };
+
+  const reprocessLatestContractDocument = () => {
+    if (!latestContractDocument) return;
+
+    startReprocessingContractDocument(async () => {
+      const result = await reprocessDocumentIntake(latestContractDocument.id);
+      if (!result.success) {
+        toast.error(result.error ?? 'Impossibile rileggere il documento');
+        return;
+      }
+
+      toast.success('Documento riletto. Riapri la review o aggiorna la pagina per vedere la nuova proposta.');
     });
   };
 
@@ -1085,7 +1146,92 @@ export function ClientDetailWorkspace({
           ) : null}
 
           {activeTab === 'contract' ? (
-            <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
+            <div className="space-y-4">
+              {latestContractDocument ? (
+                <div
+                  className={
+                    contract
+                      ? 'rounded-xl border border-sky-200 bg-sky-50 px-4 py-3'
+                      : 'rounded-xl border border-amber-200 bg-amber-50 px-4 py-3'
+                  }
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-zinc-900">
+                        Documento contratto rilevato
+                      </p>
+                      <p className="text-sm text-zinc-700">
+                        {latestContractDocument.title || 'Documento senza titolo'}
+                      </p>
+                      <p className="text-xs text-zinc-500">
+                        Intake: {latestContractDocument.ingestion_status || 'manuale'}
+                        {latestContractDocument.version
+                          ? ` · versione ${latestContractDocument.version}`
+                          : ''}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {contractAttachmentUrl ? (
+                        <Button asChild variant="outline" size="sm">
+                          <a href={contractAttachmentUrl} target="_blank" rel="noreferrer">
+                            Apri file
+                          </a>
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={reprocessLatestContractDocument}
+                        disabled={reprocessingContractDocument}
+                      >
+                        {reprocessingContractDocument ? 'Rilettura...' : 'Rileggi file'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={loadLatestContractProposal}
+                        disabled={!latestContractProposal}
+                      >
+                        Carica proposta nel form
+                      </Button>
+                      <DocumentIntakeReviewSheet document={latestContractDocument} />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setActiveTab('documents')}
+                      >
+                        Vai ai documenti
+                      </Button>
+                    </div>
+                  </div>
+                  {!contract ? (
+                    <p className="mt-2 text-sm text-amber-800">
+                      Hai caricato un contratto, ma i dati non sono ancora stati applicati al
+                      workspace cliente. Puoi farlo dalla review oppure caricando la proposta nel
+                      form e salvando il contratto.
+                    </p>
+                  ) : contractDocumentMismatches.some((document) => document.id === latestContractDocument.id) ? (
+                    <p className="mt-2 text-sm text-rose-700">
+                      Il documento contratto propone dati diversi da quelli oggi confermati nel
+                      workspace.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-sm text-sky-700">
+                      Il file contratto è disponibile direttamente da questa scheda.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+                  Nessun documento categoria contratto collegato a questo cliente. Caricalo dalla
+                  tab Documenti o dal pulsante Nuovo Documento.
+                </div>
+              )}
+
+              <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
               <Card>
                 <CardHeader>
                   <CardTitle>Perimetro contrattuale</CardTitle>
@@ -1258,17 +1404,47 @@ export function ClientDetailWorkspace({
                     <p className="text-xs uppercase tracking-wide text-zinc-500">Owner interno</p>
                     <p className="font-medium text-zinc-900">{contractForm.internal_owner || '-'}</p>
                   </div>
-                  {contractForm.attachment_url ? (
+                  {contractAttachmentUrl ? (
                     <Button asChild variant="outline" className="w-full">
-                      <a href={contractForm.attachment_url} target="_blank" rel="noreferrer">
+                      <a href={contractAttachmentUrl} target="_blank" rel="noreferrer">
                         Apri allegato contratto
                       </a>
                     </Button>
                   ) : (
                     <p className="text-xs text-zinc-500">Nessun allegato contratto collegato.</p>
                   )}
+                  {latestContractProposal ? (
+                    <div className="space-y-2 rounded-md border border-dashed border-zinc-200 bg-zinc-50 px-3 py-3">
+                      <p className="text-xs uppercase tracking-wide text-zinc-500">
+                        Dati proposti dal documento
+                      </p>
+                      <div className="grid gap-2 text-sm text-zinc-700">
+                        <p>
+                          <span className="font-medium text-zinc-900">Tipo:</span>{' '}
+                          {latestContractProposal.contract_type || '-'}
+                        </p>
+                        <p>
+                          <span className="font-medium text-zinc-900">Inizio:</span>{' '}
+                          {toDateLabel(latestContractProposal.start_date)}
+                        </p>
+                        <p>
+                          <span className="font-medium text-zinc-900">Rinnovo:</span>{' '}
+                          {toDateLabel(latestContractProposal.renewal_date)}
+                        </p>
+                        <p>
+                          <span className="font-medium text-zinc-900">Scadenza:</span>{' '}
+                          {toDateLabel(latestContractProposal.end_date)}
+                        </p>
+                        <p>
+                          <span className="font-medium text-zinc-900">Frequenza:</span>{' '}
+                          {latestContractProposal.activity_frequency || '-'}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
+              </div>
             </div>
           ) : null}
 

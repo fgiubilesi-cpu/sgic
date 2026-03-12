@@ -7,6 +7,7 @@ export interface DocumentProposalSource {
   category: SupportedDocumentCategory | null;
   description?: string | null;
   expiry_date?: string | null;
+  extracted_text?: string | null;
   file_name?: string | null;
   issue_date?: string | null;
   title?: string | null;
@@ -164,6 +165,36 @@ function firstDateInText(input: string) {
   return null;
 }
 
+function firstLabeledValue(input: string, labels: string[]) {
+  for (const label of labels) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`${escaped}\\s*[:\\-]?\\s*([^\\n;|]+)`, 'i');
+    const match = input.match(regex);
+    if (match?.[1]?.trim()) {
+      return match[1].trim();
+    }
+  }
+
+  return null;
+}
+
+function firstLabeledDate(input: string, labels: string[]) {
+  const value = firstLabeledValue(input, labels);
+  return parseDateCandidate(value) ?? firstDateInText(value ?? '');
+}
+
+function excerptAroundKeyword(input: string, keywords: string[]) {
+  const lower = input.toLowerCase();
+  for (const keyword of keywords) {
+    const index = lower.indexOf(keyword.toLowerCase());
+    if (index >= 0) {
+      const excerpt = input.slice(index, index + 240).trim();
+      if (excerpt) return excerpt;
+    }
+  }
+  return null;
+}
+
 function compact(input?: string | null) {
   return (input ?? '').trim();
 }
@@ -199,28 +230,55 @@ function derivePriorityByDate(dateIso: string | null | undefined): DeadlinePropo
 export function buildIntakeProposalFromDocument(source: DocumentProposalSource): DocumentIntakeProposal {
   const title = compact(source.title) || suggestDocumentTitleFromName(source.file_name || 'Documento');
   const description = compact(source.description);
+  const extractedText = compact(source.extracted_text);
   const fileName = compact(source.file_name);
   const category = source.category ?? 'Other';
-  const issueDate = parseDateCandidate(source.issue_date) ?? firstDateInText(`${title} ${description}`);
+  const fullText = `${title}\n${description}\n${fileName}\n${extractedText}`.trim();
+  const issueDate =
+    parseDateCandidate(source.issue_date) ??
+    firstLabeledDate(fullText, ['data inizio', 'decorrenza', 'inizio servizio', 'data emissione']) ??
+    firstDateInText(fullText);
   const expiryDate = parseDateCandidate(source.expiry_date);
-  const lower = `${title} ${description} ${fileName}`.toLowerCase();
+  const lower = fullText.toLowerCase();
+  const summaryBase =
+    extractedText?.slice(0, 280) ??
+    description ??
+    `Documento classificato come ${category}`;
 
   const payload: DocumentIntakeProposal = {
-    confidence: category === 'Other' ? 'low' : 'medium',
+    confidence: extractedText ? 'high' : category === 'Other' ? 'low' : 'medium',
     parser: 'heuristics_v2',
-    summary: description || `Documento classificato come ${category}`,
+    summary: summaryBase,
   };
 
   if (category === 'Contract') {
+    const startDate =
+      firstLabeledDate(fullText, ['data inizio', 'decorrenza', 'inizio servizio']) ?? issueDate;
+    const renewalDate =
+      firstLabeledDate(fullText, ['data rinnovo', 'rinnovo', 'renewal']) ?? expiryDate;
+    const endDate =
+      firstLabeledDate(fullText, ['data scadenza', 'scadenza', 'termine contratto', 'fine contratto']) ??
+      renewalDate ??
+      expiryDate;
+    const serviceScope =
+      firstLabeledValue(fullText, ['oggetto', 'servizi inclusi', 'servizio', 'attivita', 'attività']) ??
+      excerptAroundKeyword(fullText, ['oggetto', 'servizi', 'attività', 'attivita']) ??
+      description ??
+      null;
+
     payload.contract = {
       contract_type: deriveContractType(lower),
-      start_date: issueDate,
-      renewal_date: expiryDate,
-      end_date: expiryDate,
-      activity_frequency: deriveFrequency(lower),
-      service_scope: description || null,
-      internal_owner: firstRegexGroup(description, /owner[:\s]+([^,;\n]+)/i),
-      notes: description || null,
+      start_date: startDate,
+      renewal_date: renewalDate,
+      end_date: endDate,
+      activity_frequency:
+        firstLabeledValue(fullText, ['frequenza', 'cadenza', 'periodicita', 'periodicità']) ??
+        deriveFrequency(lower),
+      service_scope: serviceScope,
+      internal_owner:
+        firstLabeledValue(fullText, ['referente interno', 'owner interno', 'owner']) ??
+        firstRegexGroup(description, /owner[:\s]+([^,;\n]+)/i),
+      notes: extractedText?.slice(0, 500) ?? description ?? null,
     };
   }
 

@@ -332,6 +332,28 @@ function extractTemplateFamily(lines: string[]) {
   return 'generic';
 }
 
+function deriveContractDates(options: {
+  durationTerms: string | null;
+  explicitEndDate: string | null;
+  explicitRenewalDate: string | null;
+  issueDate: string | null;
+  startDate: string | null;
+}) {
+  const { durationTerms, explicitEndDate, explicitRenewalDate, issueDate, startDate } = options;
+  const baseStartDate = startDate ?? issueDate ?? null;
+  const inferredEndDate =
+    explicitEndDate ??
+    (baseStartDate && durationTerms ? deriveEndDateFromDuration(durationTerms, baseStartDate) : null);
+  const tacitRenewal = /tacito\s+rinnovo|tacitamente\s+rinnovato/i.test(durationTerms ?? '');
+  const inferredRenewalDate = explicitRenewalDate ?? (tacitRenewal ? inferredEndDate : null);
+
+  return {
+    endDate: inferredEndDate,
+    renewalDate: inferredRenewalDate,
+    startDate: baseStartDate,
+  };
+}
+
 function cleanQuotedLabelValue(value: string | null | undefined) {
   const compacted = compact(value);
   if (!compacted) return null;
@@ -385,6 +407,27 @@ function sectionBetweenHeadings(lines: string[], startMatchers: RegExp[], endMat
   return value || null;
 }
 
+function lastSectionBetweenHeadings(lines: string[], startMatchers: RegExp[], endMatchers: RegExp[]) {
+  let startIndex = -1;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (startMatchers.some((matcher) => matcher.test(lines[index]))) {
+      startIndex = index;
+      break;
+    }
+  }
+  if (startIndex < 0) return null;
+
+  const collected: string[] = [];
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (endMatchers.some((matcher) => matcher.test(line))) break;
+    collected.push(line);
+  }
+
+  const value = collected.join(' ').trim();
+  return value || null;
+}
+
 function addMonths(dateIso: string, months: number) {
   const date = new Date(dateIso);
   if (Number.isNaN(date.getTime())) return null;
@@ -396,7 +439,7 @@ function deriveEndDateFromDuration(input: string, startDate: string | null | und
   if (!startDate) return null;
 
   const durationLine = firstLabeledValue(input, ['durata', 'durata contratto']);
-  const source = durationLine ?? excerptAroundKeyword(input, ['durata']);
+  const source = durationLine ?? excerptAroundKeyword(input, ['durata']) ?? input;
   if (!source) return null;
 
   const monthsMatch = source.match(/(\d{1,2})\s*mes/i);
@@ -414,6 +457,27 @@ function deriveEndDateFromDuration(input: string, startDate: string | null | und
   if (source.toLowerCase().includes('triennale')) return addMonths(startDate, 36);
 
   return null;
+}
+
+function extractValidityTermsFromCriteria(lines: string[]) {
+  const criteriaSection =
+    lastSectionBetweenHeadings(
+      lines,
+      [/^CRITERI GENERALI$/i, /^2\.03\s+CRITERI GENERALI$/i],
+      [/^ALLEGATI$/i, /^2\.04\s+ALLEGATI$/i]
+    ) ?? null;
+
+  if (!criteriaSection) return null;
+
+  const sentence = firstSentenceContaining(
+    criteriaSection,
+    /\b(valida|validità)\b.+\b(\d+\s*giorni|\d+\s*gg)\b/i
+  );
+  if (!sentence) return null;
+
+  const compacted = normalizeCompactSpaces(sentence);
+  const shortMatch = compacted.match(/(\d+\s*giorni|\d+\s*gg)/i);
+  return shortMatch?.[1]?.trim() ?? compacted;
 }
 
 function deriveContractType(text: string) {
@@ -559,11 +623,27 @@ function extractServiceLinesFromText(input: string) {
   }
 
   if (serviceLines.length === 0) {
+    let numberedSectionActive = false;
     for (const line of lines) {
-      const numberedActivity = line.match(/^(\d+(?:\.\d+)+)\s+(.+)$/);
+      if (/^Prestazioni$/i.test(line) || /^OBIETTIVI DEL PROGETTO$/i.test(line) || /^CAP\.\s*1/i.test(line)) {
+        numberedSectionActive = true;
+        continue;
+      }
+      if (/^\d+\.\d+\s+DURATA$/i.test(line) || /^DURATA$/i.test(line) || /^CAP\.\s*2/i.test(line)) {
+        numberedSectionActive = false;
+      }
+
+      const numberedActivity = line.match(/^(\d+(?:\.\d+)+)\)?\s+(.+)$/);
       if (!numberedActivity) continue;
       const [, code, title] = numberedActivity;
-      if (!/attività|consulenza|supporto|forfetaria|giornate/i.test(title)) continue;
+      if (
+        !numberedSectionActive &&
+        !/attività|consulenza|supporto|forfetaria|giornate|check-up|registrazione|riqualificazione|nomina|formazione|redazione|audit|verifica|dichiarazione/i.test(
+          title
+        )
+      ) {
+        continue;
+      }
       const cleanedTitle = normalizeCompactSpaces(title);
       serviceLines.push({
         billing_phase: currentBillingPhase,
@@ -651,7 +731,7 @@ export function buildIntakeProposalFromDocument(source: DocumentProposalSource):
       exactLineValue(lines, ['Data prima emissione', 'Data e validità offerta']) ??
       firstLabeledValue(fullText, ['data prima emissione', 'data e validità offerta', 'data emissione']);
     const issueDateNormalized = parseDateCandidate(issueDateLabelValue) ?? issueDate;
-    const validityTerms = extractValidityTerms(issueDateLabelValue);
+    const validityTerms = extractValidityTerms(issueDateLabelValue) ?? extractValidityTermsFromCriteria(lines);
     const durationTerms =
       exactLineValue(lines, ['Durata del Progetto']) ??
       extractDurationTermsFromType(rawTypeValue) ??
@@ -674,15 +754,22 @@ export function buildIntakeProposalFromDocument(source: DocumentProposalSource):
     const supervisorLine = lineMatching(lines, /^Supervisore:/i);
     const internalOwner = firstRegexGroup(teamLeaderLine ?? '', /^Team Leader:\s*(.+)$/i);
     const supervisorName = firstRegexGroup(supervisorLine ?? '', /^Supervisore:\s*(.+)$/i);
-    const startDate =
+    const explicitStartDate =
       firstLabeledDate(fullText, ['data inizio', 'decorrenza', 'inizio servizio', 'validita dal', 'validità dal']) ??
       firstDateInText(firstSentenceContaining(fullText, /\ba partire dal\s+\d{2}[\/.-]\d{2}[\/.-]\d{2,4}\b/i) ?? '');
     const explicitRenewalDate =
       firstLabeledDate(fullText, ['data rinnovo', 'renewal']) ??
       firstDateInText(firstSentenceContaining(fullText, /\brinnovo\b.+\d{2}[\/.-]\d{2}[\/.-]\d{2,4}\b/i) ?? '');
-    const endDate =
+    const explicitEndDate =
       firstLabeledDate(fullText, ['data scadenza', 'scadenza', 'termine contratto', 'fine contratto', 'valido fino al']) ??
-      (startDate ? deriveEndDateFromDuration(durationTerms ?? fullText, startDate) : null);
+      null;
+    const { startDate, renewalDate, endDate } = deriveContractDates({
+      durationTerms,
+      explicitEndDate,
+      explicitRenewalDate,
+      issueDate: issueDateNormalized,
+      startDate: explicitStartDate,
+    });
     const frequencyHint = extractFrequencyHint(fullText, serviceLines);
     const listedDeliverables = bulletListBetweenHeadings(
       lines,
@@ -699,6 +786,15 @@ export function buildIntakeProposalFromDocument(source: DocumentProposalSource):
       .join('\n');
 
     payload.parser = templateFamily === 'generic' ? payload.parser : `${templateFamily}_v1`;
+    payload.summary = [
+      `Contratto ${projectType ?? deriveContractType(lower)}`,
+      protocolCode ? `Protocollo ${protocolCode}` : null,
+      issueDateNormalized ? `Emissione ${issueDateNormalized}` : null,
+      serviceLines.length > 0 ? `Rilevate ${serviceLines.length} attività / righe economiche` : null,
+      serviceScope,
+    ]
+      .filter((value): value is string => Boolean(compact(value)))
+      .join('\n');
     payload.contract = {
       activity_frequency: frequencyHint,
       client_references: customerReferences,
@@ -713,7 +809,7 @@ export function buildIntakeProposalFromDocument(source: DocumentProposalSource):
         (listedDeliverables.length > 0 ? listedDeliverables.slice(0, 3).join('\n') : null) ||
         null,
       protocol_code: protocolCode,
-      renewal_date: explicitRenewalDate,
+      renewal_date: renewalDate,
       service_scope: serviceScope,
       start_date: startDate,
       supervisor_name: supervisorName,
@@ -728,10 +824,10 @@ export function buildIntakeProposalFromDocument(source: DocumentProposalSource):
         .join('; ');
     }
 
-    if (!payload.deadline && (explicitRenewalDate || endDate)) {
+    if (!payload.deadline && (renewalDate || endDate)) {
       payload.deadline = {
-        due_date: explicitRenewalDate ?? endDate,
-        priority: derivePriorityByDate(explicitRenewalDate ?? endDate),
+        due_date: renewalDate ?? endDate,
+        priority: derivePriorityByDate(renewalDate ?? endDate),
         title: `Rinnovo ${title}`,
         description: 'Scadenza estratta dal contratto',
       };

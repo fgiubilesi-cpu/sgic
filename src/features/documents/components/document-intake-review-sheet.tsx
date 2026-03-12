@@ -73,6 +73,22 @@ function confidenceLabel(value: DocumentIntakeProposal['confidence']) {
   return 'Bassa';
 }
 
+function inferReviewCategory(
+  document: DocumentListItem,
+  proposal: DocumentIntakeProposal | null
+): ReviewCategory {
+  if (proposal?.contract || (proposal?.service_lines?.length ?? 0) > 0) return 'Contract';
+  const lower = `${document.title ?? ''} ${document.file_name ?? ''}`.toLowerCase();
+  if (
+    lower.includes('offerta') ||
+    lower.includes('contratto') ||
+    lower.includes('progetto di consulenza')
+  ) {
+    return 'Contract';
+  }
+  return (document.category ?? 'Other') as ReviewCategory;
+}
+
 export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewSheetProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -107,7 +123,7 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
         setAction((result.data.action as ReviewAction) ?? 'save_review');
         setLatestIngestionStatus(result.data.latestIngestionStatus ?? document.ingestion_status);
         setExtractedText(result.data.extractedText ?? null);
-        setReviewCategory((document.category ?? 'Other') as ReviewCategory);
+        setReviewCategory(inferReviewCategory(document, result.data.proposal));
       })
       .catch(() => {
         if (!active) return;
@@ -254,7 +270,7 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
           Review
         </Button>
       </SheetTrigger>
-      <SheetContent className="sm:max-w-2xl">
+      <SheetContent className="overflow-y-auto pb-8 sm:max-w-3xl lg:max-w-4xl">
         <SheetHeader>
           <SheetTitle>Intake documento</SheetTitle>
           <SheetDescription>

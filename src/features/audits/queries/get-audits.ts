@@ -9,6 +9,7 @@ export type Audit = {
   status: AuditStatus;
   scheduled_date: string | null;
   score: number | null;
+  template_id: string | null;
   client_id: string | null;
   location_id: string | null;
   client_name: string | null;
@@ -27,7 +28,7 @@ export async function getAudits(): Promise<AuditWithNCCount[]> {
 
   let query = supabase
     .from("audits")
-    .select("id, title, status, scheduled_date, score, client_id, location_id")
+    .select("id, title, status, scheduled_date, score, template_id, client_id, location_id")
     .eq("organization_id", organizationId);
 
   if (role === "client" && clientId) {
@@ -95,6 +96,7 @@ export async function getAudits(): Promise<AuditWithNCCount[]> {
     status: audit.status ?? "Scheduled",
     scheduled_date: audit.scheduled_date ?? null,
     score: audit.score ?? null,
+    template_id: audit.template_id ?? null,
     client_id: audit.client_id ?? null,
     location_id: audit.location_id ?? null,
     client_name: audit.client_id ? clientNameById.get(audit.client_id) ?? null : null,

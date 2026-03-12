@@ -1,20 +1,29 @@
 "use client";
 
-import { useState } from "react";
-import { FileText, Plus, Edit2, Copy, Trash2, ChevronUp, ChevronDown, X } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import Link from "next/link";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Copy,
+  Edit2,
+  FileText,
+  FolderOpen,
+  Plus,
+  RefreshCcw,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { AuditWithChecklists } from "@/features/audits/queries/get-audit";
 import type { TemplateWithDetails } from "@/features/audits/types/templates";
 import {
-  createTemplate,
-  updateTemplate,
   deleteTemplate,
+  duplicateTemplate,
+  switchAuditTemplate,
 } from "@/features/audits/actions/template-actions";
 import { EditTemplateSheet } from "./edit-template-sheet";
+import { ImportTemplateSheet } from "./import-template-sheet";
 
 interface TemplateTabProps {
   audit: AuditWithChecklists;
@@ -22,474 +31,420 @@ interface TemplateTabProps {
   readOnly?: boolean;
 }
 
-type FormQuestion = {
-  id?: string;
-  question: string;
-  sortOrder: number;
-};
-
 export function TemplateTab({ audit, templates, readOnly = false }: TemplateTabProps) {
-  const [showNewTemplate, setShowNewTemplate] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<TemplateWithDetails | null>(null);
-  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const router = useRouter();
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
-  const [formTitle, setFormTitle] = useState("");
-  const [formDescription, setFormDescription] = useState("");
-  const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
-  const [templatesData, setTemplatesData] = useState<TemplateWithDetails[]>(templates);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [switchSheetOpen, setSwitchSheetOpen] = useState(false);
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  // Determine active template (from audit.template_id or first checklist's source)
-  const activeTemplateId = (audit as any)?.template_id || null;
+  const activeTemplateId =
+    audit.template_id ?? audit.checklists.find((checklist) => checklist.template_id)?.template_id ?? null;
+  const activeTemplate =
+    (activeTemplateId ? templates.find((template) => template.id === activeTemplateId) : null) ?? null;
+  const totalQuestions = audit.checklists.reduce(
+    (total, checklist) => total + (checklist.items?.length ?? 0),
+    0
+  );
 
-  const handleOpenNewTemplate = () => {
-    setEditingTemplate(null);
-    setFormTitle("");
-    setFormDescription("");
-    setFormQuestions([]);
-    setShowNewTemplate(true);
+  const runTemplateAction = (templateId: string, action: () => Promise<void>) => {
+    setPendingTemplateId(templateId);
+    startTransition(async () => {
+      try {
+        await action();
+      } finally {
+        setPendingTemplateId((currentValue) => (currentValue === templateId ? null : currentValue));
+      }
+    });
   };
 
-  const handleOpenEditTemplate = async (template: TemplateWithDetails) => {
-    setEditingTemplateId(template.id);
-    setEditSheetOpen(true);
+  const handleDuplicateTemplate = (template: TemplateWithDetails) => {
+    runTemplateAction(template.id, async () => {
+      const result = await duplicateTemplate(template.id);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success("Template duplicato.");
+      router.push(`/templates/${result.id}`);
+      router.refresh();
+    });
   };
 
-  const handleSaveTemplate = async () => {
-    if (!formTitle.trim()) {
-      toast.error("Il titolo del template è obbligatorio");
+  const handleDeleteTemplate = (template: TemplateWithDetails) => {
+    if (!window.confirm(`Eliminare il template "${template.title}"?`)) {
       return;
     }
 
-    setIsSaving(true);
-    try {
-      if (editingTemplate) {
-        // Update existing template
-        const result = await updateTemplate({
-          templateId: editingTemplate.id,
-          title: formTitle,
-          description: formDescription || null,
-        });
-
-        if (result.success) {
-          toast.success("Template aggiornato");
-          setShowNewTemplate(false);
-          // Templates will be refreshed from parent page
-        } else {
-          toast.error(result.error);
-        }
-      } else {
-        // Create new template
-        const result = await createTemplate({
-          title: formTitle,
-          description: formDescription || undefined,
-        });
-
-        if (result.success) {
-          toast.success("Template creato");
-          setShowNewTemplate(false);
-          // Templates will be refreshed from parent page
-        } else {
-          toast.error(result.error);
-        }
-      }
-    } catch (err) {
-      console.error("Error saving template:", err);
-      toast.error("Errore nel salvataggio");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleAddQuestion = () => {
-    const newSortOrder = Math.max(...formQuestions.map((q) => q.sortOrder), 0) + 1;
-    setFormQuestions([...formQuestions, { question: "", sortOrder: newSortOrder }]);
-  };
-
-  const handleDeleteQuestion = (index: number) => {
-    setFormQuestions(formQuestions.filter((_, i) => i !== index));
-  };
-
-  const handleUpdateQuestion = (index: number, text: string) => {
-    const updated = [...formQuestions];
-    updated[index].question = text;
-    setFormQuestions(updated);
-  };
-
-  const handleMoveQuestion = (index: number, direction: "up" | "down") => {
-    const updated = [...formQuestions];
-    const newIndex = direction === "up" ? index - 1 : index + 1;
-    if (newIndex >= 0 && newIndex < updated.length) {
-      [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
-      // Update sort orders
-      updated.forEach((q, i) => {
-        q.sortOrder = i + 1;
-      });
-      setFormQuestions(updated);
-    }
-  };
-
-  const handleDeleteTemplate = async (template: TemplateWithDetails) => {
-    if (!confirm(`Elimina il template "${template.title}"?`)) return;
-
-    try {
+    runTemplateAction(template.id, async () => {
       const result = await deleteTemplate(template.id);
-      if (result.success) {
-        toast.success("Template eliminato");
-        // Templates will be refreshed from parent page
-      } else {
+      if (!result.success) {
         toast.error(result.error);
+        return;
       }
-    } catch (err) {
-      console.error("Error deleting template:", err);
-      toast.error("Errore nell'eliminazione");
-    }
+
+      toast.success("Template eliminato.");
+      router.refresh();
+    });
   };
 
-  const handleDuplicateTemplate = async (template: TemplateWithDetails) => {
-    try {
-      const result = await createTemplate({
-        title: `${template.title} (copia)`,
-        description: template.description || undefined,
+  const handleSwitchTemplate = (template: TemplateWithDetails) => {
+    if (template.id === activeTemplateId) {
+      setSwitchSheetOpen(false);
+      return;
+    }
+
+    runTemplateAction(template.id, async () => {
+      const result = await switchAuditTemplate({
+        auditId: audit.id,
+        templateId: template.id,
       });
 
-      if (result.success) {
-        toast.success("Template duplicato");
-        // Templates will be refreshed from parent page
-      } else {
+      if (!result.success) {
         toast.error(result.error);
+        return;
       }
-    } catch (err) {
-      console.error("Error duplicating template:", err);
-      toast.error("Errore nella duplicazione");
-    }
-  };
 
-  const allItems = audit.checklists.flatMap((c) => c.items || []);
+      toast.success("Template audit aggiornato.");
+      setSwitchSheetOpen(false);
+      router.refresh();
+    });
+  };
 
   return (
     <>
       <EditTemplateSheet
-        templateId={editingTemplateId || ""}
+        templateId={editingTemplateId ?? ""}
         open={editSheetOpen}
-        onOpenChange={setEditSheetOpen}
+        onOpenChange={(nextOpen) => {
+          setEditSheetOpen(nextOpen);
+          if (!nextOpen) {
+            setEditingTemplateId(null);
+          }
+        }}
         onSaved={() => {
-          // Refresh templates if needed
-          setEditingTemplateId(null);
+          router.refresh();
         }}
       />
-      <div className="space-y-8">
-      {/* Section 1: Current Template Associated with Audit */}
-      <div className="rounded-lg border border-zinc-200 bg-white overflow-hidden shadow-sm">
-        <div className="px-4 py-4 border-b border-zinc-200 bg-gradient-to-r from-blue-50 to-cyan-50">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-zinc-900">
-                Template: {
-                  activeTemplateId
-                    ? templates.find(t => t.id === activeTemplateId)?.title ?? "Nessun template"
-                    : "Nessun template"
-                }
-              </h2>
-              <p className="text-sm text-zinc-600 mt-1">
-                {audit.checklists.length > 0
-                  ? `${allItems.length} domande in ${audit.checklists.length} checklist`
-                  : "Nessun template configurato"}
-              </p>
+
+      <Sheet open={switchSheetOpen} onOpenChange={setSwitchSheetOpen}>
+        <SheetContent className="overflow-y-auto sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>Cambia template audit</SheetTitle>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-4">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Il cambio template e consentito solo su audit ancora pianificati e senza risposte,
+              note, evidenze o non conformita.
             </div>
-            {!readOnly && (
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    Cambia template
-                  </Button>
-                </SheetTrigger>
-                <SheetContent>
-                  <SheetHeader>
-                    <SheetTitle>Seleziona un template</SheetTitle>
-                  </SheetHeader>
-                  <div className="mt-6 space-y-2">
-                    {templatesData.map((t) => {
-                      const isActive = activeTemplateId === t.id;
-                      return (
-                        <button
-                          key={t.id}
-                          className={`w-full p-3 rounded-lg border transition text-left ${
-                            isActive
-                              ? "border-blue-300 bg-blue-50 hover:bg-blue-100"
-                              : "border-zinc-200 bg-white hover:bg-zinc-50"
-                          }`}
-                          onClick={async () => {
-                            // TODO: Implement template switching on audit
-                            toast.info("Cambio template: implementazione in corso");
-                          }}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className={`font-medium text-sm ${isActive ? "text-blue-900" : "text-zinc-900"}`}>
-                                {t.title}
-                              </div>
-                              <div className={`text-xs mt-1 ${isActive ? "text-blue-700" : "text-zinc-600"}`}>
-                                {t.questionCount} domande
-                              </div>
-                            </div>
-                            {isActive && (
-                              <div className="text-xs font-semibold text-blue-700 whitespace-nowrap">● Attivo</div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </SheetContent>
-              </Sheet>
-            )}
-          </div>
-        </div>
 
-        {/* Display current checklists */}
-        {audit.checklists.length === 0 ? (
-          <div className="px-4 py-8 text-center">
-            <FileText className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
-            <p className="text-sm text-zinc-500">Nessun template configurato per questo audit.</p>
-          </div>
-        ) : (
-          <div className="space-y-4 p-4">
-            {audit.checklists.map((checklist) => (
-              <div key={checklist.id} className="rounded-lg border border-zinc-100 bg-zinc-50 overflow-hidden">
-                <div className="px-3 py-2 border-b border-zinc-200 bg-white">
-                  <h3 className="text-sm font-semibold text-zinc-800">{checklist.title ?? "Checklist senza titolo"}</h3>
-                  <p className="text-xs text-zinc-500 mt-0.5">{(checklist.items || []).length} domande</p>
-                </div>
-                <ol className="divide-y divide-zinc-100">
-                  {(checklist.items || []).map((item, idx) => (
-                    <li key={item.id} className="flex items-start gap-3 px-3 py-2">
-                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-zinc-200 text-zinc-600 text-[10px] font-semibold shrink-0 mt-0.5">
-                        {idx + 1}
-                      </span>
-                      <p className="text-sm text-zinc-700 leading-snug">{item.question}</p>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+            <div className="space-y-3">
+              {templates.map((template) => {
+                const isActive = template.id === activeTemplateId;
+                const isBusy = isPending && pendingTemplateId === template.id;
 
-      {/* Section 2: Template Management */}
-      {!readOnly && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-semibold text-zinc-900">Gestione template</h2>
-              <p className="text-sm text-zinc-600 mt-1">{templates.length} template disponibili</p>
-            </div>
-            <Sheet open={showNewTemplate} onOpenChange={setShowNewTemplate}>
-              <SheetTrigger asChild>
-                <Button size="sm" className="gap-2" onClick={handleOpenNewTemplate}>
-                  <Plus className="w-4 h-4" />
-                  Nuovo Template
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="sm:max-w-lg overflow-y-auto">
-                <SheetHeader>
-                  <SheetTitle>{editingTemplate ? "Modifica Template" : "Crea Nuovo Template"}</SheetTitle>
-                </SheetHeader>
-                <div className="mt-6 space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-zinc-900">Titolo</label>
-                    <Input
-                      value={formTitle}
-                      onChange={(e) => setFormTitle(e.target.value)}
-                      placeholder="Es. Audit Caseificio"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-zinc-900">Descrizione</label>
-                    <Textarea
-                      value={formDescription}
-                      onChange={(e) => setFormDescription(e.target.value)}
-                      placeholder="Descrizione opzionale..."
-                      className="mt-1 resize-none"
-                      rows={3}
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-medium text-zinc-900">Domande</label>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleAddQuestion}
-                        className="gap-1"
-                      >
-                        <Plus className="w-3 h-3" />
-                        Aggiungi
-                      </Button>
-                    </div>
-
-                    {formQuestions.length > 0 ? (
-                      <div className="space-y-2">
-                        {formQuestions.map((q, idx) => (
-                          <div key={idx} className="flex gap-2 items-start p-2 rounded-lg bg-zinc-50 border border-zinc-200">
-                            <div className="flex flex-col gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleMoveQuestion(idx, "up")}
-                                disabled={idx === 0}
-                                className="p-1 rounded hover:bg-zinc-200 disabled:opacity-30"
-                              >
-                                <ChevronUp className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleMoveQuestion(idx, "down")}
-                                disabled={idx === formQuestions.length - 1}
-                                className="p-1 rounded hover:bg-zinc-200 disabled:opacity-30"
-                              >
-                                <ChevronDown className="w-4 h-4" />
-                              </button>
-                            </div>
-                            <input
-                              type="text"
-                              value={q.question}
-                              onChange={(e) => handleUpdateQuestion(idx, e.target.value)}
-                              placeholder="Testo della domanda..."
-                              className="flex-1 px-2 py-1 text-sm rounded border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteQuestion(idx)}
-                              className="p-1 rounded hover:bg-red-100 text-red-600"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-zinc-500 italic p-2">Nessuna domanda ancora</p>
-                    )}
-                  </div>
-
-                  <Button
-                    onClick={handleSaveTemplate}
-                    disabled={isSaving}
-                    className="w-full"
-                  >
-                    {isSaving ? "Salvataggio..." : editingTemplate ? "Aggiorna Template" : "Crea Template"}
-                  </Button>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
-
-          {/* Templates Grid */}
-          {templatesData.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50 px-6 py-8 text-center">
-              <FileText className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
-              <p className="text-sm text-zinc-500">Nessun template disponibile</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {templatesData.map((template) => {
-                const isActive = activeTemplateId === template.id;
                 return (
                   <div
                     key={template.id}
-                    className={`rounded-lg border overflow-hidden shadow-sm hover:shadow-md transition ${
-                      isActive
-                        ? "border-blue-300 bg-blue-50"
-                        : "border-zinc-200 bg-white"
+                    className={`rounded-xl border p-4 ${
+                      isActive ? "border-blue-300 bg-blue-50" : "border-zinc-200 bg-white"
                     }`}
                   >
-                    <div className={`px-4 py-3 border-b ${
-                      isActive
-                        ? "border-blue-200 bg-gradient-to-r from-blue-100 to-blue-50"
-                        : "border-zinc-100 bg-gradient-to-r from-zinc-50 to-zinc-100"
-                    }`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <h3 className={`font-semibold text-sm truncate ${isActive ? "text-blue-900" : "text-zinc-900"}`}>
-                            {template.title}
-                          </h3>
-                          {template.description && (
-                            <p className={`text-xs mt-1 line-clamp-2 ${isActive ? "text-blue-700" : "text-zinc-600"}`}>
-                              {template.description}
-                            </p>
-                          )}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm font-semibold text-zinc-900">{template.title}</div>
+                          {isActive ? (
+                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                              Attivo
+                            </span>
+                          ) : null}
                         </div>
-                        {isActive && (
-                          <span className="text-xs font-bold text-blue-700 whitespace-nowrap">● Attivo</span>
-                        )}
+                        <p className="text-sm text-zinc-600">
+                          {template.description ?? "Nessuna descrizione disponibile."}
+                        </p>
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 font-medium text-zinc-700">
+                            {template.questionCount} domande
+                          </span>
+                          <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 font-medium text-zinc-600">
+                            {template.clientName ? `Cliente: ${template.clientName}` : "Globale"}
+                          </span>
+                        </div>
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          isActive
-                            ? "bg-blue-200 text-blue-800 border border-blue-300"
-                            : "bg-white border border-zinc-200 text-zinc-700"
-                        }`}>
-                          {template.questionCount} domande
-                        </span>
-                        {template.clientName ? (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            isActive
-                              ? "bg-blue-300 text-blue-900"
-                              : "bg-blue-100 text-blue-800"
-                          }`}>
-                            Per: {template.clientName}
+
+                      <Button
+                        variant={isActive ? "outline" : "default"}
+                        size="sm"
+                        disabled={isBusy}
+                        onClick={() => handleSwitchTemplate(template)}
+                      >
+                        {isBusy ? "Aggiornamento..." : isActive ? "Gia attivo" : "Usa questo"}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <div className="space-y-8">
+        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+          <div className="border-b border-zinc-200 bg-gradient-to-r from-sky-50 via-cyan-50 to-white px-5 py-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
+                  Template attivo
+                </div>
+                <div className="text-xl font-semibold text-zinc-900">
+                  {activeTemplate?.title ?? "Template non collegato"}
+                </div>
+                <p className="max-w-3xl text-sm text-zinc-600">
+                  {activeTemplate?.description ??
+                    "Questo audit non espone ancora un template attivo leggibile. Selezionane uno dalla libreria per riallineare la checklist."}
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1 text-xs">
+                  <span className="rounded-full border border-sky-200 bg-white px-2.5 py-1 font-medium text-sky-800">
+                    {totalQuestions} domande snapshot
+                  </span>
+                  <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 font-medium text-zinc-600">
+                    {audit.checklists.length} checklist collegate
+                  </span>
+                  {activeTemplate ? (
+                    <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 font-medium text-zinc-600">
+                      {activeTemplate.clientName ? `Cliente: ${activeTemplate.clientName}` : "Globale"}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <ImportTemplateSheet
+                  templates={templates.map((template) => ({
+                    id: template.id,
+                    title: template.title,
+                  }))}
+                />
+                <Button variant="outline" asChild>
+                  <Link href="/templates">
+                    <FolderOpen className="mr-2 h-4 w-4" />
+                    Apri libreria
+                  </Link>
+                </Button>
+
+                {!readOnly && activeTemplate ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditingTemplateId(activeTemplate.id);
+                      setEditSheetOpen(true);
+                    }}
+                  >
+                    <Edit2 className="mr-2 h-4 w-4" />
+                    Modifica template
+                  </Button>
+                ) : null}
+
+                {!readOnly ? (
+                  <Button onClick={() => setSwitchSheetOpen(true)}>
+                    <RefreshCcw className="mr-2 h-4 w-4" />
+                    Cambia template
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          {audit.checklists.length === 0 ? (
+            <div className="px-5 py-12 text-center">
+              <FileText className="mx-auto mb-3 h-9 w-9 text-zinc-300" />
+              <p className="text-sm text-zinc-500">
+                Nessuna checklist presente. Collega un template per generare le domande.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4 p-5">
+              {audit.checklists.map((checklist, checklistIndex) => {
+                const checklistTemplate =
+                  (checklist.template_id
+                    ? templates.find((template) => template.id === checklist.template_id)
+                    : null) ?? null;
+
+                return (
+                  <div
+                    key={checklist.id}
+                    className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50"
+                  >
+                    <div className="border-b border-zinc-200 bg-white px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-zinc-900">
+                            {checklist.title ?? `Checklist ${checklistIndex + 1}`}
+                          </div>
+                          <div className="text-xs text-zinc-500">
+                            {checklist.items.length} domande in snapshot per questo audit
+                          </div>
+                        </div>
+                        {checklistTemplate ? (
+                          <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[11px] font-medium text-zinc-600">
+                            Origine: {checklistTemplate.title}
                           </span>
-                        ) : (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            isActive
-                              ? "bg-blue-200 text-blue-800"
-                              : "bg-zinc-100 text-zinc-700"
-                          }`}>
-                            Global
-                          </span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
 
-                  <div className="px-4 py-3 flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleOpenEditTemplate(template)}
-                      className="flex-1 gap-1"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Modifica
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDuplicateTemplate(template)}
-                      className="flex-1 gap-1"
-                    >
-                      <Copy className="w-4 h-4" />
-                      Duplica
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDeleteTemplate(template)}
-                      className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
+                    <ol className="divide-y divide-zinc-200">
+                      {checklist.items.map((item, itemIndex) => (
+                        <li key={item.id} className="flex items-start gap-3 px-4 py-3">
+                          <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-700">
+                            {itemIndex + 1}
+                          </span>
+                          <p className="text-sm leading-snug text-zinc-700">{item.question}</p>
+                        </li>
+                      ))}
+                    </ol>
                   </div>
                 );
               })}
             </div>
           )}
         </div>
-      )}
+
+        {!readOnly ? (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-zinc-900">Libreria template</h2>
+                <p className="text-sm text-zinc-600">
+                  Scegli il modello di riferimento, duplicalo o modificalo senza uscire
+                  dall&apos;audit.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" asChild>
+                  <Link href="/templates">
+                    <FolderOpen className="mr-2 h-4 w-4" />
+                    Vai alla libreria
+                  </Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/templates/new">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nuovo template
+                  </Link>
+                </Button>
+              </div>
+            </div>
+
+            {templates.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-6 py-10 text-center text-sm text-zinc-500">
+                Nessun template disponibile. Crea un template o importane uno da Excel dalla libreria.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {templates.map((template) => {
+                  const isActive = template.id === activeTemplateId;
+                  const isBusy = isPending && pendingTemplateId === template.id;
+
+                  return (
+                    <div
+                      key={template.id}
+                      className={`overflow-hidden rounded-2xl border shadow-sm ${
+                        isActive ? "border-blue-300 bg-blue-50" : "border-zinc-200 bg-white"
+                      }`}
+                    >
+                      <div
+                        className={`border-b px-4 py-3 ${
+                          isActive
+                            ? "border-blue-200 bg-gradient-to-r from-blue-100 to-blue-50"
+                            : "border-zinc-200 bg-zinc-50"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-2">
+                            <div className="text-sm font-semibold text-zinc-900">{template.title}</div>
+                            <p className="text-sm text-zinc-600">
+                              {template.description ?? "Nessuna descrizione disponibile."}
+                            </p>
+                          </div>
+                          {isActive ? (
+                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                              Attivo
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                          <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 font-medium text-zinc-700">
+                            {template.questionCount} domande
+                          </span>
+                          <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 font-medium text-zinc-600">
+                            {template.clientName ? `Cliente: ${template.clientName}` : "Globale"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 p-4">
+                        <Button
+                          variant={isActive ? "outline" : "default"}
+                          size="sm"
+                          onClick={() => handleSwitchTemplate(template)}
+                          disabled={isActive || isBusy}
+                          className="col-span-2"
+                        >
+                          {isBusy ? "Aggiornamento..." : isActive ? "Template attivo" : "Usa su questo audit"}
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingTemplateId(template.id);
+                            setEditSheetOpen(true);
+                          }}
+                        >
+                          <Edit2 className="mr-2 h-4 w-4" />
+                          Modifica
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDuplicateTemplate(template)}
+                          disabled={isBusy}
+                        >
+                          <Copy className="mr-2 h-4 w-4" />
+                          Duplica
+                        </Button>
+
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/templates/${template.id}`}>Apri</Link>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteTemplate(template)}
+                          disabled={isBusy || isActive}
+                          className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Elimina
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
     </>
   );

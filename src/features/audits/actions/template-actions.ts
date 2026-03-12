@@ -7,10 +7,8 @@ import { z } from 'zod'
 
 type ActionResult = { success: true } | { success: false; error: string }
 type TemplateResult = { success: true; id: string } | { success: false; error: string }
-
-// ============================================
-// GET TEMPLATE WITH QUESTIONS (Server Action — chiamabile da client)
-// ============================================
+type OrganizationContext = NonNullable<Awaited<ReturnType<typeof getOrganizationContext>>>
+type OrganizationSupabaseClient = OrganizationContext['supabase']
 
 export interface TemplateQuestion {
   id: string
@@ -29,7 +27,49 @@ export interface TemplateWithQuestions {
   questions: TemplateQuestion[]
 }
 
-export async function getTemplateWithQuestionsAction(
+type EditableTemplateQuestionInput = {
+  id?: string
+  question: string
+  sortOrder: number
+}
+
+const EditableTemplateQuestionSchema = z.object({
+  id: z.string().uuid().optional(),
+  question: z.string().trim().min(1, 'La domanda non puo essere vuota').max(1000),
+  sortOrder: z.number().int().positive(),
+})
+
+function revalidateTemplateSurfaces(templateId?: string, auditId?: string) {
+  revalidatePath('/templates')
+  revalidatePath('/audits')
+
+  if (templateId) {
+    revalidatePath(`/templates/${templateId}`)
+  }
+
+  if (auditId) {
+    revalidatePath(`/audits/${auditId}`)
+  }
+}
+
+function normalizeQuestions(
+  questions: EditableTemplateQuestionInput[] | undefined
+): EditableTemplateQuestionInput[] {
+  return (questions ?? [])
+    .map((question) => ({
+      id: question.id,
+      question: question.question.trim(),
+      sortOrder: question.sortOrder,
+    }))
+    .filter((question) => question.question.length > 0)
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+    .map((question, index) => ({
+      ...question,
+      sortOrder: index + 1,
+    }))
+}
+
+async function getTemplateWithQuestions(
   templateId: string
 ): Promise<{ success: true; data: TemplateWithQuestions } | { success: false; error: string }> {
   const ctx = await getOrganizationContext()
@@ -53,15 +93,76 @@ export async function getTemplateWithQuestionsAction(
   }
 
   const questions = (template.template_questions as TemplateQuestion[])
-    .filter(q => !q.deleted_at)
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    .filter((question) => !question.deleted_at)
+    .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0))
 
   return { success: true, data: { ...template, questions } }
 }
 
+async function loadTemplateQuestionIds(
+  supabase: OrganizationSupabaseClient,
+  templateId: string
+) {
+  const { data, error } = await supabase
+    .from('template_questions')
+    .select('id')
+    .eq('template_id', templateId)
+    .is('deleted_at', null)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data ?? []).map((question) => String(question.id))
+}
+
+async function insertTemplateQuestions(
+  supabase: OrganizationSupabaseClient,
+  templateId: string,
+  questions: EditableTemplateQuestionInput[]
+) {
+  if (questions.length === 0) return
+
+  const { error } = await supabase.from('template_questions').insert(
+    questions.map((question) => ({
+      template_id: templateId,
+      question: question.question,
+      sort_order: question.sortOrder,
+    }))
+  )
+
+  if (error) {
+    throw new Error(error.message)
+  }
+}
+
+async function loadActiveTemplateQuestionsForCopy(
+  supabase: OrganizationSupabaseClient,
+  templateId: string
+) {
+  const { data, error } = await supabase
+    .from('template_questions')
+    .select('id, question, sort_order, weight')
+    .eq('template_id', templateId)
+    .is('deleted_at', null)
+    .order('sort_order', { ascending: true })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return data ?? []
+}
+
+export async function getTemplateWithQuestionsAction(
+  templateId: string
+): Promise<{ success: true; data: TemplateWithQuestions } | { success: false; error: string }> {
+  return getTemplateWithQuestions(templateId)
+}
+
 const AddQuestionSchema = z.object({
   templateId: z.string().uuid(),
-  question: z.string().min(1, 'Question cannot be empty').max(1000),
+  question: z.string().trim().min(1, 'Question cannot be empty').max(1000),
 })
 
 export async function addTemplateQuestion(
@@ -73,19 +174,36 @@ export async function addTemplateQuestion(
 > {
   const supabase = await createClient()
 
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
   if (userError || !user) {
     return { success: false, error: 'Not authenticated.' }
   }
 
-  const parsed = AddQuestionSchema.safeParse({ templateId, question: question.trim() })
+  const parsed = AddQuestionSchema.safeParse({ templateId, question })
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid data.' }
   }
 
+  const { data: currentQuestions, error: currentQuestionsError } = await supabase
+    .from('template_questions')
+    .select('id')
+    .eq('template_id', parsed.data.templateId)
+    .is('deleted_at', null)
+
+  if (currentQuestionsError) {
+    return { success: false, error: currentQuestionsError.message }
+  }
+
   const { data, error } = await supabase
     .from('template_questions')
-    .insert({ template_id: parsed.data.templateId, question: parsed.data.question })
+    .insert({
+      template_id: parsed.data.templateId,
+      question: parsed.data.question,
+      sort_order: (currentQuestions?.length ?? 0) + 1,
+    })
     .select('id, question')
     .single()
 
@@ -94,7 +212,7 @@ export async function addTemplateQuestion(
     return { success: false, error: error?.message ?? 'Failed to add question.' }
   }
 
-  revalidatePath(`/templates/${templateId}`)
+  revalidateTemplateSurfaces(parsed.data.templateId)
   return { success: true, question: { id: String(data.id), question: data.question ?? '' } }
 }
 
@@ -109,7 +227,10 @@ export async function softDeleteTemplateQuestion(
 ): Promise<ActionResult> {
   const supabase = await createClient()
 
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
   if (userError || !user) {
     return { success: false, error: 'Not authenticated.' }
   }
@@ -130,24 +251,22 @@ export async function softDeleteTemplateQuestion(
     return { success: false, error: error.message }
   }
 
-  revalidatePath(`/templates/${templateId}`)
+  revalidateTemplateSurfaces(parsed.data.templateId)
   return { success: true }
 }
 
-// ============================================
-// CREATE TEMPLATE
-// ============================================
-
 const CreateTemplateSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(200),
-  description: z.string().max(1000).optional(),
+  title: z.string().trim().min(1, 'Title is required').max(200),
+  description: z.string().trim().max(1000).optional(),
   clientId: z.string().uuid().nullable().optional(),
+  questions: z.array(EditableTemplateQuestionSchema).optional(),
 })
 
 export async function createTemplate(input: {
   title: string
   description?: string
   clientId?: string | null
+  questions?: EditableTemplateQuestionInput[]
 }): Promise<TemplateResult> {
   const ctx = await getOrganizationContext()
   if (!ctx) return { success: false, error: 'Not authenticated.' }
@@ -158,6 +277,8 @@ export async function createTemplate(input: {
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid data.' }
   }
+
+  const normalizedQuestions = normalizeQuestions(parsed.data.questions)
 
   const { data, error } = await supabase
     .from('checklist_templates')
@@ -175,18 +296,134 @@ export async function createTemplate(input: {
     return { success: false, error: error?.message ?? 'Failed to create template.' }
   }
 
-  revalidatePath('/audits')
+  try {
+    await insertTemplateQuestions(supabase, String(data.id), normalizedQuestions)
+  } catch (insertError) {
+    await supabase.from('checklist_templates').delete().eq('id', data.id)
+    return {
+      success: false,
+      error: insertError instanceof Error ? insertError.message : 'Failed to create template questions.',
+    }
+  }
+
+  revalidateTemplateSurfaces(String(data.id))
   return { success: true, id: String(data.id) }
 }
 
-// ============================================
-// UPDATE TEMPLATE
-// ============================================
+const SaveTemplateDefinitionSchema = z.object({
+  templateId: z.string().uuid(),
+  title: z.string().trim().min(1, 'Title is required').max(200),
+  description: z.string().trim().max(1000).nullable().optional(),
+  clientId: z.string().uuid().nullable().optional(),
+  questions: z.array(EditableTemplateQuestionSchema).min(1, 'Add at least one question.'),
+})
+
+export async function saveTemplateDefinition(input: {
+  templateId: string
+  title: string
+  description?: string | null
+  clientId?: string | null
+  questions: EditableTemplateQuestionInput[]
+}): Promise<TemplateResult> {
+  const ctx = await getOrganizationContext()
+  if (!ctx) return { success: false, error: 'Not authenticated.' }
+
+  const { supabase, organizationId } = ctx
+
+  const parsed = SaveTemplateDefinitionSchema.safeParse({
+    ...input,
+    questions: normalizeQuestions(input.questions),
+  })
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid data.' }
+  }
+
+  const { data: template, error: templateError } = await supabase
+    .from('checklist_templates')
+    .select('id')
+    .eq('id', parsed.data.templateId)
+    .eq('organization_id', organizationId)
+    .single()
+
+  if (templateError || !template) {
+    return { success: false, error: 'Template not found.' }
+  }
+
+  const { error: updateTemplateError } = await supabase
+    .from('checklist_templates')
+    .update({
+      title: parsed.data.title,
+      description: parsed.data.description ?? null,
+      client_id: parsed.data.clientId ?? null,
+    })
+    .eq('id', parsed.data.templateId)
+    .eq('organization_id', organizationId)
+
+  if (updateTemplateError) {
+    console.error('Error updating template:', updateTemplateError)
+    return { success: false, error: updateTemplateError.message }
+  }
+
+  try {
+    const existingQuestionIds = await loadTemplateQuestionIds(supabase, parsed.data.templateId)
+    const incomingQuestionIds = new Set(
+      parsed.data.questions.flatMap((question) => (question.id ? [question.id] : []))
+    )
+    const questionIdsToDelete = existingQuestionIds.filter(
+      (questionId) => !incomingQuestionIds.has(questionId)
+    )
+
+    if (questionIdsToDelete.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('template_questions')
+        .update({ deleted_at: new Date().toISOString() })
+        .in('id', questionIdsToDelete)
+        .eq('template_id', parsed.data.templateId)
+
+      if (deleteError) {
+        throw new Error(deleteError.message)
+      }
+    }
+
+    for (const question of parsed.data.questions) {
+      if (!question.id) continue
+
+      const { error: updateQuestionError } = await supabase
+        .from('template_questions')
+        .update({
+          question: question.question,
+          sort_order: question.sortOrder,
+          deleted_at: null,
+        })
+        .eq('id', question.id)
+        .eq('template_id', parsed.data.templateId)
+
+      if (updateQuestionError) {
+        throw new Error(updateQuestionError.message)
+      }
+    }
+
+    await insertTemplateQuestions(
+      supabase,
+      parsed.data.templateId,
+      parsed.data.questions.filter((question) => !question.id)
+    )
+  } catch (error) {
+    console.error('Error saving template definition:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to save template definition.',
+    }
+  }
+
+  revalidateTemplateSurfaces(parsed.data.templateId)
+  return { success: true, id: parsed.data.templateId }
+}
 
 const UpdateTemplateSchema = z.object({
   templateId: z.string().uuid(),
-  title: z.string().min(1).max(200).optional(),
-  description: z.string().max(1000).nullable().optional(),
+  title: z.string().trim().min(1).max(200).optional(),
+  description: z.string().trim().max(1000).nullable().optional(),
   clientId: z.string().uuid().nullable().optional(),
 })
 
@@ -207,7 +444,7 @@ export async function updateTemplate(input: {
   }
 
   const updateData: Record<string, unknown> = {}
-  if (parsed.data.title) updateData.title = parsed.data.title
+  if (parsed.data.title !== undefined) updateData.title = parsed.data.title
   if (parsed.data.description !== undefined) updateData.description = parsed.data.description
   if (parsed.data.clientId !== undefined) updateData.client_id = parsed.data.clientId
 
@@ -222,13 +459,9 @@ export async function updateTemplate(input: {
     return { success: false, error: error.message }
   }
 
-  revalidatePath('/audits')
+  revalidateTemplateSurfaces(parsed.data.templateId)
   return { success: true }
 }
-
-// ============================================
-// DELETE TEMPLATE
-// ============================================
 
 const DeleteTemplateSchema = z.object({
   templateId: z.string().uuid(),
@@ -245,23 +478,61 @@ export async function deleteTemplate(templateId: string): Promise<ActionResult> 
     return { success: false, error: 'Invalid data.' }
   }
 
-  // Check if template is used by any audits
-  const { count } = await supabase
-    .from('audits')
-    .select('id', { count: 'exact', head: true })
-    .eq('template_id', parsed.data.templateId)
+  const [{ count: auditCount }, { count: checklistCount }, { data: questionRows, error: questionsError }] =
+    await Promise.all([
+      supabase
+        .from('audits')
+        .select('id', { count: 'exact', head: true })
+        .eq('template_id', parsed.data.templateId)
+        .eq('organization_id', organizationId),
+      supabase
+        .from('checklists')
+        .select('id', { count: 'exact', head: true })
+        .eq('template_id', parsed.data.templateId)
+        .eq('organization_id', organizationId),
+      supabase
+        .from('template_questions')
+        .select('id')
+        .eq('template_id', parsed.data.templateId),
+    ])
 
-  if ((count ?? 0) > 0) {
-    return { success: false, error: 'Cannot delete template in use by audits.' }
+  if ((auditCount ?? 0) > 0 || (checklistCount ?? 0) > 0) {
+    return { success: false, error: 'Impossibile eliminare un template gia assegnato ad audit o checklist.' }
   }
 
-  // Soft delete template_questions
-  await supabase
+  if (questionsError) {
+    return { success: false, error: questionsError.message }
+  }
+
+  const questionIds = (questionRows ?? []).map((question) => String(question.id))
+  if (questionIds.length > 0) {
+    const { count: historicalUsageCount, error: historyError } = await supabase
+      .from('checklist_items')
+      .select('id', { count: 'exact', head: true })
+      .in('source_question_id', questionIds)
+
+    if (historyError) {
+      return { success: false, error: historyError.message }
+    }
+
+    if ((historicalUsageCount ?? 0) > 0) {
+      return {
+        success: false,
+        error: 'Impossibile eliminare un template gia usato in audit storici.',
+      }
+    }
+  }
+
+  const { error: deleteQuestionsError } = await supabase
     .from('template_questions')
-    .update({ deleted_at: new Date().toISOString() })
+    .delete()
     .eq('template_id', parsed.data.templateId)
 
-  // Delete template
+  if (deleteQuestionsError) {
+    console.error('Error deleting template questions:', deleteQuestionsError)
+    return { success: false, error: deleteQuestionsError.message }
+  }
+
   const { error } = await supabase
     .from('checklist_templates')
     .delete()
@@ -273,18 +544,14 @@ export async function deleteTemplate(templateId: string): Promise<ActionResult> 
     return { success: false, error: error.message }
   }
 
-  revalidatePath('/audits')
+  revalidateTemplateSurfaces(parsed.data.templateId)
   return { success: true }
 }
-
-// ============================================
-// UPDATE TEMPLATE QUESTION
-// ============================================
 
 const UpdateQuestionSchema = z.object({
   questionId: z.string().uuid(),
   templateId: z.string().uuid(),
-  question: z.string().min(1).max(1000),
+  question: z.string().trim().min(1).max(1000),
   sortOrder: z.number().int().positive(),
 })
 
@@ -297,7 +564,7 @@ export async function updateTemplateQuestion(input: {
   const ctx = await getOrganizationContext()
   if (!ctx) return { success: false, error: 'Not authenticated.' }
 
-  const { supabase, organizationId } = ctx
+  const { supabase } = ctx
 
   const parsed = UpdateQuestionSchema.safeParse(input)
   if (!parsed.success) {
@@ -318,22 +585,20 @@ export async function updateTemplateQuestion(input: {
     return { success: false, error: error.message }
   }
 
-  revalidatePath(`/audits`)
+  revalidateTemplateSurfaces(parsed.data.templateId)
   return { success: true }
 }
 
-// ============================================
-// REORDER QUESTIONS
-// ============================================
-
 const ReorderSchema = z.object({
   templateId: z.string().uuid(),
-  questions: z.array(
-    z.object({
-      id: z.string().uuid(),
-      sortOrder: z.number().int().positive(),
-    })
-  ).min(1),
+  questions: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        sortOrder: z.number().int().positive(),
+      })
+    )
+    .min(1),
 })
 
 export async function reorderTemplateQuestions(input: {
@@ -350,13 +615,12 @@ export async function reorderTemplateQuestions(input: {
     return { success: false, error: 'Invalid data.' }
   }
 
-  // Update all questions in one go using upsert pattern
   const { error } = await supabase
     .from('template_questions')
     .upsert(
-      parsed.data.questions.map((q) => ({
-        id: q.id,
-        sort_order: q.sortOrder,
+      parsed.data.questions.map((question) => ({
+        id: question.id,
+        sort_order: question.sortOrder,
       })),
       { onConflict: 'id' }
     )
@@ -366,6 +630,286 @@ export async function reorderTemplateQuestions(input: {
     return { success: false, error: error.message }
   }
 
-  revalidatePath(`/audits`)
+  revalidateTemplateSurfaces(parsed.data.templateId)
+  return { success: true }
+}
+
+const DuplicateTemplateSchema = z.object({
+  templateId: z.string().uuid(),
+})
+
+export async function duplicateTemplate(templateId: string): Promise<TemplateResult> {
+  const ctx = await getOrganizationContext()
+  if (!ctx) return { success: false, error: 'Not authenticated.' }
+
+  const { supabase, organizationId } = ctx
+
+  const parsed = DuplicateTemplateSchema.safeParse({ templateId })
+  if (!parsed.success) {
+    return { success: false, error: 'Invalid data.' }
+  }
+
+  const { data: template, error: templateError } = await supabase
+    .from('checklist_templates')
+    .select('id, title, description, client_id')
+    .eq('id', parsed.data.templateId)
+    .eq('organization_id', organizationId)
+    .single()
+
+  if (templateError || !template) {
+    return { success: false, error: 'Template not found.' }
+  }
+
+  const questions = await loadActiveTemplateQuestionsForCopy(supabase, parsed.data.templateId)
+
+  const { data: newTemplate, error: insertTemplateError } = await supabase
+    .from('checklist_templates')
+    .insert({
+      organization_id: organizationId,
+      title: `${template.title} (copia)`,
+      description: template.description,
+      client_id: template.client_id,
+    })
+    .select('id')
+    .single()
+
+  if (insertTemplateError || !newTemplate) {
+    return { success: false, error: insertTemplateError?.message ?? 'Failed to duplicate template.' }
+  }
+
+  try {
+    await insertTemplateQuestions(
+      supabase,
+      String(newTemplate.id),
+      questions.map((question, index) => ({
+        question: question.question ?? '',
+        sortOrder: question.sort_order ?? index + 1,
+      }))
+    )
+  } catch (error) {
+    await supabase.from('checklist_templates').delete().eq('id', newTemplate.id)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to duplicate template questions.',
+    }
+  }
+
+  revalidateTemplateSurfaces(String(newTemplate.id))
+  return { success: true, id: String(newTemplate.id) }
+}
+
+const SwitchAuditTemplateSchema = z.object({
+  auditId: z.string().uuid(),
+  templateId: z.string().uuid(),
+})
+
+export async function switchAuditTemplate(input: {
+  auditId: string
+  templateId: string
+}): Promise<ActionResult> {
+  const ctx = await getOrganizationContext()
+  if (!ctx) return { success: false, error: 'Not authenticated.' }
+
+  const { supabase, organizationId } = ctx
+
+  const parsed = SwitchAuditTemplateSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: 'Invalid data.' }
+  }
+
+  const { data: audit, error: auditError } = await supabase
+    .from('audits')
+    .select('id, title, status, template_id')
+    .eq('id', parsed.data.auditId)
+    .eq('organization_id', organizationId)
+    .single()
+
+  if (auditError || !audit) {
+    return { success: false, error: 'Audit non trovato.' }
+  }
+
+  if (audit.status !== 'Scheduled') {
+    return {
+      success: false,
+      error: 'Il template puo essere cambiato solo su audit ancora pianificati.',
+    }
+  }
+
+  const { data: template, error: templateError } = await supabase
+    .from('checklist_templates')
+    .select('id, title')
+    .eq('id', parsed.data.templateId)
+    .eq('organization_id', organizationId)
+    .single()
+
+  if (templateError || !template) {
+    return { success: false, error: 'Template non trovato.' }
+  }
+
+  const { data: checklists, error: checklistsError } = await supabase
+    .from('checklists')
+    .select('id, created_at')
+    .eq('audit_id', parsed.data.auditId)
+    .eq('organization_id', organizationId)
+    .order('created_at', { ascending: true })
+
+  if (checklistsError) {
+    return { success: false, error: checklistsError.message }
+  }
+
+  const checklistIds = (checklists ?? []).map((checklist) => String(checklist.id))
+  if (checklistIds.length > 0) {
+    const { data: checklistItems, error: itemsError } = await supabase
+      .from('checklist_items')
+      .select('id, outcome, notes, evidence_url, audio_url')
+      .in('checklist_id', checklistIds)
+
+    if (itemsError) {
+      return { success: false, error: itemsError.message }
+    }
+
+    const hasCompiledItems = (checklistItems ?? []).some((item) => {
+      const notes = typeof item.notes === 'string' ? item.notes.trim() : ''
+      return (
+        item.outcome !== null &&
+        item.outcome !== 'pending'
+      ) || notes.length > 0 || Boolean(item.evidence_url) || Boolean(item.audio_url)
+    })
+
+    if (hasCompiledItems) {
+      return {
+        success: false,
+        error: 'Questo audit contiene gia risposte o note: cambia template solo prima di iniziare la compilazione.',
+      }
+    }
+  }
+
+  const [{ count: mediaCount, error: mediaError }, { count: ncCount, error: ncError }] =
+    await Promise.all([
+      supabase
+        .from('checklist_item_media')
+        .select('id', { count: 'exact', head: true })
+        .eq('audit_id', parsed.data.auditId)
+        .eq('organization_id', organizationId),
+      supabase
+        .from('non_conformities')
+        .select('id', { count: 'exact', head: true })
+        .eq('audit_id', parsed.data.auditId)
+        .eq('organization_id', organizationId),
+    ])
+
+  if (mediaError) {
+    return { success: false, error: mediaError.message }
+  }
+
+  if (ncError) {
+    return { success: false, error: ncError.message }
+  }
+
+  if ((mediaCount ?? 0) > 0 || (ncCount ?? 0) > 0) {
+    return {
+      success: false,
+      error: 'Questo audit contiene gia evidenze o non conformita: il cambio template non e piu sicuro.',
+    }
+  }
+
+  const templateQuestions = await loadActiveTemplateQuestionsForCopy(supabase, parsed.data.templateId)
+
+  const primaryChecklistId = checklistIds[0] ?? null
+  const extraChecklistIds = checklistIds.slice(1)
+
+  if (checklistIds.length > 0) {
+    const { error: deleteItemsError } = await supabase
+      .from('checklist_items')
+      .delete()
+      .in('checklist_id', checklistIds)
+
+    if (deleteItemsError) {
+      return { success: false, error: deleteItemsError.message }
+    }
+  }
+
+  if (extraChecklistIds.length > 0) {
+    const { error: deleteChecklistsError } = await supabase
+      .from('checklists')
+      .delete()
+      .in('id', extraChecklistIds)
+
+    if (deleteChecklistsError) {
+      return { success: false, error: deleteChecklistsError.message }
+    }
+  }
+
+  let checklistId = primaryChecklistId
+
+  if (!checklistId) {
+    const { data: newChecklist, error: createChecklistError } = await supabase
+      .from('checklists')
+      .insert({
+        audit_id: parsed.data.auditId,
+        organization_id: organizationId,
+        title: template.title,
+        template_id: parsed.data.templateId,
+      })
+      .select('id')
+      .single()
+
+    if (createChecklistError || !newChecklist) {
+      return {
+        success: false,
+        error: createChecklistError?.message ?? 'Impossibile creare la checklist del nuovo template.',
+      }
+    }
+
+    checklistId = String(newChecklist.id)
+  } else {
+    const { error: updateChecklistError } = await supabase
+      .from('checklists')
+      .update({
+        title: template.title,
+        template_id: parsed.data.templateId,
+      })
+      .eq('id', checklistId)
+      .eq('organization_id', organizationId)
+
+    if (updateChecklistError) {
+      return { success: false, error: updateChecklistError.message }
+    }
+  }
+
+  if (templateQuestions.length > 0) {
+    const { error: insertItemsError } = await supabase
+      .from('checklist_items')
+      .insert(
+        templateQuestions.map((question, index) => ({
+          checklist_id: checklistId,
+          source_question_id: question.id,
+          question: question.question,
+          organization_id: organizationId,
+          outcome: 'pending',
+          sort_order: question.sort_order ?? index + 1,
+        }))
+      )
+
+    if (insertItemsError) {
+      return { success: false, error: insertItemsError.message }
+    }
+  }
+
+  const { error: updateAuditError } = await supabase
+    .from('audits')
+    .update({ template_id: parsed.data.templateId })
+    .eq('id', parsed.data.auditId)
+    .eq('organization_id', organizationId)
+
+  if (updateAuditError) {
+    return { success: false, error: updateAuditError.message }
+  }
+
+  revalidateTemplateSurfaces(parsed.data.templateId, parsed.data.auditId)
+  if (audit.template_id && audit.template_id !== parsed.data.templateId) {
+    revalidateTemplateSurfaces(audit.template_id, parsed.data.auditId)
+  }
+
   return { success: true }
 }

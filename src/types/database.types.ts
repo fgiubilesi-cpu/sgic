@@ -158,6 +158,7 @@ export type Database = {
           scheduled_date: string
           score: number | null
           status: string | null
+          template_id: string | null
           title: string
         }
         Insert: {
@@ -171,6 +172,7 @@ export type Database = {
           scheduled_date: string
           score?: number | null
           status?: string | null
+          template_id?: string | null
           title: string
         }
         Update: {
@@ -184,6 +186,7 @@ export type Database = {
           scheduled_date?: string
           score?: number | null
           status?: string | null
+          template_id?: string | null
           title?: string
         }
         Relationships: [
@@ -199,6 +202,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audits_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
             referencedColumns: ["id"]
           },
           {
@@ -399,6 +409,7 @@ export type Database = {
           created_at: string | null
           id: string
           organization_id: string
+          template_id: string | null
           title: string
         }
         Insert: {
@@ -406,6 +417,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           organization_id: string
+          template_id?: string | null
           title: string
         }
         Update: {
@@ -413,6 +425,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           organization_id?: string
+          template_id?: string | null
           title?: string
         }
         Relationships: [
@@ -421,6 +434,13 @@ export type Database = {
             columns: ["audit_id"]
             isOneToOne: false
             referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklists_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
             referencedColumns: ["id"]
           },
           {

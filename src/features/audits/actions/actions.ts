@@ -247,6 +247,17 @@ export async function createAuditFromTemplate(input: {
 
     const { title, scheduled_date, templateId, client_id, location_id } = result.data
 
+    const { data: template, error: templateError } = await supabase
+      .from('checklist_templates')
+      .select('id, title')
+      .eq('id', templateId)
+      .eq('organization_id', organizationId)
+      .single()
+
+    if (templateError || !template) {
+      return { success: false, error: 'Template non trovato.' }
+    }
+
     const { data: audit, error: auditError } = await supabase
       .from('audits')
       .insert({
@@ -254,6 +265,7 @@ export async function createAuditFromTemplate(input: {
         status: 'Scheduled',
         scheduled_date: scheduled_date || null,
         organization_id: organizationId,
+        template_id: templateId,
         client_id,
         location_id,
       })
@@ -270,8 +282,9 @@ export async function createAuditFromTemplate(input: {
       .from('checklists')
       .insert({
         audit_id: audit.id,
-        title: title,
+        title: template.title || title,
         organization_id: organizationId,
+        template_id: templateId,
       })
       .select()
       .single()
@@ -391,9 +404,9 @@ export async function cloneTemplateForClient(input: {
   }
 
   // Copy all questions from original template
-  const { data: sourceQuestions } = await supabase
-    .from('template_questions')
-    .select('question, sort_order')
+    const { data: sourceQuestions } = await supabase
+      .from('template_questions')
+      .select('question, sort_order')
     .eq('template_id', templateId)
     .is('deleted_at', null)
     .order('sort_order', { ascending: true })
@@ -401,7 +414,6 @@ export async function cloneTemplateForClient(input: {
   if (sourceQuestions && sourceQuestions.length > 0) {
     const newQuestions = sourceQuestions.map((q) => ({
       template_id: newTemplate.id,
-      organization_id: organizationId,
       question: q.question,
       sort_order: q.sort_order,
     }))

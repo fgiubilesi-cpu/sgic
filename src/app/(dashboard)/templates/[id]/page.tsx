@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { TemplateEditor } from "./template-editor";
 import { CloneTemplateSheet } from "@/features/audits/components/clone-template-sheet";
+import { TemplateEditorForm } from "@/features/audits/components/template-editor-form";
 
 export default async function EditTemplatePage({
   params,
@@ -13,7 +13,7 @@ export default async function EditTemplatePage({
 
   const { data: template, error } = await supabase
     .from("checklist_templates")
-    .select("id, title, template_questions(id, question, deleted_at)")
+    .select("id, title, description, template_questions(id, question, sort_order, deleted_at)")
     .eq("id", id)
     .single();
 
@@ -26,11 +26,17 @@ export default async function EditTemplatePage({
     (template.template_questions as Array<{
       id: string | number;
       question: string | null;
+      sort_order: number | null;
       deleted_at: string | null;
     }>) ?? []
   )
     .filter((q) => q.deleted_at == null)
-    .map((q) => ({ id: String(q.id), question: q.question ?? "" }));
+    .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0))
+    .map((q, index) => ({
+      id: String(q.id),
+      question: q.question ?? "",
+      sortOrder: q.sort_order ?? index + 1,
+    }));
 
   return (
     <div className="flex flex-col space-y-6">
@@ -43,9 +49,12 @@ export default async function EditTemplatePage({
         </h1>
         <CloneTemplateSheet templateId={String(template.id)} />
       </div>
-      <TemplateEditor
+      <TemplateEditorForm
         templateId={String(template.id)}
+        initialTitle={(template as { title?: string | null }).title ?? ""}
+        initialDescription={(template as { description?: string | null }).description ?? ""}
         initialQuestions={questions}
+        submitLabel="Salva template"
       />
     </div>
   );

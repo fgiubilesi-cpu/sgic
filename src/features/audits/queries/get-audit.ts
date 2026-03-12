@@ -24,6 +24,7 @@ export type ChecklistItem = {
 export type Checklist = {
   id: string;
   title: string | null;
+  template_id: string | null;
   created_at: string | null;
   items: ChecklistItem[];
 };
@@ -41,7 +42,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
 
   const { data: audit, error: auditError } = await supabase
     .from("audits")
-    .select("id, title, status, scheduled_date, score, organization_id, client_id, location_id")
+    .select("id, title, status, scheduled_date, score, template_id, organization_id, client_id, location_id")
     .eq("id", id)
     .eq("organization_id", organizationId)
     .single();
@@ -76,7 +77,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
   const { data: rawChecklists, error: checklistError } = await supabase
     .from("checklists")
     .select(
-      "id, title, created_at, checklist_items(id, question, outcome, notes, evidence_url, audio_url, created_at, checklist_item_media(id, checklist_item_id, audit_id, organization_id, storage_path, mime_type, media_kind, original_name, created_at))"
+      "id, title, template_id, created_at, checklist_items(id, question, outcome, notes, evidence_url, audio_url, created_at, checklist_item_media(id, checklist_item_id, audit_id, organization_id, storage_path, mime_type, media_kind, original_name, created_at))"
     )
     .eq("audit_id", id);
 
@@ -118,6 +119,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
       const checklist = rawChecklist as {
         id?: string | number;
         title?: string | null;
+        template_id?: string | null;
         created_at?: string | null;
         checklist_items?: unknown[] | null;
       };
@@ -226,6 +228,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
       return {
         id: String(checklist.id),
         title: checklist.title ?? null,
+        template_id: checklist.template_id ?? null,
         created_at: checklist.created_at ?? null,
         items,
       };
@@ -238,6 +241,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
     status,
     scheduled_date: (audit as { scheduled_date?: string | null }).scheduled_date ?? null,
     score: (audit as { score?: number | null }).score ?? null,
+    template_id: (audit as { template_id?: string | null }).template_id ?? null,
     client_id: (audit as { client_id?: string | null }).client_id ?? null,
     location_id: (audit as { location_id?: string | null }).location_id ?? null,
     client_name: client?.name ?? null,

@@ -85,12 +85,16 @@ export async function getAllTemplates(): Promise<TemplateWithDetails[]> {
     return [];
   }
 
-  return (data ?? []).map((t: any) => ({
-    id: String(t.id),
-    title: t.title ?? "",
-    description: t.description ?? null,
-    clientId: t.client_id ?? null,
-    clientName: t.client?.[0]?.name ?? null,
-    questionCount: (t.template_questions ?? []).filter((q: any) => !q.deleted_at).length,
-  }));
+  return (data ?? []).map((t: any) => {
+    const clientRecord = Array.isArray(t.client) ? t.client[0] : t.client;
+
+    return {
+      id: String(t.id),
+      title: t.title ?? "",
+      description: t.description ?? null,
+      clientId: t.client_id ?? null,
+      clientName: clientRecord?.name ?? null,
+      questionCount: (t.template_questions ?? []).filter((q: any) => !q.deleted_at).length,
+    };
+  });
 }

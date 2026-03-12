@@ -184,6 +184,26 @@ function sourceTypeBadgeClass(sourceType: AggregatedDeadline['source_type']) {
   return 'border-zinc-200 bg-zinc-50 text-zinc-700';
 }
 
+function asObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function stringOrNull(value: unknown) {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
+function getDocumentProposal(document: DocumentListItem) {
+  const payload = asObject(document.extracted_payload);
+  const proposal = asObject(payload?.proposal ?? document.extracted_payload);
+  return proposal;
+}
+
+function getContractProposal(document: DocumentListItem) {
+  const proposal = getDocumentProposal(document);
+  return asObject(proposal?.contract);
+}
+
 function computeRiskLevel({
   openNcCount,
   overdueDeadlines,
@@ -391,6 +411,28 @@ export function ClientDetailWorkspace({
     if (!document.expiry_date) return false;
     return toDateStart(document.expiry_date) < today;
   }).length;
+  const documentReviewQueue = documents.filter(
+    (document) => document.ingestion_status === 'review_required' || document.ingestion_status === 'failed'
+  );
+  const linkedDocumentCount = documents.filter((document) => document.ingestion_status === 'linked').length;
+  const versionedDocumentCount = documents.filter((document) => document.version_count > 1).length;
+  const contractDocumentMismatches = documents.filter((document) => {
+    if (document.category !== 'Contract' || !contract) return false;
+    const proposal = getContractProposal(document);
+    if (!proposal) return false;
+
+    const proposalStartDate = stringOrNull(proposal.start_date);
+    const proposalRenewalDate = stringOrNull(proposal.renewal_date);
+    const proposalEndDate = stringOrNull(proposal.end_date);
+    const proposalType = stringOrNull(proposal.contract_type);
+
+    return (
+      (proposalType !== null && proposalType !== (contract.contract_type ?? null)) ||
+      (proposalStartDate !== null && proposalStartDate !== (contract.start_date ?? null)) ||
+      (proposalRenewalDate !== null && proposalRenewalDate !== (contract.renewal_date ?? null)) ||
+      (proposalEndDate !== null && proposalEndDate !== (contract.end_date ?? null))
+    );
+  });
 
   const openTasks = tasks.filter((task) => task.status !== 'done');
   const completedTasks = tasks.filter((task) => task.status === 'done');
@@ -448,6 +490,12 @@ export function ClientDetailWorkspace({
     documentExpiredCount > 0
       ? `${documentExpiredCount} documenti risultano scaduti.`
       : 'Nessun documento scaduto.',
+    documentReviewQueue.length > 0
+      ? `${documentReviewQueue.length} documenti attendono review intake.`
+      : 'Nessun documento in coda review.',
+    contractDocumentMismatches.length > 0
+      ? `${contractDocumentMismatches.length} contratti documentali non sono allineati al workspace.`
+      : 'Nessun mismatch rilevato tra documenti contratto e tab contratto.',
     contract?.end_date
       ? `Contratto in scadenza il ${toDateLabel(contract.end_date)}.`
       : 'Scadenza contratto non configurata.',
@@ -1488,6 +1536,49 @@ export function ClientDetailWorkspace({
 
           {activeTab === 'documents' ? (
             <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      In coda review
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold text-amber-700">{documentReviewQueue.length}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      Collegati
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold text-emerald-700">{linkedDocumentCount}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      Revisionati
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold text-zinc-900">{versionedDocumentCount}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      Mismatch contratto
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold text-rose-700">{contractDocumentMismatches.length}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <div>
@@ -1503,6 +1594,37 @@ export function ClientDetailWorkspace({
                   />
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {documentReviewQueue.length > 0 || contractDocumentMismatches.length > 0 ? (
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+                          <AlertTriangle className="h-4 w-4" />
+                          Queue intake
+                        </div>
+                        <p className="mt-1 text-sm text-amber-700">
+                          {documentReviewQueue.length > 0
+                            ? `${documentReviewQueue.length} documenti richiedono review o sono andati in errore.`
+                            : 'Nessun documento bloccato in intake.'}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-rose-800">
+                          <ShieldAlert className="h-4 w-4" />
+                          Allineamento workspace
+                        </div>
+                        <p className="mt-1 text-sm text-rose-700">
+                          {contractDocumentMismatches.length > 0
+                            ? `${contractDocumentMismatches.length} documenti contratto propongono dati diversi dalla tab contratto.`
+                            : 'Nessun mismatch rilevato sul contratto cliente.'}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                      Archivio documentale allineato: nessuna review bloccata e nessun mismatch contratto rilevato.
+                    </div>
+                  )}
+
                   <div className="grid gap-3 md:grid-cols-4">
                     <div className="space-y-2 md:col-span-2">
                       <Label>Ricerca</Label>

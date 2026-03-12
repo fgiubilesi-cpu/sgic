@@ -544,6 +544,61 @@ export async function getDocumentIntakeData(documentId: string) {
   }
 }
 
+export async function getDocumentGovernanceData(documentId: string) {
+  try {
+    const ctx = await getOrganizationContext();
+    if (!ctx) throw new Error('Unauthorized');
+
+    const [{ data: document, error: documentError }, { data: versions, error: versionsError }, { data: reviews, error: reviewsError }, { data: entities, error: entitiesError }] =
+      await Promise.all([
+        ctx.supabase
+          .from('documents')
+          .select('id, title, category, status, version, created_at, updated_at, ingestion_status')
+          .eq('id', documentId)
+          .eq('organization_id', ctx.organizationId)
+          .single(),
+        ctx.supabase
+          .from('document_versions')
+          .select('id, created_at')
+          .eq('organization_id', ctx.organizationId)
+          .eq('document_id', documentId)
+          .order('created_at', { ascending: false }),
+        ctx.supabase
+          .from('document_extraction_reviews')
+          .select('id, status, review_action, reviewer_notes, reviewed_at, created_at')
+          .eq('organization_id', ctx.organizationId)
+          .eq('document_id', documentId)
+          .order('created_at', { ascending: false }),
+        ctx.supabase
+          .from('document_entities')
+          .select('id, entity_type, linked_table, linked_record_id, confidence, created_at')
+          .eq('organization_id', ctx.organizationId)
+          .eq('document_id', documentId)
+          .order('created_at', { ascending: false }),
+      ]);
+
+    if (documentError || !document) throw documentError ?? new Error('Documento non trovato');
+    if (versionsError) throw versionsError;
+    if (reviewsError) throw reviewsError;
+    if (entitiesError) throw entitiesError;
+
+    return {
+      success: true as const,
+      data: {
+        document,
+        entities: entities ?? [],
+        reviews: reviews ?? [],
+        versions: versions ?? [],
+      },
+    };
+  } catch (error) {
+    return {
+      success: false as const,
+      error: normalizeActionError(error, 'Errore caricamento governance documento'),
+    };
+  }
+}
+
 export async function submitDocumentIntakeReview(documentId: string, input: DocumentIntakeReviewInput) {
   try {
     const ctx = await getOrganizationContext();

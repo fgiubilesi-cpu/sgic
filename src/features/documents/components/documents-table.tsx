@@ -15,6 +15,7 @@ import type { PersonnelListItem } from '@/features/personnel/queries/get-personn
 import type { DocumentListItem } from '@/features/documents/queries/get-documents';
 import { ManageDocumentSheet } from './manage-document-sheet';
 import { DocumentIntakeReviewSheet } from './document-intake-review-sheet';
+import { DocumentGovernanceDialog } from './document-governance-dialog';
 
 interface DocumentsTableProps {
   clientOptions: ClientOption[];
@@ -123,6 +124,11 @@ export function DocumentsTable({
                 <Badge variant="outline" className={ingestionTone(document.ingestion_status)}>
                   {ingestionLabel(document.ingestion_status)}
                 </Badge>
+                {document.linked_entity_count > 0 ? (
+                  <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-700">
+                    {document.linked_entity_count} link operativi
+                  </Badge>
+                ) : null}
               </div>
             </TableCell>
             <TableCell>
@@ -142,6 +148,7 @@ export function DocumentsTable({
                   </Button>
                 ) : null}
                 <DocumentIntakeReviewSheet document={document} />
+                <DocumentGovernanceDialog document={document} />
                 <ManageDocumentSheet
                   clientOptions={clientOptions}
                   document={document}

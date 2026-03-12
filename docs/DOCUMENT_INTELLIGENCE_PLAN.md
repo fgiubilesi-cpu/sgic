@@ -517,3 +517,5 @@ Ordine rigoroso:
 - 2026-03-12: implementati M1-M2 base su branch `codex/client-workspace` con upload file su bucket `documents`, metadati file persistiti su `documents`, intake tracking in `document_ingestions`, categorie estese e apertura file via signed URL
 - 2026-03-12: implementati M3-M5 core con parser euristico per categoria (`heuristics_v2`), review UI nel tab documenti cliente, salvataggio review in `document_extraction_reviews` e write-back operativo verso `client_contracts`, `client_contacts`, `client_deadlines`, `client_tasks` con tracciamento entità in `document_entities`
 - 2026-03-12: implementato M7 base con filtro documentale esteso (ricerca testuale + stato intake) e coda review direttamente nella tabella documenti
+- 2026-03-12: implementati M6 + M8 base con dialog `Governance` per storico versioni/review/link operativi, KPI documentali nel dossier cliente, alert su review queue e mismatch contratto
+- 2026-03-12: sistemata la pipeline CSS globale in dev rimuovendo un import non valido da `globals.css`; UI tornata stabile su `3000`

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -8,7 +8,18 @@ import type { Tables } from '@/types/database.types';
 import type { ClientOption } from '@/features/clients/queries/get-client-options';
 import type { PersonnelListItem } from '@/features/personnel/queries/get-personnel';
 import { createDocument, updateDocument } from '@/features/documents/actions/document-actions';
-import { documentSchema, type DocumentFormInput } from '@/features/documents/schemas/document-schema';
+import {
+  documentSchema,
+  type DocumentFormInput,
+  type DocumentFormValues,
+} from '@/features/documents/schemas/document-schema';
+import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client';
+import {
+  buildInitialExtractionPayload,
+  sanitizeFileName,
+  suggestDocumentCategoryFromName,
+  suggestDocumentTitleFromName,
+} from '@/features/documents/lib/document-intelligence';
 import {
   Form,
   FormControl,
@@ -30,6 +41,23 @@ import {
 
 type DocumentRow = Tables<'documents'>;
 
+const INGESTION_STATUSES: ReadonlyArray<NonNullable<DocumentFormValues['ingestion_status']>> = [
+  'manual',
+  'uploaded',
+  'parsed',
+  'review_required',
+  'reviewed',
+  'linked',
+  'failed',
+];
+
+function coerceIngestionStatus(value: string | null | undefined): DocumentFormValues['ingestion_status'] {
+  if (!value) return 'manual';
+  return INGESTION_STATUSES.includes(value as NonNullable<DocumentFormValues['ingestion_status']>)
+    ? (value as NonNullable<DocumentFormValues['ingestion_status']>)
+    : 'manual';
+}
+
 interface DocumentFormProps {
   clientOptions: ClientOption[];
   defaultClientId?: string;
@@ -49,17 +77,28 @@ export function DocumentForm({
   onSuccess,
   personnelOptions,
 }: DocumentFormProps) {
-  const form = useForm<DocumentFormInput>({
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [uploadedFilePath, setUploadedFilePath] = useState(document?.storage_path ?? null);
+
+  const form = useForm<DocumentFormValues>({
     resolver: zodResolver(documentSchema),
     defaultValues: {
       category: document?.category ?? 'Procedure',
       client_id: document?.client_id ?? defaultClientId ?? 'none',
       description: document?.description ?? '',
       expiry_date: document?.expiry_date ?? '',
+      extracted_payload: document?.extracted_payload ?? null,
+      file_name: document?.file_name ?? '',
+      file_size_bytes: document?.file_size_bytes ?? null,
       file_url: document?.file_url ?? '',
+      ingestion_status: coerceIngestionStatus(document?.ingestion_status),
       issue_date: document?.issue_date ?? '',
       location_id: document?.location_id ?? defaultLocationId ?? 'none',
+      mime_type: document?.mime_type ?? '',
       personnel_id: document?.personnel_id ?? defaultPersonnelId ?? 'none',
+      storage_path: document?.storage_path ?? '',
       status: document?.status ?? 'draft',
       title: document?.title ?? '',
       version: document?.version ?? '',
@@ -81,10 +120,106 @@ export function DocumentForm({
     return personnelOptions.filter((person) => person.client_id === selectedClientId);
   }, [personnelOptions, selectedClientId]);
 
-  const onSubmit = async (values: DocumentFormInput) => {
+  const uploadDocumentFile = async (file: File) => {
+    setIsUploadingFile(true);
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      if (authError || !user) {
+        throw new Error('Sessione utente non disponibile per upload file.');
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile?.organization_id) {
+        throw new Error('Profilo organizzazione non disponibile.');
+      }
+
+      const safeName = sanitizeFileName(file.name || `document-${Date.now()}`);
+      const clientScope = selectedClientId && selectedClientId !== 'none' ? selectedClientId : 'shared';
+      const storagePath = `${profile.organization_id}/${clientScope}/${Date.now()}-${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(storagePath, file, {
+          contentType: file.type || 'application/octet-stream',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: signedData } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+
+      const suggestedCategory = suggestDocumentCategoryFromName(file.name);
+      if (suggestedCategory) {
+        form.setValue('category', suggestedCategory, { shouldDirty: true, shouldValidate: true });
+      }
+      if (!form.getValues('title').trim()) {
+        form.setValue('title', suggestDocumentTitleFromName(file.name), {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
+
+      const extractionPayload = buildInitialExtractionPayload({
+        category: suggestedCategory ?? form.getValues('category'),
+        file,
+        originalFileName: file.name,
+      });
+
+      form.setValue('storage_path', storagePath, { shouldDirty: true, shouldValidate: true });
+      form.setValue('file_name', file.name, { shouldDirty: true, shouldValidate: false });
+      form.setValue('mime_type', file.type || '', { shouldDirty: true, shouldValidate: false });
+      form.setValue('file_size_bytes', file.size, { shouldDirty: true, shouldValidate: false });
+      form.setValue('file_url', signedData?.signedUrl ?? '', { shouldDirty: true, shouldValidate: false });
+      form.setValue('ingestion_status', 'uploaded', { shouldDirty: true, shouldValidate: true });
+      form.setValue('extracted_payload', extractionPayload, {
+        shouldDirty: true,
+        shouldValidate: false,
+      });
+      setUploadedFilePath(storagePath);
+      return true;
+    } finally {
+      setIsUploadingFile(false);
+    }
+  };
+
+  const onSubmit = async (values: DocumentFormValues) => {
+    if (selectedFile) {
+      try {
+        await uploadDocumentFile(selectedFile);
+        setSelectedFile(null);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Upload file non riuscito';
+        toast.error(message);
+        return;
+      }
+    }
+
+    const payload: DocumentFormInput = {
+      ...values,
+      storage_path: form.getValues('storage_path'),
+      file_name: form.getValues('file_name'),
+      mime_type: form.getValues('mime_type'),
+      file_size_bytes: form.getValues('file_size_bytes'),
+      ingestion_status: form.getValues('ingestion_status'),
+      extracted_payload: form.getValues('extracted_payload'),
+      file_url: form.getValues('file_url'),
+    };
+
     const result = document
-      ? await updateDocument(document.id, values)
-      : await createDocument(values);
+      ? await updateDocument(document.id, payload)
+      : await createDocument(payload);
 
     if (!result.success) {
       toast.error(result.error ?? 'Impossibile salvare il documento.');
@@ -159,7 +294,11 @@ export function DocumentForm({
                     <SelectItem value="Instruction">Istruzione</SelectItem>
                     <SelectItem value="Form">Modulo</SelectItem>
                     <SelectItem value="Contract">Contratto</SelectItem>
+                    <SelectItem value="OrgChart">Organigramma</SelectItem>
                     <SelectItem value="Certificate">Certificato</SelectItem>
+                    <SelectItem value="Authorization">Autorizzazione</SelectItem>
+                    <SelectItem value="Registry">Visura / Registro</SelectItem>
+                    <SelectItem value="Report">Report / Verbale</SelectItem>
                     <SelectItem value="Other">Altro</SelectItem>
                   </SelectContent>
                 </Select>
@@ -292,10 +431,52 @@ export function DocumentForm({
 
         <FormField
           control={form.control}
+          name="storage_path"
+          render={() => (
+            <FormItem>
+              <FormLabel>File documento</FormLabel>
+              <FormControl>
+                <Input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    setSelectedFile(file);
+                    if (!file) return;
+                    if (!form.getValues('title').trim()) {
+                      form.setValue('title', suggestDocumentTitleFromName(file.name), {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    }
+                    const suggestedCategory = suggestDocumentCategoryFromName(file.name);
+                    if (suggestedCategory) {
+                      form.setValue('category', suggestedCategory, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    }
+                  }}
+                />
+              </FormControl>
+              <div className="text-xs text-zinc-500">
+                {selectedFile
+                  ? `Pronto per upload: ${selectedFile.name} (${Math.round(selectedFile.size / 1024)} KB)`
+                  : uploadedFilePath
+                  ? `File già caricato: ${uploadedFilePath}`
+                  : 'Carica un file per registrarlo in storage e avviare intake documentale.'}
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
           name="file_url"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>URL file</FormLabel>
+              <FormLabel>URL file (manuale o firmato)</FormLabel>
               <FormControl>
                 <Input {...field} placeholder="https://..." />
               </FormControl>
@@ -319,7 +500,11 @@ export function DocumentForm({
         />
 
         <Button type="submit" className="w-full">
-          {document ? 'Aggiorna documento' : 'Crea documento'}
+          {isUploadingFile
+            ? 'Upload in corso...'
+            : document
+            ? 'Aggiorna documento'
+            : 'Crea documento'}
         </Button>
       </form>
     </Form>

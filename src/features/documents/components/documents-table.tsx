@@ -14,6 +14,7 @@ import type { ClientOption } from '@/features/clients/queries/get-client-options
 import type { PersonnelListItem } from '@/features/personnel/queries/get-personnel';
 import type { DocumentListItem } from '@/features/documents/queries/get-documents';
 import { ManageDocumentSheet } from './manage-document-sheet';
+import { DocumentIntakeReviewSheet } from './document-intake-review-sheet';
 
 interface DocumentsTableProps {
   clientOptions: ClientOption[];
@@ -26,6 +27,32 @@ function statusTone(status: string | null) {
   if (status === 'published') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
   if (status === 'archived') return 'border-zinc-200 bg-zinc-50 text-zinc-500';
   return 'border-amber-200 bg-amber-50 text-amber-700';
+}
+
+function ingestionTone(status: string | null) {
+  if (status === 'reviewed' || status === 'linked') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  }
+  if (status === 'review_required' || status === 'parsed') {
+    return 'border-amber-200 bg-amber-50 text-amber-700';
+  }
+  if (status === 'failed') {
+    return 'border-rose-200 bg-rose-50 text-rose-700';
+  }
+  if (status === 'uploaded') {
+    return 'border-sky-200 bg-sky-50 text-sky-700';
+  }
+  return 'border-zinc-200 bg-zinc-50 text-zinc-600';
+}
+
+function ingestionLabel(status: string | null) {
+  if (status === 'uploaded') return 'Caricato';
+  if (status === 'parsed') return 'Estratto';
+  if (status === 'review_required') return 'Da validare';
+  if (status === 'reviewed') return 'Validato';
+  if (status === 'linked') return 'Collegato';
+  if (status === 'failed') return 'Errore';
+  return 'Manuale';
 }
 
 function expiryTone(expiryDate: string | null) {
@@ -70,6 +97,7 @@ export function DocumentsTable({
                 <span className="text-xs text-zinc-500">
                   {document.category || 'Categoria non definita'}
                   {document.version ? ` · ${document.version}` : ''}
+                  {document.version_count > 1 ? ` · ${document.version_count} revisioni` : ''}
                 </span>
               </div>
             </TableCell>
@@ -84,13 +112,18 @@ export function DocumentsTable({
               </div>
             </TableCell>
             <TableCell>
-              <Badge variant="outline" className={statusTone(document.status)}>
-                {document.status === 'published'
-                  ? 'Pubblicato'
-                  : document.status === 'archived'
-                  ? 'Archiviato'
-                  : 'Bozza'}
-              </Badge>
+              <div className="space-y-1">
+                <Badge variant="outline" className={statusTone(document.status)}>
+                  {document.status === 'published'
+                    ? 'Pubblicato'
+                    : document.status === 'archived'
+                    ? 'Archiviato'
+                    : 'Bozza'}
+                </Badge>
+                <Badge variant="outline" className={ingestionTone(document.ingestion_status)}>
+                  {ingestionLabel(document.ingestion_status)}
+                </Badge>
+              </div>
             </TableCell>
             <TableCell>
               <div className={`text-sm ${expiryTone(document.expiry_date)}`}>
@@ -101,13 +134,14 @@ export function DocumentsTable({
             </TableCell>
             <TableCell>
               <div className="flex items-center gap-2">
-                {document.file_url ? (
+                {document.access_url || document.file_url ? (
                   <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-blue-600">
-                    <a href={document.file_url} target="_blank" rel="noreferrer">
+                    <a href={document.access_url ?? document.file_url ?? '#'} target="_blank" rel="noreferrer">
                       Apri
                     </a>
                   </Button>
                 ) : null}
+                <DocumentIntakeReviewSheet document={document} />
                 <ManageDocumentSheet
                   clientOptions={clientOptions}
                   document={document}

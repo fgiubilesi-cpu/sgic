@@ -537,12 +537,18 @@ export type Database = {
           created_by: string | null
           description: string | null
           expiry_date: string | null
+          extracted_payload: Json | null
+          file_name: string | null
+          file_size_bytes: number | null
           file_url: string | null
           id: string
+          ingestion_status: string
           issue_date: string | null
           location_id: string | null
+          mime_type: string | null
           organization_id: string
           personnel_id: string | null
+          storage_path: string | null
           status: Database["public"]["Enums"]["document_status"] | null
           title: string | null
           updated_at: string | null
@@ -555,12 +561,18 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           expiry_date?: string | null
+          extracted_payload?: Json | null
+          file_name?: string | null
+          file_size_bytes?: number | null
           file_url?: string | null
           id?: string
+          ingestion_status?: string
           issue_date?: string | null
           location_id?: string | null
+          mime_type?: string | null
           organization_id: string
           personnel_id?: string | null
+          storage_path?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
           title?: string | null
           updated_at?: string | null
@@ -573,12 +585,18 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           expiry_date?: string | null
+          extracted_payload?: Json | null
+          file_name?: string | null
+          file_size_bytes?: number | null
           file_url?: string | null
           id?: string
+          ingestion_status?: string
           issue_date?: string | null
           location_id?: string | null
+          mime_type?: string | null
           organization_id?: string
           personnel_id?: string | null
+          storage_path?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
           title?: string | null
           updated_at?: string | null
@@ -618,6 +636,244 @@ export type Database = {
             columns: ["personnel_id"]
             isOneToOne: false
             referencedRelation: "personnel"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_ingestions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          document_id: string
+          error_message: string | null
+          extracted_payload: Json | null
+          extracted_text: string | null
+          id: string
+          organization_id: string
+          parser_type: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          document_id: string
+          error_message?: string | null
+          extracted_payload?: Json | null
+          extracted_text?: string | null
+          id?: string
+          organization_id: string
+          parser_type?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          document_id?: string
+          error_message?: string | null
+          extracted_payload?: Json | null
+          extracted_text?: string | null
+          id?: string
+          organization_id?: string
+          parser_type?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_ingestions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_ingestions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_ingestions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_ingestions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_extraction_reviews: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          document_id: string
+          id: string
+          ingestion_id: string | null
+          organization_id: string
+          review_action: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewed_payload: Json
+          reviewer_notes: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          document_id: string
+          id?: string
+          ingestion_id?: string | null
+          organization_id: string
+          review_action?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewed_payload?: Json
+          reviewer_notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          document_id?: string
+          id?: string
+          ingestion_id?: string | null
+          organization_id?: string
+          review_action?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewed_payload?: Json
+          reviewer_notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extraction_reviews_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_reviews_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_reviews_ingestion_id_fkey"
+            columns: ["ingestion_id"]
+            isOneToOne: false
+            referencedRelation: "document_ingestions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_reviews_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_reviews_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_entities: {
+        Row: {
+          confidence: string
+          created_at: string
+          created_by: string | null
+          document_id: string
+          entity_payload: Json
+          entity_type: string
+          extraction_review_id: string | null
+          id: string
+          linked_record_id: string | null
+          linked_table: string | null
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          confidence?: string
+          created_at?: string
+          created_by?: string | null
+          document_id: string
+          entity_payload?: Json
+          entity_type: string
+          extraction_review_id?: string | null
+          id?: string
+          linked_record_id?: string | null
+          linked_table?: string | null
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          confidence?: string
+          created_at?: string
+          created_by?: string | null
+          document_id?: string
+          entity_payload?: Json
+          entity_type?: string
+          extraction_review_id?: string | null
+          id?: string
+          linked_record_id?: string | null
+          linked_table?: string | null
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_entities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_entities_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_entities_extraction_review_id_fkey"
+            columns: ["extraction_review_id"]
+            isOneToOne: false
+            referencedRelation: "document_extraction_reviews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_entities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1203,7 +1459,18 @@ export type Database = {
         | "non_compliant"
         | "not_applicable"
         | "pending"
-      document_category: "Procedure" | "Manual" | "Instruction" | "Form"
+      document_category:
+        | "Procedure"
+        | "Manual"
+        | "Instruction"
+        | "Form"
+        | "Contract"
+        | "Certificate"
+        | "Other"
+        | "OrgChart"
+        | "Authorization"
+        | "Registry"
+        | "Report"
       document_status: "draft" | "published" | "archived"
       lab_outcome: "compliant" | "non_compliant" | "warning"
       risk_category: "Strategic" | "Operational" | "Financial" | "Compliance"
@@ -1342,7 +1609,19 @@ export const Constants = {
         "not_applicable",
         "pending",
       ],
-      document_category: ["Procedure", "Manual", "Instruction", "Form"],
+      document_category: [
+        "Procedure",
+        "Manual",
+        "Instruction",
+        "Form",
+        "Contract",
+        "Certificate",
+        "Other",
+        "OrgChart",
+        "Authorization",
+        "Registry",
+        "Report",
+      ],
       document_status: ["draft", "published", "archived"],
       lab_outcome: ["compliant", "non_compliant", "warning"],
       risk_category: ["Strategic", "Operational", "Financial", "Compliance"],

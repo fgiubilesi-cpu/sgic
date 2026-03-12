@@ -4,9 +4,12 @@ import type { Tables } from '@/types/database.types';
 type DocumentRow = Tables<'documents'>;
 
 export interface DocumentListItem extends DocumentRow {
+  access_url: string | null;
   client_name: string | null;
+  ingestion_status: string;
   location_name: string | null;
   personnel_name: string | null;
+  version_count: number;
 }
 
 interface GetDocumentsOptions {
@@ -63,6 +66,7 @@ export async function getDocuments({
     { data: clients, error: clientsError },
     { data: locations, error: locationsError },
     { data: personnel, error: personnelError },
+    { data: versions, error: versionsError },
   ] = await Promise.all([
     documentClientIds.length
       ? supabase.from('clients').select('id, name').in('id', documentClientIds)
@@ -76,22 +80,61 @@ export async function getDocuments({
           .select('id, first_name, last_name')
           .in('id', documentPersonnelIds)
       : Promise.resolve({ data: [], error: null }),
+    filteredDocuments.length
+      ? supabase
+          .from('document_versions')
+          .select('document_id')
+          .in(
+            'document_id',
+            filteredDocuments.map((document) => document.id)
+          )
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (clientsError) throw clientsError;
   if (locationsError) throw locationsError;
   if (personnelError) throw personnelError;
+  if (versionsError) throw versionsError;
 
   const clientMap = new Map((clients ?? []).map((client) => [client.id, client.name]));
   const locationMap = new Map((locations ?? []).map((location) => [location.id, location.name]));
   const personnelMap = new Map(
     (personnel ?? []).map((person) => [person.id, `${person.first_name} ${person.last_name}`.trim()])
   );
+  const versionCountMap = new Map<string, number>();
+  for (const version of versions ?? []) {
+    versionCountMap.set(version.document_id, (versionCountMap.get(version.document_id) ?? 0) + 1);
+  }
+
+  const storagePaths = Array.from(
+    new Set(
+      filteredDocuments
+        .map((document) => document.storage_path)
+        .filter((path): path is string => Boolean(path))
+    )
+  );
+
+  const signedUrlMap = new Map<string, string>();
+  if (storagePaths.length > 0) {
+    await Promise.all(
+      storagePaths.map(async (path) => {
+        const { data: signedData } = await supabase.storage
+          .from('documents')
+          .createSignedUrl(path, 60 * 60 * 6);
+        if (signedData?.signedUrl) {
+          signedUrlMap.set(path, signedData.signedUrl);
+        }
+      })
+    );
+  }
 
   return filteredDocuments.map((document) => ({
     ...document,
+    access_url: document.storage_path ? signedUrlMap.get(document.storage_path) ?? null : null,
     client_name: document.client_id ? clientMap.get(document.client_id) ?? null : null,
+    ingestion_status: document.ingestion_status ?? 'manual',
     location_name: document.location_id ? locationMap.get(document.location_id) ?? null : null,
     personnel_name: document.personnel_id ? personnelMap.get(document.personnel_id) ?? null : null,
+    version_count: Math.max(versionCountMap.get(document.id) ?? 0, document.storage_path ? 1 : 0),
   }));
 }

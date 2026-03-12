@@ -231,8 +231,10 @@ export function ClientDetailWorkspace({
   const [taskSearch, setTaskSearch] = useState('');
   const [taskStatus, setTaskStatus] = useState<'all' | ClientTaskStatus>('all');
   const [taskPriority, setTaskPriority] = useState<'all' | ClientTaskPriority>('all');
+  const [docSearch, setDocSearch] = useState('');
   const [docCategory, setDocCategory] = useState<string>('all');
   const [docStatus, setDocStatus] = useState<string>('all');
+  const [docIngestion, setDocIngestion] = useState<string>('all');
   const [docScope, setDocScope] = useState<'all' | 'client' | 'location' | 'personnel'>('all');
   const [deadlineSource, setDeadlineSource] =
     useState<'all' | AggregatedDeadline['source_type']>('all');
@@ -477,14 +479,21 @@ export function ClientDetailWorkspace({
   );
 
   const filteredDocuments = documents.filter((document) => {
+    const search = docSearch.trim().toLowerCase();
+    const matchesSearch =
+      search === '' ||
+      (document.title ?? '').toLowerCase().includes(search) ||
+      (document.description ?? '').toLowerCase().includes(search) ||
+      (document.file_name ?? '').toLowerCase().includes(search);
     const matchesCategory = docCategory === 'all' || document.category === docCategory;
     const matchesStatus = docStatus === 'all' || document.status === docStatus;
+    const matchesIngestion = docIngestion === 'all' || document.ingestion_status === docIngestion;
     const matchesScope =
       docScope === 'all' ||
       (docScope === 'client' && Boolean(document.client_id && !document.location_id && !document.personnel_id)) ||
       (docScope === 'location' && Boolean(document.location_id)) ||
       (docScope === 'personnel' && Boolean(document.personnel_id));
-    return matchesCategory && matchesStatus && matchesScope;
+    return matchesSearch && matchesCategory && matchesStatus && matchesIngestion && matchesScope;
   });
 
   const filteredDeadlines = aggregatedDeadlines.filter((deadline) => {
@@ -1494,7 +1503,15 @@ export function ClientDetailWorkspace({
                   />
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="grid gap-3 md:grid-cols-3">
+                  <div className="grid gap-3 md:grid-cols-4">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Ricerca</Label>
+                      <Input
+                        value={docSearch}
+                        onChange={(event) => setDocSearch(event.target.value)}
+                        placeholder="Titolo, descrizione o nome file"
+                      />
+                    </div>
                     <div className="space-y-2">
                       <Label>Categoria</Label>
                       <select
@@ -1521,6 +1538,23 @@ export function ClientDetailWorkspace({
                         <option value="draft">Bozza</option>
                         <option value="published">Pubblicato</option>
                         <option value="archived">Archiviato</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Intake</Label>
+                      <select
+                        className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm"
+                        value={docIngestion}
+                        onChange={(event) => setDocIngestion(event.target.value)}
+                      >
+                        <option value="all">Tutti</option>
+                        <option value="manual">Manuale</option>
+                        <option value="uploaded">Caricato</option>
+                        <option value="parsed">Estratto</option>
+                        <option value="review_required">Da validare</option>
+                        <option value="reviewed">Validato</option>
+                        <option value="linked">Collegato</option>
+                        <option value="failed">Errore</option>
                       </select>
                     </div>
                     <div className="space-y-2">

@@ -529,6 +529,52 @@ function normalizeBillingPhase(section: string | null | undefined) {
   return compact(section) || null;
 }
 
+function codeDepth(code: string | null | undefined) {
+  const compacted = compact(code);
+  if (!compacted) return 0;
+  return compacted.split('.').length;
+}
+
+function isAllCapsHeading(input: string | null | undefined) {
+  const compacted = compact(input);
+  if (!compacted) return false;
+  const lettersOnly = compacted.replace(/[^A-Za-zÀ-ÿ]/g, '');
+  if (lettersOnly.length < 6) return false;
+  return lettersOnly === lettersOnly.toUpperCase();
+}
+
+function isLikelySectionHeading(code: string | null | undefined, title: string | null | undefined) {
+  const compactedTitle = normalizeCompactSpaces(title ?? '');
+  if (!compactedTitle) return false;
+
+  const depth = codeDepth(code);
+  const headingLike =
+    isAllCapsHeading(compactedTitle) ||
+    /^(consulenza specialistica|consulenza per|servizi integrati|gestione del sistema|attività preliminari)$/i.test(
+      compactedTitle
+    );
+  const looksLikeDetailedActivity =
+    /^(attività|check-?up|registrazione|riqualificazione|nomina|formazione|redazione|audit|verifica|dichiarazione|assistenza|monitoraggio|predisposizione|supporto)/i.test(
+      compactedTitle
+    );
+
+  if (depth <= 2 && headingLike && !looksLikeDetailedActivity) return true;
+  if (depth <= 2 && compactedTitle.split(' ').length <= 4 && !looksLikeDetailedActivity) return true;
+
+  return false;
+}
+
+function buildServiceLineKey(line: ServiceLineProposal) {
+  return [
+    compact(line.code),
+    compact(line.title),
+    compact(line.section),
+    compact(line.billing_phase),
+    compact(line.quantity),
+    compact(line.total_price),
+  ].join('|');
+}
+
 function extractServiceLinesFromText(input: string) {
   const lines = extractLines(input);
 
@@ -608,6 +654,10 @@ function extractServiceLinesFromText(input: string) {
     if (partialRowMatch && line.length > 28) {
       const [, lineCode, serviceCode, title, quantity, unit] = partialRowMatch;
       const cleanedTitle = normalizeCompactSpaces(title);
+      if (isLikelySectionHeading(lineCode, cleanedTitle)) {
+        currentSection = cleanedTitle;
+        continue;
+      }
       serviceLines.push({
         billing_phase: currentBillingPhase,
         code: `${lineCode} ${serviceCode}`.trim(),
@@ -636,15 +686,19 @@ function extractServiceLinesFromText(input: string) {
       const numberedActivity = line.match(/^(\d+(?:\.\d+)+)\)?\s+(.+)$/);
       if (!numberedActivity) continue;
       const [, code, title] = numberedActivity;
+      const cleanedTitle = normalizeCompactSpaces(title);
+      if (isLikelySectionHeading(code, cleanedTitle)) {
+        currentSection = cleanedTitle;
+        continue;
+      }
       if (
         !numberedSectionActive &&
         !/attività|consulenza|supporto|forfetaria|giornate|check-up|registrazione|riqualificazione|nomina|formazione|redazione|audit|verifica|dichiarazione/i.test(
-          title
+          cleanedTitle
         )
       ) {
         continue;
       }
-      const cleanedTitle = normalizeCompactSpaces(title);
       serviceLines.push({
         billing_phase: currentBillingPhase,
         code,
@@ -657,7 +711,16 @@ function extractServiceLinesFromText(input: string) {
     }
   }
 
-  return serviceLines;
+  const dedupedLines = Array.from(
+    new Map(
+      serviceLines
+        .filter((line) => compact(line.title))
+        .filter((line) => !isLikelySectionHeading(line.code, line.title))
+        .map((line) => [buildServiceLineKey(line), line])
+    ).values()
+  );
+
+  return dedupedLines;
 }
 
 function derivePriorityByDate(dateIso: string | null | undefined): DeadlineProposal['priority'] {

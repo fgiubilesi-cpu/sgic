@@ -262,6 +262,13 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
     }));
   };
 
+  const removeServiceLine = (index: number) => {
+    setProposal((prev) => ({
+      ...(prev ?? { confidence: 'medium', parser: 'manual', summary: '' }),
+      service_lines: (prev?.service_lines ?? []).filter((_, currentIndex) => currentIndex !== index),
+    }));
+  };
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
@@ -559,6 +566,20 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
                 <div className="space-y-3">
                   {proposal.service_lines.map((line, index) => (
                     <div key={`${line.code ?? 'line'}-${index}`} className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                          Riga {index + 1}
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 px-2 text-rose-700"
+                          onClick={() => removeServiceLine(index)}
+                        >
+                          Rimuovi
+                        </Button>
+                      </div>
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="space-y-1">
                           <Label>Attività</Label>

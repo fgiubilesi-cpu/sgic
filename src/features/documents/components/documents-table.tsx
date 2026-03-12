@@ -75,7 +75,12 @@ export function DocumentsTable({
   personnelOptions,
 }: DocumentsTableProps) {
   if (documents.length === 0) {
-    return <p className="text-sm text-zinc-500">{emptyMessage}</p>;
+    return (
+      <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-6 py-8 text-center">
+        <p className="text-sm font-medium text-zinc-700">Archivio vuoto per i filtri correnti</p>
+        <p className="mt-1 text-sm text-zinc-500">{emptyMessage}</p>
+      </div>
+    );
   }
 
   return (
@@ -129,6 +134,13 @@ export function DocumentsTable({
                     {document.linked_entity_count} link operativi
                   </Badge>
                 ) : null}
+                {document.review_count > 0 ? (
+                  <p className="text-xs text-zinc-500">
+                    {document.last_review_action
+                      ? `Ultima review: ${document.last_review_action}`
+                      : `${document.review_count} review registrate`}
+                  </p>
+                ) : null}
               </div>
             </TableCell>
             <TableCell>
@@ -139,14 +151,16 @@ export function DocumentsTable({
               </div>
             </TableCell>
             <TableCell>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {document.access_url || document.file_url ? (
                   <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-blue-600">
                     <a href={document.access_url ?? document.file_url ?? '#'} target="_blank" rel="noreferrer">
                       Apri
                     </a>
                   </Button>
-                ) : null}
+                ) : (
+                  <span className="text-xs text-zinc-400">File non disponibile</span>
+                )}
                 <DocumentIntakeReviewSheet document={document} />
                 <DocumentGovernanceDialog document={document} />
                 <ManageDocumentSheet

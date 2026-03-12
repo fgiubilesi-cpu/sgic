@@ -46,6 +46,16 @@ function formatDate(value: string | null | undefined) {
   return new Date(value).toLocaleString('it-IT');
 }
 
+function ingestionLabel(status: string | null | undefined) {
+  if (status === 'uploaded') return 'Caricato';
+  if (status === 'parsed') return 'Estratto';
+  if (status === 'review_required') return 'Da validare';
+  if (status === 'reviewed') return 'Validato';
+  if (status === 'linked') return 'Collegato';
+  if (status === 'failed') return 'Errore';
+  return 'Manuale';
+}
+
 export function DocumentGovernanceDialog({ document }: DocumentGovernanceDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -94,6 +104,17 @@ export function DocumentGovernanceDialog({ document }: DocumentGovernanceDialogP
           <div className="py-8 text-sm text-zinc-500">Caricamento governance...</div>
         ) : data ? (
           <div className="space-y-6">
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-zinc-900">{data.document.title || 'Documento senza titolo'}</p>
+                <Badge variant="outline">{data.document.category ?? 'Other'}</Badge>
+                <Badge variant="outline">{ingestionLabel(data.document.ingestion_status)}</Badge>
+              </div>
+              <p className="mt-2 text-xs text-zinc-500">
+                Ultimo aggiornamento {formatDate(data.document.updated_at ?? data.document.created_at)}
+              </p>
+            </div>
+
             <div className="grid gap-3 md:grid-cols-4">
               <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
                 <p className="text-xs uppercase tracking-wide text-zinc-500">Versioni</p>

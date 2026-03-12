@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { Bot, Link2, SquarePen } from 'lucide-react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,6 +42,22 @@ function scopeHint(document: DocumentListItem) {
   if (document.location_name) pieces.push(`sede ${document.location_name}`);
   if (document.personnel_name) pieces.push(`collaboratore ${document.personnel_name}`);
   return pieces.length > 0 ? pieces.join(' · ') : 'nessun contesto specifico';
+}
+
+function ingestionLabel(status: string | null) {
+  if (status === 'uploaded') return 'Caricato';
+  if (status === 'parsed') return 'Estratto';
+  if (status === 'review_required') return 'Da validare';
+  if (status === 'reviewed') return 'Validato';
+  if (status === 'linked') return 'Collegato';
+  if (status === 'failed') return 'Errore';
+  return 'Manuale';
+}
+
+function confidenceLabel(value: DocumentIntakeProposal['confidence']) {
+  if (value === 'high') return 'Alta';
+  if (value === 'medium') return 'Media';
+  return 'Bassa';
 }
 
 export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewSheetProps) {
@@ -191,9 +208,19 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
                 <Bot className="h-3.5 w-3.5" />
                 Parser {proposal.parser}
               </div>
-              <p className="mt-1">Documento: {document.title || 'Senza titolo'}</p>
-              <p>Categoria: {category}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge variant="outline">Categoria: {category}</Badge>
+                <Badge variant="outline">Intake: {ingestionLabel(document.ingestion_status)}</Badge>
+                <Badge variant="outline">Confidenza: {confidenceLabel(proposal.confidence)}</Badge>
+              </div>
+              <p className="mt-2">Documento: {document.title || 'Senza titolo'}</p>
               <p>Contesto: {scopeHint(document)}</p>
+            </div>
+
+            <div className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700">
+              {canApplyToWorkspace
+                ? "Puoi correggere la proposta e applicarla al workspace cliente. Nessuna scrittura viene fatta senza questa conferma."
+                : "Il documento non è collegato a un cliente. Puoi validare la proposta, ma non applicarla ancora al workspace."}
             </div>
 
             <div className="space-y-2">

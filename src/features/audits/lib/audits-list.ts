@@ -52,26 +52,13 @@ export type AuditsListSection = {
   audits: AuditWithNCCount[];
 };
 
-export type AuditsListInsights = {
-  attentionCount: number;
-  overdueCount: number;
-  lowScoreCount: number;
-  unscoredCount: number;
-  upcoming: AuditWithNCCount[];
-  clientTrends: Array<{
-    id: string;
-    label: string;
-    audits: number;
-    avgScore: number | null;
-    openNc: number;
-  }>;
-  locationTrends: Array<{
-    id: string;
-    label: string;
-    audits: number;
-    avgScore: number | null;
-    openNc: number;
-  }>;
+export type AuditsWorkweekDay = {
+  id: string;
+  date: string;
+  label: string;
+  shortLabel: string;
+  isToday: boolean;
+  audits: AuditWithNCCount[];
 };
 
 type SearchParamValue = string | string[] | undefined;
@@ -354,6 +341,104 @@ export function getAuditsListKpis(audits: AuditWithNCCount[]): AuditsListKpis {
   };
 }
 
+export function getAuditsWorkweek(
+  audits: AuditWithNCCount[],
+  referenceDate = new Date()
+): AuditsWorkweekDay[] {
+  const startDate = getNextBusinessDay(referenceDate);
+  const days: AuditsWorkweekDay[] = [];
+
+  for (let index = 0; index < 5; index += 1) {
+    const dayDate = addBusinessDays(startDate, index);
+    const isoDate = formatIsoDate(dayDate);
+
+    days.push({
+      id: isoDate,
+      date: isoDate,
+      label: new Intl.DateTimeFormat("it-IT", {
+        weekday: "long",
+        day: "2-digit",
+        month: "short",
+      }).format(dayDate),
+      shortLabel: new Intl.DateTimeFormat("it-IT", {
+        weekday: "short",
+      }).format(dayDate),
+      isToday: isSameDay(dayDate, referenceDate),
+      audits: [],
+    });
+  }
+
+  const dayMap = new Map(days.map((day) => [day.date, day]));
+
+  for (const audit of audits) {
+    const auditDate = parseDate(audit.scheduled_date);
+    if (!auditDate) continue;
+
+    const day = dayMap.get(formatIsoDate(auditDate));
+    if (!day) continue;
+
+    day.audits.push(audit);
+  }
+
+  for (const day of days) {
+    day.audits.sort((left, right) => {
+      const leftDate = parseDate(left.scheduled_date)?.getTime() ?? 0;
+      const rightDate = parseDate(right.scheduled_date)?.getTime() ?? 0;
+      if (leftDate !== rightDate) return leftDate - rightDate;
+      return (left.title ?? "").localeCompare(right.title ?? "");
+    });
+  }
+
+  return days;
+}
+
+function getNextBusinessDay(referenceDate: Date): Date {
+  const normalized = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth(),
+    referenceDate.getDate()
+  );
+
+  while (isWeekend(normalized)) {
+    normalized.setDate(normalized.getDate() + 1);
+  }
+
+  return normalized;
+}
+
+function addBusinessDays(startDate: Date, amount: number): Date {
+  const date = new Date(startDate);
+  let remaining = amount;
+
+  while (remaining > 0) {
+    date.setDate(date.getDate() + 1);
+    if (isWeekend(date)) continue;
+    remaining -= 1;
+  }
+
+  return date;
+}
+
+function isWeekend(date: Date): boolean {
+  const weekday = date.getDay();
+  return weekday === 0 || weekday === 6;
+}
+
+function isSameDay(left: Date, right: Date): boolean {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+function formatIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function getAuditRiskSignals(audit: AuditWithNCCount): AuditRiskSignal[] {
   const signals: AuditRiskSignal[] = [];
   const auditDate = parseDate(audit.scheduled_date);
@@ -429,97 +514,6 @@ export function getAuditNextStep(audit: AuditWithNCCount): string {
   }
 
   return "Open full audit details";
-}
-
-export function getAuditsListInsights(audits: AuditWithNCCount[]): AuditsListInsights {
-  const today = new Date();
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const upcoming = [...audits]
-    .filter((audit) => {
-      const date = parseDate(audit.scheduled_date);
-      return date !== null && date >= todayStart;
-    })
-    .sort((left, right) => {
-      const leftDate = parseDate(left.scheduled_date)?.getTime() ?? 0;
-      const rightDate = parseDate(right.scheduled_date)?.getTime() ?? 0;
-      return leftDate - rightDate;
-    })
-    .slice(0, 5);
-
-  const attentionCount = audits.filter((audit) => getAuditRiskSignals(audit).length > 0).length;
-  const overdueCount = audits.filter((audit) =>
-    getAuditRiskSignals(audit).some((signal) => signal.key === "overdue")
-  ).length;
-  const lowScoreCount = audits.filter((audit) =>
-    getAuditRiskSignals(audit).some((signal) => signal.key === "low_score")
-  ).length;
-  const unscoredCount = audits.filter((audit) =>
-    getAuditRiskSignals(audit).some((signal) => signal.key === "unscored")
-  ).length;
-
-  return {
-    attentionCount,
-    overdueCount,
-    lowScoreCount,
-    unscoredCount,
-    upcoming,
-    clientTrends: buildTrendList(audits, "client"),
-    locationTrends: buildTrendList(audits, "location"),
-  };
-}
-
-function buildTrendList(
-  audits: AuditWithNCCount[],
-  mode: "client" | "location"
-): AuditsListInsights["clientTrends"] {
-  const grouped = new Map<
-    string,
-    {
-      label: string;
-      audits: number;
-      scoredTotal: number;
-      scoredCount: number;
-      openNc: number;
-    }
-  >();
-
-  for (const audit of audits) {
-    const id = mode === "client" ? audit.client_id ?? "no-client" : audit.location_id ?? "no-location";
-    const label =
-      mode === "client" ? audit.client_name ?? "No Client" : audit.location_name ?? "No Location";
-
-    const current = grouped.get(id) ?? {
-      label,
-      audits: 0,
-      scoredTotal: 0,
-      scoredCount: 0,
-      openNc: 0,
-    };
-
-    current.audits += 1;
-    current.openNc += audit.nc_count;
-
-    if (audit.score !== null) {
-      current.scoredTotal += audit.score;
-      current.scoredCount += 1;
-    }
-
-    grouped.set(id, current);
-  }
-
-  return Array.from(grouped.entries())
-    .map(([id, entry]) => ({
-      id,
-      label: entry.label,
-      audits: entry.audits,
-      avgScore: entry.scoredCount > 0 ? Math.round(entry.scoredTotal / entry.scoredCount) : null,
-      openNc: entry.openNc,
-    }))
-    .sort((left, right) => {
-      if (right.openNc !== left.openNc) return right.openNc - left.openNc;
-      return (left.avgScore ?? 101) - (right.avgScore ?? 101);
-    })
-    .slice(0, 4);
 }
 
 export function getActiveFilterLabels(

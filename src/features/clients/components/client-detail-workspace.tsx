@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   FileText,
   MapPin,
+  RefreshCcw,
   ScrollText,
   ShieldAlert,
   Users,
@@ -202,6 +203,15 @@ function getDocumentProposal(document: DocumentListItem) {
 function getContractProposal(document: DocumentListItem) {
   const proposal = getDocumentProposal(document);
   return asObject(proposal?.contract);
+}
+
+function documentFocusLabel(focus: 'all' | 'review' | 'expired' | 'contracts' | 'mismatch' | 'versioned') {
+  if (focus === 'review') return 'Da validare';
+  if (focus === 'expired') return 'Scaduti';
+  if (focus === 'contracts') return 'Contratti';
+  if (focus === 'mismatch') return 'Mismatch contratto';
+  if (focus === 'versioned') return 'Versionati';
+  return 'Tutti';
 }
 
 function computeRiskLevel({
@@ -625,6 +635,23 @@ export function ClientDetailWorkspace({
       setDocCategory('Contract');
     }
   };
+
+  const resetDocumentFilters = () => {
+    applyDocumentPreset('all');
+  };
+
+  const activeDocumentFilters = [
+    docFocus !== 'all' ? `Preset: ${documentFocusLabel(docFocus)}` : null,
+    docCategory !== 'all' ? `Categoria: ${docCategory}` : null,
+    docStatus !== 'all' ? `Stato: ${docStatus}` : null,
+    docIngestion !== 'all' ? `Intake: ${docIngestion}` : null,
+    docScope !== 'all'
+      ? `Ambito: ${
+          docScope === 'client' ? 'Cliente' : docScope === 'location' ? 'Sede' : 'Collaboratore'
+        }`
+      : null,
+    docSearch.trim() !== '' ? `Ricerca: "${docSearch.trim()}"` : null,
+  ].filter((value): value is string => Boolean(value));
 
   return (
     <div className="space-y-6">
@@ -1692,12 +1719,48 @@ export function ClientDetailWorkspace({
                     </button>
                   </div>
 
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-zinc-900">
+                        {filteredDocuments.length} documenti visibili su {documents.length}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {activeDocumentFilters.length > 0 ? (
+                          activeDocumentFilters.map((filter) => (
+                            <Badge key={filter} variant="outline" className="border-zinc-200 bg-white text-zinc-700">
+                              {filter}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-sm text-zinc-500">Nessun filtro attivo: stai vedendo l'archivio completo.</span>
+                        )}
+                      </div>
+                    </div>
+                    {activeDocumentFilters.length > 0 ? (
+                      <Button variant="outline" size="sm" onClick={resetDocumentFilters}>
+                        <RefreshCcw className="mr-2 h-3.5 w-3.5" />
+                        Reset filtri
+                      </Button>
+                    ) : null}
+                  </div>
+
                   {documentReviewQueue.length > 0 || contractDocumentMismatches.length > 0 ? (
                     <div className="grid gap-3 lg:grid-cols-2">
                       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
-                          <AlertTriangle className="h-4 w-4" />
-                          Queue intake
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+                            <AlertTriangle className="h-4 w-4" />
+                            Queue intake
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="border-amber-200 bg-white text-amber-800 hover:bg-amber-100"
+                            onClick={() => applyDocumentPreset('review')}
+                          >
+                            Apri coda
+                          </Button>
                         </div>
                         <p className="mt-1 text-sm text-amber-700">
                           {documentReviewQueue.length > 0
@@ -1706,9 +1769,20 @@ export function ClientDetailWorkspace({
                         </p>
                       </div>
                       <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-rose-800">
-                          <ShieldAlert className="h-4 w-4" />
-                          Allineamento workspace
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-rose-800">
+                            <ShieldAlert className="h-4 w-4" />
+                            Allineamento workspace
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="border-rose-200 bg-white text-rose-800 hover:bg-rose-100"
+                            onClick={() => applyDocumentPreset('mismatch')}
+                          >
+                            Vedi mismatch
+                          </Button>
                         </div>
                         <p className="mt-1 text-sm text-rose-700">
                           {contractDocumentMismatches.length > 0
@@ -1728,9 +1802,14 @@ export function ClientDetailWorkspace({
                     expiredDocuments.length > 0) ? (
                     <div className="grid gap-3 lg:grid-cols-3">
                       <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                          Review queue
-                        </p>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                            Review queue
+                          </p>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-zinc-600" onClick={() => applyDocumentPreset('review')}>
+                            Filtra
+                          </Button>
+                        </div>
                         <div className="mt-3 space-y-2">
                           {documentReviewQueue.slice(0, 3).map((document) => (
                             <div key={document.id} className="rounded-lg border border-zinc-200 bg-white px-3 py-2">
@@ -1744,9 +1823,14 @@ export function ClientDetailWorkspace({
                         </div>
                       </div>
                       <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                          Documenti scaduti
-                        </p>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                            Documenti scaduti
+                          </p>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-zinc-600" onClick={() => applyDocumentPreset('expired')}>
+                            Filtra
+                          </Button>
+                        </div>
                         <div className="mt-3 space-y-2">
                           {expiredDocuments.slice(0, 3).map((document) => (
                             <div key={document.id} className="rounded-lg border border-zinc-200 bg-white px-3 py-2">
@@ -1760,9 +1844,14 @@ export function ClientDetailWorkspace({
                         </div>
                       </div>
                       <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                          Mismatch contratto
-                        </p>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                            Mismatch contratto
+                          </p>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-zinc-600" onClick={() => applyDocumentPreset('mismatch')}>
+                            Filtra
+                          </Button>
+                        </div>
                         <div className="mt-3 space-y-2">
                           {contractDocumentMismatches.slice(0, 3).map((document) => (
                             <div key={document.id} className="rounded-lg border border-zinc-200 bg-white px-3 py-2">
@@ -1852,6 +1941,19 @@ export function ClientDetailWorkspace({
                   <DocumentsTable
                     clientOptions={clientOptions}
                     documents={filteredDocuments}
+                    emptyAction={
+                      <div className="flex flex-wrap justify-center gap-2">
+                        <Button variant="outline" size="sm" onClick={resetDocumentFilters}>
+                          <RefreshCcw className="mr-2 h-3.5 w-3.5" />
+                          Reset filtri
+                        </Button>
+                        <ManageDocumentSheet
+                          clientOptions={clientOptions}
+                          defaultClientId={client.id}
+                          personnelOptions={personnel}
+                        />
+                      </div>
+                    }
                     emptyMessage="Nessun documento coerente con i filtri selezionati."
                     personnelOptions={personnel}
                   />

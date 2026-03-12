@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +21,7 @@ import { DocumentGovernanceDialog } from './document-governance-dialog';
 interface DocumentsTableProps {
   clientOptions: ClientOption[];
   documents: DocumentListItem[];
+  emptyAction?: ReactNode;
   emptyMessage?: string;
   personnelOptions: PersonnelListItem[];
 }
@@ -71,6 +73,7 @@ function expiryTone(expiryDate: string | null) {
 export function DocumentsTable({
   clientOptions,
   documents,
+  emptyAction,
   emptyMessage = 'Nessun documento registrato.',
   personnelOptions,
 }: DocumentsTableProps) {
@@ -79,6 +82,7 @@ export function DocumentsTable({
       <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-6 py-8 text-center">
         <p className="text-sm font-medium text-zinc-700">Archivio vuoto per i filtri correnti</p>
         <p className="mt-1 text-sm text-zinc-500">{emptyMessage}</p>
+        {emptyAction ? <div className="mt-4 flex justify-center">{emptyAction}</div> : null}
       </div>
     );
   }

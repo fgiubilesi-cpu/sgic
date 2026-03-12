@@ -518,4 +518,5 @@ Ordine rigoroso:
 - 2026-03-12: implementati M3-M5 core con parser euristico per categoria (`heuristics_v2`), review UI nel tab documenti cliente, salvataggio review in `document_extraction_reviews` e write-back operativo verso `client_contracts`, `client_contacts`, `client_deadlines`, `client_tasks` con tracciamento entità in `document_entities`
 - 2026-03-12: implementato M7 base con filtro documentale esteso (ricerca testuale + stato intake) e coda review direttamente nella tabella documenti
 - 2026-03-12: implementati M6 + M8 base con dialog `Governance` per storico versioni/review/link operativi, KPI documentali nel dossier cliente, alert su review queue e mismatch contratto
+- 2026-03-12: completato un passaggio M9 sul tab documenti cliente con riepilogo filtri attivi, reset rapido, preset operativi richiamabili dalle code e empty state azionabile per upload / recovery dei filtri
 - 2026-03-12: sistemata la pipeline CSS globale in dev rimuovendo un import non valido da `globals.css`; UI tornata stabile su `3000`

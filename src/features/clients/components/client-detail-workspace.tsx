@@ -252,6 +252,7 @@ export function ClientDetailWorkspace({
   const [taskStatus, setTaskStatus] = useState<'all' | ClientTaskStatus>('all');
   const [taskPriority, setTaskPriority] = useState<'all' | ClientTaskPriority>('all');
   const [docSearch, setDocSearch] = useState('');
+  const [docFocus, setDocFocus] = useState<'all' | 'review' | 'expired' | 'contracts' | 'mismatch' | 'versioned'>('all');
   const [docCategory, setDocCategory] = useState<string>('all');
   const [docStatus, setDocStatus] = useState<string>('all');
   const [docIngestion, setDocIngestion] = useState<string>('all');
@@ -541,7 +542,16 @@ export function ClientDetailWorkspace({
       (docScope === 'client' && Boolean(document.client_id && !document.location_id && !document.personnel_id)) ||
       (docScope === 'location' && Boolean(document.location_id)) ||
       (docScope === 'personnel' && Boolean(document.personnel_id));
-    return matchesSearch && matchesCategory && matchesStatus && matchesIngestion && matchesScope;
+    const matchesFocus =
+      docFocus === 'all' ||
+      (docFocus === 'review' && document.ingestion_status === 'review_required') ||
+      (docFocus === 'expired' &&
+        Boolean(document.expiry_date) &&
+        toDateStart(document.expiry_date as string) < today) ||
+      (docFocus === 'contracts' && document.category === 'Contract') ||
+      (docFocus === 'mismatch' && contractDocumentMismatches.some((item) => item.id === document.id)) ||
+      (docFocus === 'versioned' && document.version_count > 1);
+    return matchesSearch && matchesCategory && matchesStatus && matchesIngestion && matchesScope && matchesFocus;
   });
 
   const filteredDeadlines = aggregatedDeadlines.filter((deadline) => {
@@ -561,6 +571,11 @@ export function ClientDetailWorkspace({
   });
 
   const filteredNotes = notes.filter((note) => noteType === 'all' || note.note_type === noteType);
+  const expiredDocuments = documents.filter((document) => {
+    if (!document.expiry_date) return false;
+    return toDateStart(document.expiry_date) < today;
+  });
+  const versionedDocuments = documents.filter((document) => document.version_count > 1);
 
   const locationInsights = client.locations.map((location) => {
     const locationAudits = audits.filter((audit) => audit.location_id === location.id);
@@ -595,6 +610,20 @@ export function ClientDetailWorkspace({
       }
       toast.success('Contratto aggiornato');
     });
+  };
+
+  const applyDocumentPreset = (preset: 'all' | 'review' | 'expired' | 'contracts' | 'mismatch' | 'versioned') => {
+    setDocFocus(preset);
+    setDocSearch('');
+    setDocStatus('all');
+    setDocIngestion('all');
+    setDocScope('all');
+    setDocCategory('all');
+
+    if (preset === 'review') setDocIngestion('review_required');
+    if (preset === 'contracts' || preset === 'mismatch') {
+      setDocCategory('Contract');
+    }
   };
 
   return (
@@ -1594,6 +1623,75 @@ export function ClientDetailWorkspace({
                   />
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => applyDocumentPreset('all')}
+                      className={
+                        docFocus === 'all'
+                          ? 'rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white'
+                          : 'rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600'
+                      }
+                    >
+                      Tutti
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyDocumentPreset('review')}
+                      className={
+                        docFocus === 'review'
+                          ? 'rounded-full bg-amber-600 px-3 py-1.5 text-xs font-medium text-white'
+                          : 'rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700'
+                      }
+                    >
+                      Da validare
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyDocumentPreset('expired')}
+                      className={
+                        docFocus === 'expired'
+                          ? 'rounded-full bg-rose-600 px-3 py-1.5 text-xs font-medium text-white'
+                          : 'rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700'
+                      }
+                    >
+                      Scaduti
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyDocumentPreset('contracts')}
+                      className={
+                        docFocus === 'contracts'
+                          ? 'rounded-full bg-sky-600 px-3 py-1.5 text-xs font-medium text-white'
+                          : 'rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700'
+                      }
+                    >
+                      Contratti
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyDocumentPreset('mismatch')}
+                      className={
+                        docFocus === 'mismatch'
+                          ? 'rounded-full bg-violet-600 px-3 py-1.5 text-xs font-medium text-white'
+                          : 'rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700'
+                      }
+                    >
+                      Mismatch
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyDocumentPreset('versioned')}
+                      className={
+                        docFocus === 'versioned'
+                          ? 'rounded-full bg-zinc-700 px-3 py-1.5 text-xs font-medium text-white'
+                          : 'rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium text-zinc-700'
+                      }
+                    >
+                      Versionati
+                    </button>
+                  </div>
+
                   {documentReviewQueue.length > 0 || contractDocumentMismatches.length > 0 ? (
                     <div className="grid gap-3 lg:grid-cols-2">
                       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -1624,6 +1722,61 @@ export function ClientDetailWorkspace({
                       Archivio documentale allineato: nessuna review bloccata e nessun mismatch contratto rilevato.
                     </div>
                   )}
+
+                  {(documentReviewQueue.length > 0 ||
+                    contractDocumentMismatches.length > 0 ||
+                    expiredDocuments.length > 0) ? (
+                    <div className="grid gap-3 lg:grid-cols-3">
+                      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                          Review queue
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          {documentReviewQueue.slice(0, 3).map((document) => (
+                            <div key={document.id} className="rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                              <p className="text-sm font-medium text-zinc-900">{document.title || 'Documento senza titolo'}</p>
+                              <p className="text-xs text-zinc-500">{document.category || 'Other'}</p>
+                            </div>
+                          ))}
+                          {documentReviewQueue.length === 0 ? (
+                            <p className="text-sm text-zinc-500">Nessun documento in coda.</p>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                          Documenti scaduti
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          {expiredDocuments.slice(0, 3).map((document) => (
+                            <div key={document.id} className="rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                              <p className="text-sm font-medium text-zinc-900">{document.title || 'Documento senza titolo'}</p>
+                              <p className="text-xs text-zinc-500">Scaduto il {toDateLabel(document.expiry_date)}</p>
+                            </div>
+                          ))}
+                          {expiredDocuments.length === 0 ? (
+                            <p className="text-sm text-zinc-500">Nessun documento scaduto.</p>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                          Mismatch contratto
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          {contractDocumentMismatches.slice(0, 3).map((document) => (
+                            <div key={document.id} className="rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                              <p className="text-sm font-medium text-zinc-900">{document.title || 'Documento senza titolo'}</p>
+                              <p className="text-xs text-zinc-500">Review richiesta sul mapping contratto</p>
+                            </div>
+                          ))}
+                          {contractDocumentMismatches.length === 0 ? (
+                            <p className="text-sm text-zinc-500">Nessun mismatch rilevato.</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="grid gap-3 md:grid-cols-4">
                     <div className="space-y-2 md:col-span-2">

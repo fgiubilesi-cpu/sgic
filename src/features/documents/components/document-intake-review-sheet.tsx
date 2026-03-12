@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { Bot, Link2, SquarePen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -68,6 +69,9 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
   const [reviewerNotes, setReviewerNotes] = useState('');
   const [action, setAction] = useState<ReviewAction>('save_review');
   const [createFollowupTask, setCreateFollowupTask] = useState(false);
+  const [latestIngestionStatus, setLatestIngestionStatus] = useState<string | null>(document.ingestion_status);
+  const [extractedText, setExtractedText] = useState<string | null>(null);
+  const router = useRouter();
 
   const canApplyToWorkspace = Boolean(document.client_id);
 
@@ -86,6 +90,8 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
         setProposal(result.data.proposal);
         setReviewerNotes(result.data.reviewerNotes ?? '');
         setAction((result.data.action as ReviewAction) ?? 'save_review');
+        setLatestIngestionStatus(result.data.latestIngestionStatus ?? document.ingestion_status);
+        setExtractedText(result.data.extractedText ?? null);
       })
       .catch(() => {
         if (!active) return;
@@ -124,6 +130,7 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
           ? 'Dati applicati al workspace cliente'
           : 'Review documento salvata'
       );
+      router.refresh();
       setOpen(false);
     });
   };
@@ -210,12 +217,21 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Badge variant="outline">Categoria: {category}</Badge>
-                <Badge variant="outline">Intake: {ingestionLabel(document.ingestion_status)}</Badge>
+                <Badge variant="outline">Intake: {ingestionLabel(latestIngestionStatus)}</Badge>
                 <Badge variant="outline">Confidenza: {confidenceLabel(proposal.confidence)}</Badge>
               </div>
               <p className="mt-2">Documento: {document.title || 'Senza titolo'}</p>
               <p>Contesto: {scopeHint(document)}</p>
             </div>
+
+            {extractedText ? (
+              <div className="space-y-2 rounded-md border border-zinc-200 bg-white p-3">
+                <Label>Anteprima testo estratto</Label>
+                <div className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-md bg-zinc-50 p-3 text-xs text-zinc-600">
+                  {extractedText.slice(0, 1600)}
+                </div>
+              </div>
+            ) : null}
 
             <div className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700">
               {canApplyToWorkspace

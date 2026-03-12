@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -308,6 +309,8 @@ export function ClientDetailWorkspace({
   });
   const [savingContract, startSavingContract] = useTransition();
   const [reprocessingContractDocument, startReprocessingContractDocument] = useTransition();
+  const router = useRouter();
+  const contractProposalAutofillRef = useRef<string | null>(null);
   const isClientActive = client.is_active ?? true;
   const locationMap = useMemo(
     () => new Map(client.locations.map((location) => [location.id, location.name])),
@@ -318,6 +321,9 @@ export function ClientDetailWorkspace({
     date.setHours(0, 0, 0, 0);
     return date;
   }, []);
+  const contractDocuments = documents.filter((document) => isContractLikeDocument(document));
+  const latestContractDocument = contractDocuments[0] ?? null;
+  const latestContractProposal = latestContractDocument ? getContractProposal(latestContractDocument) : null;
 
   useEffect(() => {
     setContractForm({
@@ -333,6 +339,38 @@ export function ClientDetailWorkspace({
       attachment_url: contract?.attachment_url ?? '',
     });
   }, [contract]);
+
+  useEffect(() => {
+    if (!latestContractDocument || !latestContractProposal) return;
+
+    const formIsEmpty =
+      !contractForm.start_date &&
+      !contractForm.renewal_date &&
+      !contractForm.end_date &&
+      !contractForm.service_scope &&
+      !contractForm.activity_frequency &&
+      !contractForm.internal_owner &&
+      !contractForm.notes &&
+      (!contractForm.contract_type || contractForm.contract_type === 'standard');
+
+    if (!formIsEmpty) return;
+    if (contractProposalAutofillRef.current === latestContractDocument.id) return;
+
+    contractProposalAutofillRef.current = latestContractDocument.id;
+    setContractForm((prev) => ({
+      ...prev,
+      contract_type: latestContractProposal.contract_type?.trim() || prev.contract_type,
+      start_date: latestContractProposal.start_date?.trim() || prev.start_date,
+      renewal_date: latestContractProposal.renewal_date?.trim() || prev.renewal_date,
+      end_date: latestContractProposal.end_date?.trim() || prev.end_date,
+      activity_frequency:
+        latestContractProposal.activity_frequency?.trim() || prev.activity_frequency,
+      service_scope: latestContractProposal.service_scope?.trim() || prev.service_scope,
+      internal_owner: latestContractProposal.internal_owner?.trim() || prev.internal_owner,
+      notes: latestContractProposal.notes?.trim() || prev.notes,
+      attachment_url: preferredDocumentAccessUrl(latestContractDocument) ?? prev.attachment_url,
+    }));
+  }, [contractForm, latestContractDocument, latestContractProposal]);
 
   const aggregatedDeadlines = useMemo<AggregatedDeadline[]>(() => {
     const list: AggregatedDeadline[] = [];
@@ -449,9 +487,6 @@ export function ClientDetailWorkspace({
   );
   const linkedDocumentCount = documents.filter((document) => document.ingestion_status === 'linked').length;
   const versionedDocumentCount = documents.filter((document) => document.version_count > 1).length;
-  const contractDocuments = documents.filter((document) => isContractLikeDocument(document));
-  const latestContractDocument = contractDocuments[0] ?? null;
-  const latestContractProposal = latestContractDocument ? getContractProposal(latestContractDocument) : null;
   const contractAttachmentUrl =
     preferredDocumentAccessUrl(latestContractDocument) ?? contractForm.attachment_url ?? null;
   const contractDocumentMismatches = documents.filter((document) => {
@@ -679,7 +714,8 @@ export function ClientDetailWorkspace({
         return;
       }
 
-      toast.success('Documento riletto. Riapri la review o aggiorna la pagina per vedere la nuova proposta.');
+      router.refresh();
+      toast.success('Documento riletto. La proposta è stata aggiornata.');
     });
   };
 

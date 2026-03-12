@@ -183,6 +183,21 @@ function firstLabeledDate(input: string, labels: string[]) {
   return parseDateCandidate(value) ?? firstDateInText(value ?? '');
 }
 
+function extractSectionAfterLabels(input: string, labels: string[]) {
+  for (const label of labels) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(
+      `${escaped}\\s*[:\\-]?\\s*([\\s\\S]{0,400}?)(?:\\n\\s*\\n|\\n[A-Z][^\\n]{0,60}:|$)`,
+      'i'
+    );
+    const match = input.match(regex);
+    const value = match?.[1]?.replace(/\s+/g, ' ').trim();
+    if (value) return value;
+  }
+
+  return null;
+}
+
 function excerptAroundKeyword(input: string, keywords: string[]) {
   const lower = input.toLowerCase();
   for (const keyword of keywords) {
@@ -199,7 +214,42 @@ function compact(input?: string | null) {
   return (input ?? '').trim();
 }
 
+function addMonths(dateIso: string, months: number) {
+  const date = new Date(dateIso);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setMonth(date.getMonth() + months);
+  return date.toISOString().slice(0, 10);
+}
+
+function deriveEndDateFromDuration(input: string, startDate: string | null | undefined) {
+  if (!startDate) return null;
+
+  const durationLine = firstLabeledValue(input, ['durata', 'durata contratto']);
+  const source = durationLine ?? excerptAroundKeyword(input, ['durata']);
+  if (!source) return null;
+
+  const monthsMatch = source.match(/(\d{1,2})\s*mes/i);
+  if (monthsMatch) {
+    return addMonths(startDate, Number.parseInt(monthsMatch[1], 10));
+  }
+
+  const yearsMatch = source.match(/(\d{1,2})\s*ann/i);
+  if (yearsMatch) {
+    return addMonths(startDate, Number.parseInt(yearsMatch[1], 10) * 12);
+  }
+
+  if (source.toLowerCase().includes('annuale')) return addMonths(startDate, 12);
+  if (source.toLowerCase().includes('biennale')) return addMonths(startDate, 24);
+  if (source.toLowerCase().includes('triennale')) return addMonths(startDate, 36);
+
+  return null;
+}
+
 function deriveContractType(text: string) {
+  if (text.includes('offerta')) return 'offerta';
+  if (text.includes('consulenza')) return 'consulenza';
+  if (text.includes('abbonamento')) return 'abbonamento';
+  if (text.includes('incarico')) return 'incarico';
   if (text.includes('annuale')) return 'annuale';
   if (text.includes('biennale')) return 'biennale';
   if (text.includes('triennale')) return 'triennale';
@@ -253,14 +303,19 @@ export function buildIntakeProposalFromDocument(source: DocumentProposalSource):
 
   if (category === 'Contract') {
     const startDate =
-      firstLabeledDate(fullText, ['data inizio', 'decorrenza', 'inizio servizio']) ?? issueDate;
+      firstLabeledDate(fullText, ['data inizio', 'decorrenza', 'inizio servizio', 'validita dal', 'validità dal']) ??
+      issueDate;
     const renewalDate =
-      firstLabeledDate(fullText, ['data rinnovo', 'rinnovo', 'renewal']) ?? expiryDate;
+      firstLabeledDate(fullText, ['data rinnovo', 'rinnovo', 'renewal', 'tacito rinnovo']) ??
+      expiryDate;
+    const derivedEndDate = deriveEndDateFromDuration(fullText, startDate);
     const endDate =
-      firstLabeledDate(fullText, ['data scadenza', 'scadenza', 'termine contratto', 'fine contratto']) ??
+      firstLabeledDate(fullText, ['data scadenza', 'scadenza', 'termine contratto', 'fine contratto', 'valido fino al']) ??
+      derivedEndDate ??
       renewalDate ??
       expiryDate;
     const serviceScope =
+      extractSectionAfterLabels(fullText, ['oggetto', 'servizi inclusi', 'servizio', 'attivita', 'attività', 'prestazioni']) ??
       firstLabeledValue(fullText, ['oggetto', 'servizi inclusi', 'servizio', 'attivita', 'attività']) ??
       excerptAroundKeyword(fullText, ['oggetto', 'servizi', 'attività', 'attivita']) ??
       description ??
@@ -272,14 +327,23 @@ export function buildIntakeProposalFromDocument(source: DocumentProposalSource):
       renewal_date: renewalDate,
       end_date: endDate,
       activity_frequency:
-        firstLabeledValue(fullText, ['frequenza', 'cadenza', 'periodicita', 'periodicità']) ??
+        firstLabeledValue(fullText, ['frequenza', 'cadenza', 'periodicita', 'periodicità', 'sopralluoghi']) ??
         deriveFrequency(lower),
       service_scope: serviceScope,
       internal_owner:
-        firstLabeledValue(fullText, ['referente interno', 'owner interno', 'owner']) ??
+        firstLabeledValue(fullText, ['referente interno', 'owner interno', 'owner', 'referente commerciale', 'account manager']) ??
         firstRegexGroup(description, /owner[:\s]+([^,;\n]+)/i),
       notes: extractedText?.slice(0, 500) ?? description ?? null,
     };
+
+    if (!payload.deadline && (renewalDate || endDate)) {
+      payload.deadline = {
+        due_date: renewalDate ?? endDate,
+        priority: derivePriorityByDate(renewalDate ?? endDate),
+        title: `Rinnovo ${title}`,
+        description: 'Scadenza estratta dal contratto',
+      };
+    }
   }
 
   if (category === 'OrgChart') {

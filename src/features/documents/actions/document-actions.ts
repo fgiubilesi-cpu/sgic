@@ -67,7 +67,7 @@ async function getLatestIngestion(
 ) {
   const { data, error } = await ctx.supabase
     .from('document_ingestions')
-    .select('id, status, extracted_payload, created_at')
+    .select('id, status, extracted_payload, extracted_text, created_at')
     .eq('organization_id', ctx.organizationId)
     .eq('document_id', documentId)
     .order('created_at', { ascending: false })
@@ -677,6 +677,9 @@ export async function getDocumentIntakeData(documentId: string) {
       success: true as const,
       data: {
         action: latestReview?.review_action ?? 'save_review',
+        extractedText:
+          latestIngestion?.extracted_text ??
+          (typeof documentPayloadObj?.extracted_text === 'string' ? documentPayloadObj.extracted_text : null),
         latestIngestionId: latestIngestion?.id ?? null,
         latestIngestionStatus: latestIngestion?.status ?? null,
         proposal,

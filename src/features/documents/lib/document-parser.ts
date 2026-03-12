@@ -43,8 +43,42 @@ function inferFormat(fileName: string | null | undefined, mimeType: string | nul
   ) {
     return 'text';
   }
+  if (
+    lowerMime.startsWith('image/') ||
+    lowerName.endsWith('.png') ||
+    lowerName.endsWith('.jpg') ||
+    lowerName.endsWith('.jpeg') ||
+    lowerName.endsWith('.heic') ||
+    lowerName.endsWith('.heif') ||
+    lowerName.endsWith('.tif') ||
+    lowerName.endsWith('.tiff')
+  ) {
+    return 'image';
+  }
 
   return 'unknown';
+}
+
+const PDF_TEXT_MIN_LENGTH = 80;
+
+async function extractTextWithVisionOcr(options: {
+  buffer: Buffer;
+  extension: string;
+}) {
+  const tempDir = await mkdtemp(join(tmpdir(), 'sgic-ocr-'));
+  const inputPath = join(tempDir, `input${options.extension}`);
+  const scriptPath = join(process.cwd(), 'scripts', 'ocr.swift');
+
+  try {
+    await writeFile(inputPath, options.buffer);
+    const { stdout } = await execFileAsync('swift', [scriptPath, inputPath], {
+      maxBuffer: 20 * 1024 * 1024,
+    });
+
+    return normalizeExtractedText(stdout);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+  }
 }
 
 export async function extractTextFromDocumentBuffer(options: {
@@ -59,9 +93,34 @@ export async function extractTextFromDocumentBuffer(options: {
     const parser = new PDFParse({ data: new Uint8Array(options.buffer) });
     try {
       const result = await parser.getText();
+      const parsedText = normalizeExtractedText(result.text);
+
+      if (parsedText && parsedText.length >= PDF_TEXT_MIN_LENGTH) {
+        return {
+          parserType: 'pdf_text_v1',
+          text: parsedText,
+        };
+      }
+
+      try {
+        const ocrText = await extractTextWithVisionOcr({
+          buffer: options.buffer,
+          extension: '.pdf',
+        });
+
+        if (ocrText) {
+          return {
+            parserType: 'pdf_ocr_v1',
+            text: ocrText,
+          };
+        }
+      } catch {
+        // Fallback to the best text extraction already available.
+      }
+
       return {
         parserType: 'pdf_text_v1',
-        text: normalizeExtractedText(result.text),
+        text: parsedText,
       };
     } finally {
       await parser.destroy().catch(() => undefined);
@@ -106,6 +165,24 @@ export async function extractTextFromDocumentBuffer(options: {
       parserType: 'plain_text_v1',
       text: normalizeExtractedText(new TextDecoder('utf-8').decode(options.buffer)),
     };
+  }
+
+  if (format === 'image') {
+    try {
+      const extension = options.fileName?.toLowerCase().match(/\.[^.]+$/)?.[0] ?? '.png';
+      return {
+        parserType: 'image_ocr_v1',
+        text: await extractTextWithVisionOcr({
+          buffer: options.buffer,
+          extension,
+        }),
+      };
+    } catch {
+      return {
+        parserType: 'image_ocr_v1',
+        text: null,
+      };
+    }
   }
 
   return {

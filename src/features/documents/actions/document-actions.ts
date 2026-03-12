@@ -107,7 +107,7 @@ function asObject(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
-function buildFallbackProposal(document: DocumentRow) {
+function buildFallbackProposal(document: DocumentRow, parser: string = 'filename_heuristics_v1') {
   return buildIntakeProposalFromDocument({
     category: document.category,
     description: document.description,
@@ -115,6 +115,7 @@ function buildFallbackProposal(document: DocumentRow) {
     expiry_date: document.expiry_date,
     file_name: document.file_name,
     issue_date: document.issue_date,
+    parser,
     title: document.title,
   });
 }
@@ -139,7 +140,7 @@ async function buildDocumentIntakePayload(
         },
         extracted_at: nowIso,
         extracted_text: null,
-        proposal: fallbackProposal,
+        proposal: buildFallbackProposal(document, 'manual_v1'),
         source: 'manual_v1',
       },
       status: 'manual' as const,
@@ -184,6 +185,7 @@ async function buildDocumentIntakePayload(
       expiry_date: document.expiry_date,
       file_name: document.file_name,
       issue_date: document.issue_date,
+      parser: extraction.parserType,
       title: document.title,
     });
 

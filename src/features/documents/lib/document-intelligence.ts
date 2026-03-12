@@ -10,6 +10,7 @@ export interface DocumentProposalSource {
   extracted_text?: string | null;
   file_name?: string | null;
   issue_date?: string | null;
+  parser?: string | null;
   title?: string | null;
 }
 
@@ -127,6 +128,7 @@ export function buildInitialExtractionPayload(options: {
   const proposal = buildIntakeProposalFromDocument({
     category,
     file_name: originalFileName,
+    parser: 'filename_heuristics_v1',
     title,
   });
 
@@ -760,7 +762,7 @@ export function buildIntakeProposalFromDocument(source: DocumentProposalSource):
 
   const payload: DocumentIntakeProposal = {
     confidence: extractedText ? 'high' : category === 'Other' ? 'low' : 'medium',
-    parser: 'heuristics_v2',
+    parser: compact(source.parser) || 'heuristics_v2',
     summary: summaryBase,
   };
 

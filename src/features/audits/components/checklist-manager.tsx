@@ -8,13 +8,33 @@ import type { AuditOutcome } from "@/features/audits/schemas/audit-schema";
 import type { NonConformity } from "@/features/audits/queries/get-non-conformities";
 import { ChecklistRow } from "./checklist-row";
 
+type PersistChecklistItemInput = {
+  itemId: string;
+  notes?: string;
+  outcome?: AuditOutcome;
+};
+
 type ChecklistManagerProps = {
   audit: AuditWithChecklists;
   nonConformities?: NonConformity[];
+  offlineNcItemIds?: string[];
+  onPersistItem?: (input: PersistChecklistItemInput) => Promise<{
+    error?: string;
+    ncCancelled?: boolean;
+    ncCreated?: boolean;
+    offline?: boolean;
+    success?: boolean;
+  }>;
   readOnly?: boolean;
 };
 
-export function ChecklistManager({ audit, nonConformities = [], readOnly = false }: ChecklistManagerProps) {
+export function ChecklistManager({
+  audit,
+  nonConformities = [],
+  offlineNcItemIds = [],
+  onPersistItem,
+  readOnly = false,
+}: ChecklistManagerProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -32,7 +52,10 @@ export function ChecklistManager({ audit, nonConformities = [], readOnly = false
     }
   }, [fullscreen]);
 
-  const ncItemIds = new Set(nonConformities.map((nc) => nc.checklistItemId));
+  const ncItemIds = new Set([
+    ...nonConformities.map((nc) => nc.checklistItemId),
+    ...offlineNcItemIds,
+  ]);
 
   if (!audit.checklists || !audit.checklists.length) {
     return (
@@ -131,12 +154,12 @@ export function ChecklistManager({ audit, nonConformities = [], readOnly = false
                   initialOutcome={(item.outcome as AuditOutcome) ?? "pending"}
                   initialNotes={item.notes ?? null}
                   initialEvidenceUrl={item.evidence_url ?? null}
-                  initialAudioUrl={item.audio_url ?? null}
                   auditId={audit.id}
                   isSelected={selectedItemId === item.id}
-                  hasNc={ncItemIds.has(item.id)}
+                  hasNc={ncItemIds.has(item.id) || item.outcome === "non_compliant"}
                   onSelect={() => setSelectedItemId(item.id)}
                   path={`/audits/${audit.id}`}
+                  persistItem={onPersistItem}
                   readOnly={readOnly}
                 />
               ))
@@ -199,12 +222,12 @@ export function ChecklistManager({ audit, nonConformities = [], readOnly = false
                         initialOutcome={(item.outcome as AuditOutcome) ?? "pending"}
                         initialNotes={item.notes ?? null}
                         initialEvidenceUrl={item.evidence_url ?? null}
-                        initialAudioUrl={item.audio_url ?? null}
                         auditId={audit.id}
                         isSelected={selectedItemId === item.id}
-                        hasNc={ncItemIds.has(item.id)}
+                        hasNc={ncItemIds.has(item.id) || item.outcome === "non_compliant"}
                         onSelect={() => setSelectedItemId(item.id)}
                         path={`/audits/${audit.id}`}
+                        persistItem={onPersistItem}
                         readOnly={readOnly}
                       />
                     ))

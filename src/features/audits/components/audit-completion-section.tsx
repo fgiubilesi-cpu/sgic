@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import type { AuditWithChecklists } from "@/features/audits/queries/get-audit";
 import type { AuditSummary } from "@/features/audits/queries/get-audit-summary";
 import { completeAudit } from "@/features/audits/actions/audit-completion-actions";
+import { useSync } from "@/lib/offline/sync-provider";
 
 interface AuditCompletionSectionProps {
   audit: AuditWithChecklists;
@@ -24,8 +25,14 @@ export function AuditCompletionSection({
   summary,
 }: AuditCompletionSectionProps) {
   const [isCompleting, setIsCompleting] = useState(false);
+  const { isOnline } = useSync();
 
   const handleCompleteAudit = async () => {
+    if (!isOnline) {
+      toast.info("Il completamento audit richiede connessione. Sincronizza prima la checklist offline.");
+      return;
+    }
+
     if (summary.openNonConformities > 0) {
       const confirmComplete = confirm(
         `This audit has ${summary.openNonConformities} open non-conformities. Are you sure you want to complete the audit?`
@@ -161,10 +168,10 @@ export function AuditCompletionSection({
           <div className="pt-4 flex gap-2 justify-end">
             <Button
               onClick={handleCompleteAudit}
-              disabled={isCompleting}
+              disabled={isCompleting || !isOnline}
               className="bg-green-600 hover:bg-green-700"
             >
-              {isCompleting ? "Completing..." : "Complete Audit"}
+              {isCompleting ? "Completing..." : !isOnline ? "Serve connessione" : "Complete Audit"}
             </Button>
           </div>
         )}

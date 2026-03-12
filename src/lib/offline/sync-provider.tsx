@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, SyncQueueItem } from './db';
 import { createClient } from '../supabase/client';
+import { patchOfflineAuditChecklistItem } from '@/lib/offline/audit-cache';
 
 interface SyncContextType {
     isOnline: boolean;
@@ -21,7 +22,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
     // Real-time count of pending sync items
     const pendingCount = useLiveQuery(
-        () => db.sync_queue.where('status').equals('pending').count(),
+        async () => {
+            const items = await db.sync_queue.toArray();
+            return items.filter((item) => item.status === 'pending' || item.status === 'failed').length;
+        },
         []
     ) ?? 0;
 
@@ -54,7 +58,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         setSyncInProgress(true);
 
         try {
-            const pendingItems = await db.sync_queue.where('status').equals('pending').toArray();
+            const queuedItems = await db.sync_queue.toArray();
+            const pendingItems = queuedItems
+                .filter((item) => item.status === 'pending' || item.status === 'failed')
+                .sort((left, right) => left.createdAt - right.createdAt);
+
             if (pendingItems.length === 0) {
                 setSyncInProgress(false);
                 return;
@@ -68,12 +76,31 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
                 try {
                     await executeAction(item);
                     await db.sync_queue.delete(item.id);
+                    window.dispatchEvent(
+                        new CustomEvent('sgic-sync-complete', {
+                            detail: {
+                                actionType: item.actionType,
+                                auditId: item.payload?.auditId ?? null,
+                                itemId: item.payload?.itemId ?? null,
+                            },
+                        })
+                    );
                 } catch (error: any) {
                     console.error(`Failed to sync item ${item.id}:`, error);
                     await db.sync_queue.update(item.id, {
                         status: 'failed',
                         error: error.message || 'Unknown error'
                     });
+                    window.dispatchEvent(
+                        new CustomEvent('sgic-sync-failed', {
+                            detail: {
+                                actionType: item.actionType,
+                                auditId: item.payload?.auditId ?? null,
+                                itemId: item.payload?.itemId ?? null,
+                                error: error.message || 'Unknown error',
+                            },
+                        })
+                    );
                 }
             }
         } finally {
@@ -111,6 +138,29 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
                 const res = await uploadEvidencePhoto(formData);
                 if (res.error) throw new Error(res.error);
+                break;
+            }
+            case 'UPLOAD_CHECKLIST_MEDIA': {
+                const { uploadChecklistMedia } = await import('@/features/audits/actions');
+                const formData = new FormData();
+                formData.append("file", item.payload.file);
+                formData.append("auditId", item.payload.auditId);
+                formData.append("itemId", item.payload.itemId);
+                formData.append("type", item.payload.type);
+                formData.append("path", item.payload.path);
+
+                const res = await uploadChecklistMedia(formData);
+                if (!res.success) throw new Error(res.error ?? 'Errore sync media offline.');
+
+                if (item.payload.type === 'evidence') {
+                    await patchOfflineAuditChecklistItem({
+                        auditId: item.payload.auditId,
+                        itemId: item.payload.itemId,
+                        patch: {
+                            evidence_url: res.url ?? null,
+                        },
+                    });
+                }
                 break;
             }
             default:

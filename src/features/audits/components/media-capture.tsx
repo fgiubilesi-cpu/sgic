@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Camera, Loader2, Trash2, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,18 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useSync } from "@/lib/offline/sync-provider";
+import { patchOfflineAuditChecklistItem } from "@/lib/offline/audit-cache";
+import { db } from "@/lib/offline/db";
+
+async function fileToDataUrl(file: File) {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(reader.error ?? new Error("Impossibile leggere il file."));
+    reader.readAsDataURL(file);
+  });
+}
 
 interface MediaCaptureProps {
   itemId: string;
@@ -34,14 +46,64 @@ export function MediaCapture({
   const [isLoading, setIsLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { isOnline } = useSync();
 
   const isVideo = url
     ? /\.(mp4|webm|mov|avi)(\?|$)/i.test(url)
     : false;
 
+  useEffect(() => {
+    setUrl(currentUrl ?? null);
+  }, [currentUrl]);
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!isOnline) {
+      if (!file.type.startsWith("image/")) {
+        toast.info("Offline supporta solo foto. Video ed altri media richiedono connessione.");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const uploadFile = await compressEvidenceImage(file);
+        const previewUrl = await fileToDataUrl(uploadFile);
+
+        await db.sync_queue.add({
+          actionType: "UPLOAD_CHECKLIST_MEDIA",
+          createdAt: Date.now(),
+          id: crypto.randomUUID(),
+          payload: {
+            auditId,
+            file: uploadFile,
+            itemId,
+            path,
+            type: "evidence",
+          },
+          status: "pending",
+        });
+
+        await patchOfflineAuditChecklistItem({
+          auditId,
+          itemId,
+          patch: {
+            evidence_url: previewUrl,
+          },
+        });
+
+        setUrl(previewUrl);
+        onUrlChange?.(previewUrl);
+        toast.success("Foto salvata offline. Verrà caricata appena torna la connessione.");
+      } catch {
+        toast.error("Impossibile salvare la foto offline.");
+      } finally {
+        setIsLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -79,6 +141,39 @@ export function MediaCapture({
   };
 
   const handleDelete = async () => {
+    if (!isOnline) {
+      const pendingUploads = await db.sync_queue
+        .where("actionType")
+        .equals("UPLOAD_CHECKLIST_MEDIA")
+        .toArray();
+
+      const relatedUploads = pendingUploads.filter(
+        (item) =>
+          item.payload?.auditId === auditId &&
+          item.payload?.itemId === itemId &&
+          item.payload?.type === "evidence"
+      );
+
+      if (relatedUploads.length === 0) {
+        toast.info("La rimozione di media già sincronizzati richiede connessione.");
+        return;
+      }
+
+      await db.sync_queue.bulkDelete(relatedUploads.map((item) => item.id));
+      await patchOfflineAuditChecklistItem({
+        auditId,
+        itemId,
+        patch: {
+          evidence_url: null,
+        },
+      });
+      setUrl(null);
+      onUrlChange?.(null);
+      setDialogOpen(false);
+      toast.success("Foto offline rimossa.");
+      return;
+    }
+
     setIsLoading(true);
     try {
       const formData = new FormData();
@@ -122,6 +217,10 @@ export function MediaCapture({
         type="button"
         onClick={(e) => {
           e.stopPropagation();
+          if (!isOnline) {
+            toast.info("Le evidenze media offline non sono ancora supportate.");
+            return;
+          }
           if (url) {
             setDialogOpen(true);
           } else {

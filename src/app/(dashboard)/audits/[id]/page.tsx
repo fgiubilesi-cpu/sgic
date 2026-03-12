@@ -9,7 +9,7 @@ import { getAllTemplates } from "@/features/audits/queries/get-templates";
 import { canManageTemplates } from "@/lib/user-roles";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import { AuditStatusBadge } from "@/features/audits/components/audit-status-badge";
-import { ChecklistManager } from "@/features/audits/components/checklist-manager";
+import { AuditChecklistWorkspace } from "@/features/audits/components/audit-checklist-workspace";
 import { AuditStats } from "@/features/audits/components/audit-stats";
 import { NcAcTab } from "@/features/audits/components/nc-ac-tab";
 import { TemplateTab } from "@/features/audits/components/template-tab";
@@ -170,7 +170,11 @@ export default async function AuditDetailPage({
       {/* Tab content */}
       {activeTab === "checklist" && (
         <>
-          <ChecklistManager audit={audit} nonConformities={nonConformities} readOnly={isReadOnly} />
+          <AuditChecklistWorkspace
+            audit={audit}
+            nonConformities={nonConformities}
+            readOnly={isReadOnly}
+          />
           {!isReadOnly && <AuditCompletionSection audit={audit} summary={summary} />}
         </>
       )}

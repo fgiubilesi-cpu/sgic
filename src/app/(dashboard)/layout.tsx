@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { NetworkStatus } from "@/components/network-status";
 import {
   ClipboardCheck,
   Home as HomeIcon,
@@ -225,6 +226,8 @@ export default async function DashboardLayout({
 
             {/* User menu desktop */}
             <div className="hidden md:flex items-center gap-3 flex-1 justify-end">
+              <NetworkStatus />
+              <Separator orientation="vertical" className="h-6" />
               <GlobalSearchLauncher />
               <Separator orientation="vertical" className="h-6" />
               <UserNav user={dashboardUser} />

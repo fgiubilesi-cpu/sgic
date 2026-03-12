@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useOptimistic, startTransition, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Check, X, Minus, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { updateChecklistItem } from "@/features/audits/actions";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { MediaCapture } from "./media-capture";
-import { AudioRecorder } from "./audio-recorder";
 import type { AuditOutcome } from "@/features/audits/schemas/audit-schema";
 
 interface ChecklistRowProps {
@@ -18,20 +17,24 @@ interface ChecklistRowProps {
   initialOutcome: AuditOutcome;
   initialNotes: string | null;
   initialEvidenceUrl: string | null;
-  initialAudioUrl: string | null;
   auditId: string;
   isSelected: boolean;
   hasNc?: boolean;
   onSelect: () => void;
   path: string;
+  persistItem?: (input: {
+    itemId: string;
+    notes?: string;
+    outcome?: AuditOutcome;
+  }) => Promise<{
+    error?: string;
+    ncCancelled?: boolean;
+    ncCreated?: boolean;
+    offline?: boolean;
+    success?: boolean;
+  }>;
   readOnly?: boolean;
 }
-
-type OptimisticState = {
-  outcome: AuditOutcome;
-  evidenceUrl: string | null;
-  audioUrl: string | null;
-};
 
 export function ChecklistRow({
   id,
@@ -40,34 +43,34 @@ export function ChecklistRow({
   initialOutcome,
   initialNotes,
   initialEvidenceUrl,
-  initialAudioUrl,
   auditId,
   isSelected,
   hasNc = false,
   onSelect,
   path,
+  persistItem,
   readOnly = false,
 }: ChecklistRowProps) {
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { isListening, transcript, startListening, stopListening, isSupported } =
     useSpeechRecognition();
 
-  // BUG-1 FIX: local state for notes — never reset by useOptimistic transitions
   const [localNotes, setLocalNotes] = useState(initialNotes ?? "");
+  const [localOutcome, setLocalOutcome] = useState(initialOutcome);
+  const [localEvidenceUrl, setLocalEvidenceUrl] = useState(initialEvidenceUrl);
 
-  const [optimisticItem, setOptimisticItem] = useOptimistic<
-    OptimisticState,
-    Partial<OptimisticState>
-  >(
-    {
-      outcome: initialOutcome,
-      evidenceUrl: initialEvidenceUrl,
-      audioUrl: initialAudioUrl,
-    },
-    (state, newValues) => ({ ...state, ...newValues })
-  );
+  useEffect(() => {
+    setLocalNotes(initialNotes ?? "");
+  }, [initialNotes]);
 
-  // BUG-2 FIX: appendTranscript uses localNotes ref to avoid stale closure
+  useEffect(() => {
+    setLocalOutcome(initialOutcome);
+  }, [initialOutcome]);
+
+  useEffect(() => {
+    setLocalEvidenceUrl(initialEvidenceUrl);
+  }, [initialEvidenceUrl]);
+
   const localNotesRef = useRef(localNotes);
   useEffect(() => {
     localNotesRef.current = localNotes;
@@ -75,19 +78,27 @@ export function ChecklistRow({
 
   const saveNotes = useCallback(
     (notes: string) => {
-      const formData = new FormData();
-      formData.append("itemId", id);
-      formData.append("notes", notes);
-      formData.append("path", path);
-      updateChecklistItem(formData).then((result) => {
+      const executeSave = persistItem
+        ? persistItem({ itemId: id, notes })
+        : (() => {
+            const formData = new FormData();
+            formData.append("itemId", id);
+            formData.append("notes", notes);
+            formData.append("path", path);
+            return updateChecklistItem(formData);
+          })();
+
+      executeSave.then((result) => {
         if ("error" in result) {
           toast.error(result.error ?? "Failed to save note.");
+        } else if ("offline" in result && result.offline) {
+          toast.info("Note salvate offline.");
         } else {
           toast.success("Note salvate.");
         }
       });
     },
-    [id, path]
+    [id, path, persistItem]
   );
 
   const appendTranscript = useCallback(
@@ -115,27 +126,32 @@ export function ChecklistRow({
   }, []);
 
   const handleOutcomeChange = async (newOutcome: AuditOutcome) => {
-    startTransition(() => {
-      setOptimisticItem({ outcome: newOutcome });
-    });
+    const previousOutcome = localOutcome;
+    setLocalOutcome(newOutcome);
 
-    const formData = new FormData();
-    formData.append("itemId", id);
-    formData.append("outcome", newOutcome);
-    formData.append("path", path);
+    const result = persistItem
+      ? await persistItem({ itemId: id, outcome: newOutcome })
+      : await (async () => {
+          const formData = new FormData();
+          formData.append("itemId", id);
+          formData.append("outcome", newOutcome);
+          formData.append("path", path);
+          return updateChecklistItem(formData);
+        })();
 
-    const result = await updateChecklistItem(formData);
     if ("error" in result) {
+      setLocalOutcome(previousOutcome);
       toast.error(result.error ?? "Failed to save outcome.");
     } else if (result.ncCreated) {
       toast.info("Non conformità registrata automaticamente.");
     } else if (result.ncCancelled) {
       toast.info("Non conformità annullata.");
+    } else if ("offline" in result && result.offline) {
+      toast.info("Esito salvato offline.");
     }
   };
 
   const handleNotesChange = (newNotes: string) => {
-    // BUG-1 FIX: update local state directly — no useOptimistic for notes
     setLocalNotes(newNotes);
 
     if (debounceTimeoutRef.current) {
@@ -152,9 +168,9 @@ export function ChecklistRow({
 
   // Border color based on outcome state
   const stateBorderClass =
-    optimisticItem.outcome === "compliant" ? "border-l-green-500" :
-    optimisticItem.outcome === "non_compliant" ? "border-l-red-500" :
-    optimisticItem.outcome === "not_applicable" ? "border-l-gray-300" :
+    localOutcome === "compliant" ? "border-l-green-500" :
+    localOutcome === "non_compliant" ? "border-l-red-500" :
+    localOutcome === "not_applicable" ? "border-l-gray-300" :
     "border-l-transparent";
 
   return (
@@ -196,7 +212,7 @@ export function ChecklistRow({
           className={cn(
             "inline-flex items-center justify-center w-7 h-7 rounded border-2 transition-colors",
             readOnly && "opacity-50 cursor-not-allowed",
-            optimisticItem.outcome === "compliant"
+            localOutcome === "compliant"
               ? "border-green-600 bg-green-100 text-green-700"
               : "border-zinc-300 bg-white text-zinc-400 hover:border-green-300"
           )}
@@ -217,7 +233,7 @@ export function ChecklistRow({
           className={cn(
             "inline-flex items-center justify-center w-7 h-7 rounded border-2 transition-colors",
             readOnly && "opacity-50 cursor-not-allowed",
-            optimisticItem.outcome === "non_compliant"
+            localOutcome === "non_compliant"
               ? "border-red-600 bg-red-100 text-red-700"
               : "border-zinc-300 bg-white text-zinc-400 hover:border-red-300"
           )}
@@ -238,7 +254,7 @@ export function ChecklistRow({
           className={cn(
             "inline-flex items-center justify-center w-7 h-7 rounded border-2 transition-colors",
             readOnly && "opacity-50 cursor-not-allowed",
-            optimisticItem.outcome === "not_applicable"
+            localOutcome === "not_applicable"
               ? "border-gray-600 bg-gray-100 text-gray-700"
               : "border-zinc-300 bg-white text-zinc-400 hover:border-gray-300"
           )}
@@ -303,20 +319,9 @@ export function ChecklistRow({
           <MediaCapture
             itemId={id}
             auditId={auditId}
-            currentUrl={optimisticItem.evidenceUrl}
+            currentUrl={localEvidenceUrl}
             path={path}
-            onUrlChange={(newUrl) =>
-              startTransition(() => setOptimisticItem({ evidenceUrl: newUrl }))
-            }
-          />
-          <AudioRecorder
-            itemId={id}
-            auditId={auditId}
-            currentUrl={optimisticItem.audioUrl}
-            path={path}
-            onUrlChange={(newUrl) =>
-              startTransition(() => setOptimisticItem({ audioUrl: newUrl }))
-            }
+            onUrlChange={setLocalEvidenceUrl}
           />
         </div>
       </td>

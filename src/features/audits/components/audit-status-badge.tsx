@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { AuditStatus } from "@/features/audits/schemas/audit-schema";
 import { updateAuditStatus } from "../actions";
+import { useSync } from "@/lib/offline/sync-provider";
 
 type Props = {
   auditId: string;
@@ -20,10 +21,16 @@ const STATUS_CONFIG: Record<AuditStatus, { label: string; color: string }> = {
 export function AuditStatusBadge({ auditId, currentStatus }: Props) {
   const [status, setStatus] = useState(currentStatus);
   const [loading, setLoading] = useState(false);
+  const { isOnline } = useSync();
 
   const activeConfig = STATUS_CONFIG[status];
 
   const handleChange = async (newStatus: AuditStatus) => {
+    if (!isOnline) {
+      toast.info("Il cambio stato audit richiede connessione.");
+      return;
+    }
+
     setLoading(true);
     const oldStatus = status;
     setStatus(newStatus);
@@ -60,7 +67,7 @@ export function AuditStatusBadge({ auditId, currentStatus }: Props) {
         <select
           value={status}
           onChange={(e) => handleChange(e.target.value as AuditStatus)}
-          disabled={loading}
+          disabled={loading || !isOnline}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           aria-label="Change audit status"
         >

@@ -5,6 +5,7 @@ import { getPersonnelList } from '@/features/personnel/queries/get-personnel';
 import { ClientDetailWorkspace } from '@/features/clients/components/client-detail-workspace';
 import { getAuditTimeline } from '@/features/audits/queries/get-audit-timeline';
 import { getDocuments } from '@/features/documents/queries/get-documents';
+import { getClientWorkspaceData } from '@/features/clients/queries/get-client-workspace';
 
 export const metadata = {
   title: 'Dettaglio Cliente - SGIC',
@@ -31,7 +32,7 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
     redirect('/clients');
   }
 
-  const [personnel, audits, timelineEvents] = await Promise.all([
+  const [personnel, audits, timelineEvents, workspace] = await Promise.all([
     getPersonnelList(orgContext.organizationId, client.id),
     orgContext.supabase
       .from('audits')
@@ -40,6 +41,7 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
       .eq('client_id', client.id)
       .order('scheduled_date', { ascending: false }),
     getAuditTimeline(client.id),
+    getClientWorkspaceData(orgContext.organizationId, client.id),
   ]);
 
   const documents = await getDocuments({
@@ -85,15 +87,22 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
         status: audit.status,
         scheduled_date: audit.scheduled_date,
         score: audit.score,
+        location_id: audit.location_id,
         location_name: audit.location_id ? locationMap.get(audit.location_id) ?? null : null,
         nc_count: openNcCountByAuditId[audit.id] ?? 0,
       }))}
       client={client}
       clientOptions={clientOptions}
       documents={documents}
+      manualDeadlines={workspace.manualDeadlines}
+      missingWorkspaceTables={workspace.missingTables}
+      notes={workspace.notes}
       openNcCount={openNcCount}
       personnel={personnel}
+      tasks={workspace.tasks}
       timelineEvents={timelineEvents}
+      contacts={workspace.contacts}
+      contract={workspace.contract}
     />
   );
 }

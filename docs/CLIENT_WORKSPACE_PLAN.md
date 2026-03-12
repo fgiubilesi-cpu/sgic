@@ -597,3 +597,4 @@ Ordine rigoroso:
 ## Progress log
 
 - 2026-03-12: creato piano esecutivo del `Client Workspace` sul branch `codex/client-workspace`
+- 2026-03-12: implementati M0-M10 sul branch `codex/client-workspace` con nuova scheda cliente a 9 tab, nuove entita (contract/tasks/deadlines/notes), integrazione org-chart, upgrade locations/audits/documents e verifica `npx tsc --noEmit` + `npm run verify:release` verde

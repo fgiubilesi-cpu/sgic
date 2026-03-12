@@ -1,7 +1,15 @@
 import { z } from 'zod';
 
 export const documentSchema = z.object({
-  category: z.enum(['Procedure', 'Manual', 'Instruction', 'Form']),
+  category: z.enum([
+    'Procedure',
+    'Manual',
+    'Instruction',
+    'Form',
+    'Contract',
+    'Certificate',
+    'Other',
+  ]),
   client_id: z.string().trim(),
   description: z.string().trim(),
   expiry_date: z.string().trim(),

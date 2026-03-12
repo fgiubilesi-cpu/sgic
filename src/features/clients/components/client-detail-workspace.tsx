@@ -1,8 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Building2, ClipboardCheck, FileText, MapPin, Users } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Building2,
+  CalendarClock,
+  CheckCircle2,
+  ClipboardCheck,
+  FileText,
+  MapPin,
+  ScrollText,
+  ShieldAlert,
+  Users,
+} from 'lucide-react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +27,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import type { ClientDetail } from '@/features/clients/queries/get-client';
 import type { ClientOption } from '@/features/clients/queries/get-client-options';
 import type { PersonnelListItem } from '@/features/personnel/queries/get-personnel';
@@ -30,6 +46,26 @@ import { ClientAuditInsights } from './client-audit-insights';
 import type { DocumentListItem } from '@/features/documents/queries/get-documents';
 import { ManageDocumentSheet } from '@/features/documents/components/manage-document-sheet';
 import { DocumentsTable } from '@/features/documents/components/documents-table';
+import {
+  ManageContactSheet,
+  ManageDeadlineSheet,
+  ManageNoteSheet,
+  ManageTaskSheet,
+  NotePinAction,
+  TaskStatusQuickAction,
+} from '@/features/clients/components/client-workspace-controls';
+import {
+  upsertClientContract,
+} from '@/features/clients/actions/client-workspace-actions';
+import type {
+  ClientContactRecord,
+  ClientContractRecord,
+  ClientManualDeadlineRecord,
+  ClientNoteRecord,
+  ClientTaskPriority,
+  ClientTaskRecord,
+  ClientTaskStatus,
+} from '@/features/clients/queries/get-client-workspace';
 
 type ClientAuditItem = {
   id: string;
@@ -38,77 +74,471 @@ type ClientAuditItem = {
   status: string;
   scheduled_date: string | null;
   score: number | null;
+  location_id: string | null;
   location_name: string | null;
 };
 
-type ClientTab = 'overview' | 'locations' | 'personnel' | 'audits' | 'documents';
+type ClientTab =
+  | 'overview'
+  | 'activities'
+  | 'contract'
+  | 'org-chart'
+  | 'locations'
+  | 'audits'
+  | 'documents'
+  | 'deadlines'
+  | 'notes';
 
 interface ClientDetailWorkspaceProps {
   audits: ClientAuditItem[];
   client: ClientDetail;
   clientOptions: ClientOption[];
+  contacts: ClientContactRecord[];
+  contract: ClientContractRecord | null;
   documents: DocumentListItem[];
+  manualDeadlines: ClientManualDeadlineRecord[];
+  missingWorkspaceTables: string[];
+  notes: ClientNoteRecord[];
   openNcCount: number;
   personnel: PersonnelListItem[];
+  tasks: ClientTaskRecord[];
   timelineEvents: AuditTimelineEvent[];
 }
 
+type AggregatedDeadline = {
+  description: string | null;
+  due_date: string;
+  href: string | null;
+  id: string;
+  location_id: string | null;
+  priority: ClientTaskPriority;
+  source_type: 'manual' | 'contract' | 'task' | 'document' | 'audit';
+  status: 'open' | 'completed' | 'cancelled';
+  title: string;
+};
+
 const tabs: Array<{ id: ClientTab; label: string; icon: React.ElementType }> = [
-  { id: 'overview', label: 'Panoramica', icon: Building2 },
+  { id: 'overview', label: 'Overview', icon: Building2 },
+  { id: 'activities', label: 'Attività', icon: CheckCircle2 },
+  { id: 'contract', label: 'Contratto', icon: ScrollText },
+  { id: 'org-chart', label: 'Org Chart', icon: Users },
   { id: 'locations', label: 'Sedi', icon: MapPin },
-  { id: 'personnel', label: 'Collaboratori', icon: Users },
   { id: 'audits', label: 'Audit', icon: ClipboardCheck },
   { id: 'documents', label: 'Documenti', icon: FileText },
+  { id: 'deadlines', label: 'Scadenze', icon: CalendarClock },
+  { id: 'notes', label: 'Note', icon: ShieldAlert },
 ];
 
-function statusTone(status: string) {
-  if (status === 'Closed') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  if (status === 'In Progress') return 'border-amber-200 bg-amber-50 text-amber-700';
-  return 'border-sky-200 bg-sky-50 text-sky-700';
+function toDateLabel(value: string | null | undefined) {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString('it-IT');
+}
+
+function toDateStart(value: string) {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function taskStatusLabel(status: ClientTaskStatus) {
+  if (status === 'open') return 'Aperta';
+  if (status === 'in_progress') return 'In lavorazione';
+  if (status === 'blocked') return 'Bloccata';
+  return 'Completata';
+}
+
+function priorityLabel(priority: ClientTaskPriority) {
+  if (priority === 'low') return 'Bassa';
+  if (priority === 'medium') return 'Media';
+  if (priority === 'high') return 'Alta';
+  return 'Critica';
+}
+
+function priorityBadgeClass(priority: ClientTaskPriority) {
+  if (priority === 'critical') return 'border-rose-200 bg-rose-50 text-rose-700';
+  if (priority === 'high') return 'border-amber-200 bg-amber-50 text-amber-700';
+  if (priority === 'medium') return 'border-sky-200 bg-sky-50 text-sky-700';
+  return 'border-zinc-200 bg-zinc-50 text-zinc-600';
+}
+
+function taskStatusBadgeClass(status: ClientTaskStatus) {
+  if (status === 'done') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (status === 'in_progress') return 'border-sky-200 bg-sky-50 text-sky-700';
+  if (status === 'blocked') return 'border-rose-200 bg-rose-50 text-rose-700';
+  return 'border-zinc-200 bg-zinc-50 text-zinc-700';
+}
+
+function sourceTypeLabel(sourceType: AggregatedDeadline['source_type']) {
+  if (sourceType === 'manual') return 'Manuale';
+  if (sourceType === 'contract') return 'Contratto';
+  if (sourceType === 'task') return 'Attività';
+  if (sourceType === 'document') return 'Documento';
+  return 'Audit';
+}
+
+function sourceTypeBadgeClass(sourceType: AggregatedDeadline['source_type']) {
+  if (sourceType === 'contract') return 'border-violet-200 bg-violet-50 text-violet-700';
+  if (sourceType === 'task') return 'border-sky-200 bg-sky-50 text-sky-700';
+  if (sourceType === 'document') return 'border-amber-200 bg-amber-50 text-amber-700';
+  if (sourceType === 'audit') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  return 'border-zinc-200 bg-zinc-50 text-zinc-700';
+}
+
+function computeRiskLevel({
+  openNcCount,
+  overdueDeadlines,
+  overdueTasks,
+}: {
+  openNcCount: number;
+  overdueDeadlines: number;
+  overdueTasks: number;
+}) {
+  const riskScore = openNcCount * 2 + overdueDeadlines + overdueTasks;
+  if (riskScore >= 8) {
+    return {
+      label: 'Rischio alto',
+      className: 'border-rose-200 bg-rose-50 text-rose-700',
+    };
+  }
+  if (riskScore >= 4) {
+    return {
+      label: 'Rischio medio',
+      className: 'border-amber-200 bg-amber-50 text-amber-700',
+    };
+  }
+  return {
+    label: 'Rischio sotto controllo',
+    className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  };
 }
 
 export function ClientDetailWorkspace({
   audits,
   client,
   clientOptions,
+  contacts,
+  contract,
   documents,
+  manualDeadlines,
+  missingWorkspaceTables,
+  notes,
   openNcCount,
   personnel,
+  tasks,
   timelineEvents,
 }: ClientDetailWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<ClientTab>('overview');
+  const [taskSearch, setTaskSearch] = useState('');
+  const [taskStatus, setTaskStatus] = useState<'all' | ClientTaskStatus>('all');
+  const [taskPriority, setTaskPriority] = useState<'all' | ClientTaskPriority>('all');
+  const [docCategory, setDocCategory] = useState<string>('all');
+  const [docStatus, setDocStatus] = useState<string>('all');
+  const [docScope, setDocScope] = useState<'all' | 'client' | 'location' | 'personnel'>('all');
+  const [deadlineSource, setDeadlineSource] =
+    useState<'all' | AggregatedDeadline['source_type']>('all');
+  const [deadlineStatus, setDeadlineStatus] =
+    useState<'all' | AggregatedDeadline['status']>('all');
+  const [deadlineUrgency, setDeadlineUrgency] = useState<'all' | 'overdue' | 'upcoming'>('all');
+  const [noteType, setNoteType] = useState<'all' | ClientNoteRecord['note_type']>('all');
+  const [contractForm, setContractForm] = useState({
+    contract_type: contract?.contract_type ?? 'standard',
+    status: contract?.status ?? 'active',
+    start_date: contract?.start_date ?? '',
+    renewal_date: contract?.renewal_date ?? '',
+    end_date: contract?.end_date ?? '',
+    service_scope: contract?.service_scope ?? '',
+    activity_frequency: contract?.activity_frequency ?? '',
+    internal_owner: contract?.internal_owner ?? '',
+    notes: contract?.notes ?? '',
+    attachment_url: contract?.attachment_url ?? '',
+  });
+  const [savingContract, startSavingContract] = useTransition();
   const isClientActive = client.is_active ?? true;
+  const locationMap = useMemo(
+    () => new Map(client.locations.map((location) => [location.id, location.name])),
+    [client.locations]
+  );
+  const today = useMemo(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, []);
 
-  const stats = [
-    { label: 'Sedi operative', value: client.locations.length },
-    { label: 'Collaboratori', value: personnel.length },
-    { label: 'Audit storici', value: audits.length },
-    { label: 'NC aperte', value: openNcCount },
-    {
-      label: 'Ultimo audit',
-      value: audits[0]?.scheduled_date
-        ? new Date(audits[0].scheduled_date).toLocaleDateString('it-IT')
-        : 'Mai',
-    },
-  ];
+  useEffect(() => {
+    setContractForm({
+      contract_type: contract?.contract_type ?? 'standard',
+      status: contract?.status ?? 'active',
+      start_date: contract?.start_date ?? '',
+      renewal_date: contract?.renewal_date ?? '',
+      end_date: contract?.end_date ?? '',
+      service_scope: contract?.service_scope ?? '',
+      activity_frequency: contract?.activity_frequency ?? '',
+      internal_owner: contract?.internal_owner ?? '',
+      notes: contract?.notes ?? '',
+      attachment_url: contract?.attachment_url ?? '',
+    });
+  }, [contract]);
 
-  const closedAudits = audits.filter((audit) => audit.status === 'Closed').length;
-  const scheduledAudits = audits.filter((audit) => audit.status === 'Scheduled').length;
+  const aggregatedDeadlines = useMemo<AggregatedDeadline[]>(() => {
+    const list: AggregatedDeadline[] = [];
+
+    for (const deadline of manualDeadlines) {
+      list.push({
+        id: deadline.id,
+        source_type: 'manual',
+        title: deadline.title,
+        description: deadline.description,
+        due_date: deadline.due_date,
+        priority: deadline.priority,
+        status: deadline.status,
+        location_id: deadline.location_id,
+        href: null,
+      });
+    }
+
+    if (contract?.renewal_date) {
+      list.push({
+        id: `contract-renewal-${client.id}`,
+        source_type: 'contract',
+        title: 'Rinnovo contratto',
+        description: `Contratto ${contract.contract_type}`,
+        due_date: contract.renewal_date,
+        priority: 'high',
+        status: contract.status === 'expired' ? 'cancelled' : 'open',
+        location_id: null,
+        href: null,
+      });
+    }
+
+    if (contract?.end_date) {
+      list.push({
+        id: `contract-end-${client.id}`,
+        source_type: 'contract',
+        title: 'Scadenza contratto',
+        description: `Contratto ${contract.contract_type}`,
+        due_date: contract.end_date,
+        priority: 'critical',
+        status: contract.status === 'expired' ? 'completed' : 'open',
+        location_id: null,
+        href: null,
+      });
+    }
+
+    for (const task of tasks) {
+      if (!task.due_date) continue;
+      list.push({
+        id: `task-${task.id}`,
+        source_type: 'task',
+        title: task.title,
+        description: task.description,
+        due_date: task.due_date,
+        priority: task.priority,
+        status: task.status === 'done' ? 'completed' : 'open',
+        location_id: task.location_id,
+        href: null,
+      });
+    }
+
+    for (const document of documents) {
+      if (!document.expiry_date) continue;
+      const due = toDateStart(document.expiry_date);
+      const diffDays = Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      list.push({
+        id: `document-${document.id}`,
+        source_type: 'document',
+        title: document.title ?? 'Documento senza titolo',
+        description: document.description,
+        due_date: document.expiry_date,
+        priority: diffDays <= 14 ? 'high' : diffDays <= 30 ? 'medium' : 'low',
+        status: document.status === 'archived' ? 'completed' : 'open',
+        location_id: document.location_id,
+        href: null,
+      });
+    }
+
+    for (const audit of audits) {
+      if (!audit.scheduled_date) continue;
+      if (audit.status === 'Closed') continue;
+      list.push({
+        id: `audit-${audit.id}`,
+        source_type: 'audit',
+        title: audit.title || 'Audit senza titolo',
+        description: `Stato audit: ${audit.status}`,
+        due_date: audit.scheduled_date,
+        priority: audit.status === 'In Progress' ? 'high' : 'medium',
+        status: 'open',
+        location_id: audit.location_id,
+        href: `/audits/${audit.id}`,
+      });
+    }
+
+    return list.sort((left, right) => {
+      return toDateStart(left.due_date).getTime() - toDateStart(right.due_date).getTime();
+    });
+  }, [audits, client.id, contract, documents, manualDeadlines, tasks, today]);
+
   const documentExpiringSoonCount = documents.filter((document) => {
     if (!document.expiry_date) return false;
-    const expiry = new Date(document.expiry_date);
-    const today = new Date();
-    const inThirtyDays = new Date();
+    const expiry = toDateStart(document.expiry_date);
+    const inThirtyDays = new Date(today);
     inThirtyDays.setDate(today.getDate() + 30);
     return expiry >= today && expiry <= inThirtyDays;
   }).length;
+
   const documentExpiredCount = documents.filter((document) => {
     if (!document.expiry_date) return false;
-    return new Date(document.expiry_date) < new Date();
+    return toDateStart(document.expiry_date) < today;
   }).length;
+
+  const openTasks = tasks.filter((task) => task.status !== 'done');
+  const completedTasks = tasks.filter((task) => task.status === 'done');
+  const overdueTasks = openTasks.filter((task) => {
+    if (!task.due_date) return false;
+    return toDateStart(task.due_date) < today;
+  });
+  const overdueDeadlines = aggregatedDeadlines.filter(
+    (deadline) => deadline.status === 'open' && toDateStart(deadline.due_date) < today
+  );
+  const upcomingDeadlines = aggregatedDeadlines.filter((deadline) => {
+    if (deadline.status !== 'open') return false;
+    const dueDate = toDateStart(deadline.due_date);
+    const inThirtyDays = new Date(today);
+    inThirtyDays.setDate(today.getDate() + 30);
+    return dueDate >= today && dueDate <= inThirtyDays;
+  });
+
+  const riskLevel = computeRiskLevel({
+    openNcCount,
+    overdueDeadlines: overdueDeadlines.length,
+    overdueTasks: overdueTasks.length,
+  });
+
+  const stats = [
+    { label: 'Task aperte', value: openTasks.length },
+    { label: 'Scadenze urgenti', value: overdueDeadlines.length + upcomingDeadlines.length },
+    { label: 'Contatti attivi', value: contacts.filter((contact) => contact.is_active).length },
+    { label: 'Sedi operative', value: client.locations.filter((location) => location.is_active ?? true).length },
+    { label: 'NC aperte', value: openNcCount },
+    { label: 'Documenti in scadenza', value: documentExpiringSoonCount + documentExpiredCount },
+  ];
+
+  const nextActions = openTasks
+    .sort((left, right) => {
+      if (!left.due_date && !right.due_date) return 0;
+      if (!left.due_date) return 1;
+      if (!right.due_date) return -1;
+      return toDateStart(left.due_date).getTime() - toDateStart(right.due_date).getTime();
+    })
+    .slice(0, 5);
+
+  const keyContacts = contacts
+    .filter((contact) => contact.is_active)
+    .sort((left, right) => Number(right.is_primary) - Number(left.is_primary))
+    .slice(0, 5);
+
+  const healthAlerts = [
+    openNcCount > 0
+      ? `${openNcCount} non conformità aperte da presidiare.`
+      : 'Nessuna non conformità aperta.',
+    overdueTasks.length > 0
+      ? `${overdueTasks.length} attività sono oltre scadenza.`
+      : 'Nessuna attività in ritardo.',
+    documentExpiredCount > 0
+      ? `${documentExpiredCount} documenti risultano scaduti.`
+      : 'Nessun documento scaduto.',
+    contract?.end_date
+      ? `Contratto in scadenza il ${toDateLabel(contract.end_date)}.`
+      : 'Scadenza contratto non configurata.',
+  ];
+
+  const taskOwners = Array.from(
+    new Set(tasks.map((task) => task.owner_name).filter((owner): owner is string => Boolean(owner)))
+  );
+
+  const filteredTasks = tasks.filter((task) => {
+    const matchesSearch =
+      taskSearch.trim() === '' ||
+      task.title.toLowerCase().includes(taskSearch.toLowerCase()) ||
+      (task.description ?? '').toLowerCase().includes(taskSearch.toLowerCase()) ||
+      (task.owner_name ?? '').toLowerCase().includes(taskSearch.toLowerCase());
+    const matchesStatus = taskStatus === 'all' || task.status === taskStatus;
+    const matchesPriority = taskPriority === 'all' || task.priority === taskPriority;
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
+
+  const categories = Array.from(
+    new Set(
+      documents
+        .map((document) => document.category)
+        .filter(
+          (category): category is NonNullable<DocumentListItem['category']> => Boolean(category)
+        )
+    )
+  );
+
+  const filteredDocuments = documents.filter((document) => {
+    const matchesCategory = docCategory === 'all' || document.category === docCategory;
+    const matchesStatus = docStatus === 'all' || document.status === docStatus;
+    const matchesScope =
+      docScope === 'all' ||
+      (docScope === 'client' && Boolean(document.client_id && !document.location_id && !document.personnel_id)) ||
+      (docScope === 'location' && Boolean(document.location_id)) ||
+      (docScope === 'personnel' && Boolean(document.personnel_id));
+    return matchesCategory && matchesStatus && matchesScope;
+  });
+
+  const filteredDeadlines = aggregatedDeadlines.filter((deadline) => {
+    const matchesSource = deadlineSource === 'all' || deadline.source_type === deadlineSource;
+    const matchesStatus = deadlineStatus === 'all' || deadline.status === deadlineStatus;
+    const dueDate = toDateStart(deadline.due_date);
+    const inThirtyDays = new Date(today);
+    inThirtyDays.setDate(today.getDate() + 30);
+    const matchesUrgency =
+      deadlineUrgency === 'all' ||
+      (deadlineUrgency === 'overdue' && deadline.status === 'open' && dueDate < today) ||
+      (deadlineUrgency === 'upcoming' &&
+        deadline.status === 'open' &&
+        dueDate >= today &&
+        dueDate <= inThirtyDays);
+    return matchesSource && matchesStatus && matchesUrgency;
+  });
+
+  const filteredNotes = notes.filter((note) => noteType === 'all' || note.note_type === noteType);
+
+  const locationInsights = client.locations.map((location) => {
+    const locationAudits = audits.filter((audit) => audit.location_id === location.id);
+    const locationTasks = openTasks.filter((task) => task.location_id === location.id);
+    const locationDocuments = documents.filter((document) => document.location_id === location.id);
+    const locationContacts = contacts.filter((contact) => contact.location_id === location.id);
+    const nextLocationDeadline = aggregatedDeadlines.find(
+      (deadline) => deadline.location_id === location.id && deadline.status === 'open'
+    );
+    return {
+      location,
+      audits: locationAudits.length,
+      tasks: locationTasks.length,
+      documents: locationDocuments.length,
+      contacts: locationContacts.length,
+      nextDeadline: nextLocationDeadline?.due_date ?? null,
+    };
+  });
+
+  const closedAudits = audits.filter((audit) => audit.status === 'Closed').length;
+  const scheduledAudits = audits.filter((audit) => audit.status === 'Scheduled').length;
   const averageScore =
     audits.filter((audit) => typeof audit.score === 'number').reduce((sum, audit) => sum + (audit.score ?? 0), 0) /
       Math.max(audits.filter((audit) => typeof audit.score === 'number').length, 1);
+
+  const saveContract = () => {
+    startSavingContract(async () => {
+      const result = await upsertClientContract(client.id, contractForm);
+      if (!result.success) {
+        toast.error(result.error ?? 'Impossibile salvare contratto');
+        return;
+      }
+      toast.success('Contratto aggiornato');
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -120,22 +550,53 @@ export function ClientDetailWorkspace({
               Torna ai clienti
             </Link>
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{client.name}</h1>
-            <p className="mt-1 text-sm text-zinc-600">
-              Gestisci anagrafica, sedi, collaboratori, audit e documenti da un unico punto.
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-3xl font-bold tracking-tight">{client.name}</h1>
+              <Badge variant="outline" className={riskLevel.className}>
+                {riskLevel.label}
+              </Badge>
+            </div>
+            <p className="text-sm text-zinc-600">
+              Dossier operativo completo: contratto, attività, contatti, sedi, audit, documenti,
+              scadenze e note interne.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ClientStateToggleButton clientId={client.id} isActive={isClientActive} />
+          <ManageTaskSheet
+            audits={audits.map((audit) => ({ id: audit.id, title: audit.title }))}
+            clientId={client.id}
+            locations={client.locations.map((location) => ({ id: location.id, name: location.name }))}
+          />
           <ManageLocationSheet clientId={client.id} />
-          <ManagePersonnelSheet clientOptions={clientOptions} defaultClientId={client.id} />
+          <CreateAuditSheet defaultClientId={client.id} hideClientField triggerLabel="Nuovo Audit" />
+          <ManageDocumentSheet
+            clientOptions={clientOptions}
+            defaultClientId={client.id}
+            personnelOptions={personnel}
+            triggerLabel="Nuovo Documento"
+          />
+          <Button variant="outline" onClick={() => setActiveTab('contract')}>
+            Apri contratto
+          </Button>
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      {missingWorkspaceTables.length > 0 ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="font-medium">Workspace parzialmente attivo</p>
+          <p className="mt-1">
+            Le tabelle <span className="font-semibold">{missingWorkspaceTables.join(', ')}</span> non
+            risultano disponibili nel database corrente. Esegui le migration del branch per attivare
+            tutte le funzionalità.
+          </p>
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         {stats.map((stat) => (
           <Card key={stat.label} className="border-zinc-200 bg-white/90 shadow-sm">
             <CardHeader className="pb-2">
@@ -155,7 +616,6 @@ export function ClientDetailWorkspace({
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
-
             return (
               <button
                 key={tab.id}
@@ -176,199 +636,732 @@ export function ClientDetailWorkspace({
 
         <div className="p-4">
           {activeTab === 'overview' ? (
-            <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-4">
+              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Health & alert</CardTitle>
+                    <CardDescription>Segnali prioritari da monitorare nelle prossime settimane.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    {healthAlerts.map((alert) => (
+                      <div
+                        key={alert}
+                        className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-700"
+                      >
+                        {alert}
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Prossime attività</CardTitle>
+                    <CardDescription>Backlog operativo ordinato per urgenza e priorità.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {nextActions.length === 0 ? (
+                      <p className="text-sm text-zinc-500">Nessuna attività aperta.</p>
+                    ) : (
+                      nextActions.map((task) => (
+                        <div
+                          key={task.id}
+                          className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-medium text-zinc-900">{task.title}</p>
+                              <p className="text-xs text-zinc-500">
+                                {task.owner_name || 'Assegnatario da definire'} · scadenza {toDateLabel(task.due_date)}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className={priorityBadgeClass(task.priority)}>
+                              {priorityLabel(task.priority)}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[1fr_1fr_1fr]">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Prossime scadenze</CardTitle>
+                    <CardDescription>Vista unificata su contratto, task, audit, documenti e manuali.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {aggregatedDeadlines.filter((deadline) => deadline.status === 'open').slice(0, 5).length === 0 ? (
+                      <p className="text-sm text-zinc-500">Nessuna scadenza aperta.</p>
+                    ) : (
+                      aggregatedDeadlines
+                        .filter((deadline) => deadline.status === 'open')
+                        .slice(0, 5)
+                        .map((deadline) => (
+                          <div
+                            key={deadline.id}
+                            className="flex items-center justify-between rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                          >
+                            <div>
+                              <p className="font-medium text-zinc-900">{deadline.title}</p>
+                              <p className="text-xs text-zinc-500">
+                                {sourceTypeLabel(deadline.source_type)} · {toDateLabel(deadline.due_date)}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className={priorityBadgeClass(deadline.priority)}>
+                              {priorityLabel(deadline.priority)}
+                            </Badge>
+                          </div>
+                        ))
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Contatti chiave</CardTitle>
+                    <CardDescription>Referenti cliente più rilevanti per l’operatività.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {keyContacts.length === 0 ? (
+                      <p className="text-sm text-zinc-500">Nessun contatto cliente attivo.</p>
+                    ) : (
+                      keyContacts.map((contact) => (
+                        <div
+                          key={contact.id}
+                          className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                        >
+                          <p className="font-medium text-zinc-900">{contact.full_name}</p>
+                          <p className="text-xs text-zinc-500">
+                            {contact.role || 'Ruolo non definito'}
+                            {contact.department ? ` · ${contact.department}` : ''}
+                          </p>
+                          <p className="text-xs text-zinc-500">
+                            {contact.email || 'Email n.d.'}
+                            {contact.phone ? ` · ${contact.phone}` : ''}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Contratto corrente</CardTitle>
+                    <CardDescription>Perimetro servizio e milestone contrattuali.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-zinc-500">Tipo</p>
+                      <p className="font-medium text-zinc-900">{contract?.contract_type ?? 'Non configurato'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-zinc-500">Stato</p>
+                      <p className="font-medium text-zinc-900">{contract?.status ?? 'Non impostato'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-zinc-500">Scadenza</p>
+                      <p className="font-medium text-zinc-900">{toDateLabel(contract?.end_date)}</p>
+                    </div>
+                    <Button variant="outline" className="w-full" onClick={() => setActiveTab('contract')}>
+                      Gestisci contratto
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+
               <Card>
                 <CardHeader>
                   <CardTitle>Anagrafica cliente</CardTitle>
-                  <CardDescription>Dati amministrativi e di contatto.</CardDescription>
+                  <CardDescription>Dati amministrativi e note base del cliente.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ClientForm client={client} />
                 </CardContent>
               </Card>
+            </div>
+          ) : null}
+
+          {activeTab === 'activities' ? (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <div>
+                    <CardTitle>Task operative ({tasks.length})</CardTitle>
+                    <CardDescription>Lista lavoro interna con priorità, stato e scadenze.</CardDescription>
+                  </div>
+                  <ManageTaskSheet
+                    audits={audits.map((audit) => ({ id: audit.id, title: audit.title }))}
+                    clientId={client.id}
+                    locations={client.locations.map((location) => ({ id: location.id, name: location.name }))}
+                  />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label>Cerca</Label>
+                      <Input
+                        value={taskSearch}
+                        onChange={(event) => setTaskSearch(event.target.value)}
+                        placeholder="Titolo, descrizione o assegnatario..."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Stato</Label>
+                      <select
+                        className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm"
+                        value={taskStatus}
+                        onChange={(event) => setTaskStatus(event.target.value as 'all' | ClientTaskStatus)}
+                      >
+                        <option value="all">Tutti</option>
+                        <option value="open">Aperte</option>
+                        <option value="in_progress">In lavorazione</option>
+                        <option value="blocked">Bloccate</option>
+                        <option value="done">Completate</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Priorità</Label>
+                      <select
+                        className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm"
+                        value={taskPriority}
+                        onChange={(event) =>
+                          setTaskPriority(event.target.value as 'all' | ClientTaskPriority)
+                        }
+                      >
+                        <option value="all">Tutte</option>
+                        <option value="low">Bassa</option>
+                        <option value="medium">Media</option>
+                        <option value="high">Alta</option>
+                        <option value="critical">Critica</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {taskOwners.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {taskOwners.map((owner) => (
+                        <span
+                          key={owner}
+                          className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-600"
+                        >
+                          {owner}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {filteredTasks.length === 0 ? (
+                    <p className="text-sm text-zinc-500">Nessuna attività coerente con i filtri.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Titolo</TableHead>
+                          <TableHead>Assegnatario</TableHead>
+                          <TableHead>Scadenza</TableHead>
+                          <TableHead>Priorità</TableHead>
+                          <TableHead>Stato</TableHead>
+                          <TableHead>Contesto</TableHead>
+                          <TableHead>Azioni</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredTasks.map((task) => (
+                          <TableRow key={task.id}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium text-zinc-900">{task.title}</p>
+                                <p className="text-xs text-zinc-500">{task.description || '-'}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>{task.owner_name || '-'}</TableCell>
+                            <TableCell>{toDateLabel(task.due_date)}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={priorityBadgeClass(task.priority)}>
+                                {priorityLabel(task.priority)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={taskStatusBadgeClass(task.status)}>
+                                {taskStatusLabel(task.status)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-xs text-zinc-500">
+                                <div>
+                                  Sede:{' '}
+                                  {task.location_id
+                                    ? locationMap.get(task.location_id) ?? 'Sede rimossa'
+                                    : '-'}
+                                </div>
+                                <div>Audit: {task.audit_id ? 'Collegato' : '-'}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap items-center gap-1">
+                                <TaskStatusQuickAction
+                                  clientId={client.id}
+                                  status={task.status}
+                                  taskId={task.id}
+                                />
+                                <ManageTaskSheet
+                                  audits={audits.map((audit) => ({ id: audit.id, title: audit.title }))}
+                                  clientId={client.id}
+                                  locations={client.locations.map((location) => ({
+                                    id: location.id,
+                                    name: location.name,
+                                  }))}
+                                  task={task}
+                                />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>In corso</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-semibold text-sky-700">
+                      {tasks.filter((task) => task.status === 'in_progress').length}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Bloccate</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-semibold text-rose-700">
+                      {tasks.filter((task) => task.status === 'blocked').length}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Completate (30gg)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-semibold text-emerald-700">
+                      {
+                        completedTasks.filter((task) => {
+                          if (!task.completed_at) return false;
+                          const completionDate = toDateStart(task.completed_at);
+                          const thirtyDaysAgo = new Date(today);
+                          thirtyDaysAgo.setDate(today.getDate() - 30);
+                          return completionDate >= thirtyDaysAgo;
+                        }).length
+                      }
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          ) : null}
+
+          {activeTab === 'contract' ? (
+            <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Perimetro contrattuale</CardTitle>
+                  <CardDescription>
+                    Definisci contratto corrente, milestone e servizi inclusi.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Tipo contratto</Label>
+                      <Input
+                        value={contractForm.contract_type}
+                        onChange={(event) =>
+                          setContractForm((prev) => ({ ...prev, contract_type: event.target.value }))
+                        }
+                        placeholder="Es. HACCP Full Service"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Stato</Label>
+                      <select
+                        className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm"
+                        value={contractForm.status}
+                        onChange={(event) =>
+                          setContractForm((prev) => ({
+                            ...prev,
+                            status: event.target.value as ClientContractRecord['status'],
+                          }))
+                        }
+                      >
+                        <option value="draft">Bozza</option>
+                        <option value="active">Attivo</option>
+                        <option value="paused">Sospeso</option>
+                        <option value="expired">Scaduto</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label>Data inizio</Label>
+                      <Input
+                        type="date"
+                        value={contractForm.start_date ?? ''}
+                        onChange={(event) =>
+                          setContractForm((prev) => ({ ...prev, start_date: event.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Data rinnovo</Label>
+                      <Input
+                        type="date"
+                        value={contractForm.renewal_date ?? ''}
+                        onChange={(event) =>
+                          setContractForm((prev) => ({ ...prev, renewal_date: event.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Data scadenza</Label>
+                      <Input
+                        type="date"
+                        value={contractForm.end_date ?? ''}
+                        onChange={(event) =>
+                          setContractForm((prev) => ({ ...prev, end_date: event.target.value }))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Servizi inclusi</Label>
+                    <Textarea
+                      rows={3}
+                      value={contractForm.service_scope ?? ''}
+                      onChange={(event) =>
+                        setContractForm((prev) => ({ ...prev, service_scope: event.target.value }))
+                      }
+                      placeholder="Elenca perimetro operativo, SLA e deliverable"
+                    />
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Frequenza attività previste</Label>
+                      <Input
+                        value={contractForm.activity_frequency ?? ''}
+                        onChange={(event) =>
+                          setContractForm((prev) => ({
+                            ...prev,
+                            activity_frequency: event.target.value,
+                          }))
+                        }
+                        placeholder="Es. Audit mensile + review trimestrale"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Referente interno</Label>
+                      <Input
+                        value={contractForm.internal_owner ?? ''}
+                        onChange={(event) =>
+                          setContractForm((prev) => ({ ...prev, internal_owner: event.target.value }))
+                        }
+                        placeholder="Es. f.giubilesi@..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>URL allegato contratto</Label>
+                    <Input
+                      value={contractForm.attachment_url ?? ''}
+                      onChange={(event) =>
+                        setContractForm((prev) => ({ ...prev, attachment_url: event.target.value }))
+                      }
+                      placeholder="https://..."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Note contrattuali</Label>
+                    <Textarea
+                      rows={4}
+                      value={contractForm.notes ?? ''}
+                      onChange={(event) =>
+                        setContractForm((prev) => ({ ...prev, notes: event.target.value }))
+                      }
+                      placeholder="Vincoli, eccezioni, extra-canone, ecc."
+                    />
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={saveContract}
+                    disabled={savingContract || contractForm.contract_type.trim() === ''}
+                    className="w-full"
+                  >
+                    {savingContract ? 'Salvataggio...' : 'Salva contratto'}
+                  </Button>
+                </CardContent>
+              </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Quadro rapido</CardTitle>
-                  <CardDescription>Informazioni chiave e stato operativo.</CardDescription>
+                  <CardTitle>Sintesi contratto</CardTitle>
+                  <CardDescription>
+                    Dati chiave per lettura rapida e alimentazione scadenze.
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 text-sm">
-                  <div>
-                    <span className="font-medium">Partita IVA</span>
-                    <p className="mt-1 text-zinc-600">{client.vat_number || '-'}</p>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">Tipo</p>
+                    <p className="font-medium text-zinc-900">{contractForm.contract_type || '-'}</p>
                   </div>
-                  <div>
-                    <span className="font-medium">Email</span>
-                    <p className="mt-1 text-zinc-600">{client.email || '-'}</p>
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">Stato</p>
+                    <p className="font-medium text-zinc-900">{contractForm.status}</p>
                   </div>
-                  <div>
-                    <span className="font-medium">Telefono</span>
-                    <p className="mt-1 text-zinc-600">{client.phone || '-'}</p>
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">Rinnovo</p>
+                    <p className="font-medium text-zinc-900">{toDateLabel(contractForm.renewal_date)}</p>
                   </div>
-                  <div>
-                    <span className="font-medium">Stato</span>
-                    <div className="mt-2">
-                      <Badge variant={isClientActive ? 'default' : 'secondary'}>
-                        {isClientActive ? 'Attivo' : 'Inattivo'}
-                      </Badge>
-                    </div>
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">Scadenza</p>
+                    <p className="font-medium text-zinc-900">{toDateLabel(contractForm.end_date)}</p>
                   </div>
-                  <div>
-                    <span className="font-medium">Audit con NC aperte</span>
-                    <p className="mt-1 text-zinc-600">
-                      {openNcCount > 0
-                        ? `${openNcCount} non conformita da seguire in questa scheda cliente.`
-                        : 'Nessuna non conformita aperta al momento.'}
-                    </p>
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">Owner interno</p>
+                    <p className="font-medium text-zinc-900">{contractForm.internal_owner || '-'}</p>
                   </div>
+                  {contractForm.attachment_url ? (
+                    <Button asChild variant="outline" className="w-full">
+                      <a href={contractForm.attachment_url} target="_blank" rel="noreferrer">
+                        Apri allegato contratto
+                      </a>
+                    </Button>
+                  ) : (
+                    <p className="text-xs text-zinc-500">Nessun allegato contratto collegato.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+
+          {activeTab === 'org-chart' ? (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <div>
-                    <span className="font-medium">Note</span>
-                    <p className="mt-1 text-zinc-600">{client.notes || 'Nessuna nota operativa.'}</p>
+                    <CardTitle>Contatti cliente ({contacts.length})</CardTitle>
+                    <CardDescription>Mappa referenti cliente per ruolo, area e sede.</CardDescription>
                   </div>
+                  <ManageContactSheet
+                    clientId={client.id}
+                    locations={client.locations.map((location) => ({ id: location.id, name: location.name }))}
+                  />
+                </CardHeader>
+                <CardContent>
+                  {contacts.length === 0 ? (
+                    <p className="text-sm text-zinc-500">Nessun contatto cliente registrato.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Contatto</TableHead>
+                          <TableHead>Ruolo/Area</TableHead>
+                          <TableHead>Sede</TableHead>
+                          <TableHead>Stato</TableHead>
+                          <TableHead>Azioni</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {contacts.map((contact) => (
+                          <TableRow key={contact.id}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium text-zinc-900">{contact.full_name}</p>
+                                <p className="text-xs text-zinc-500">
+                                  {contact.email || 'Email n.d.'}
+                                  {contact.phone ? ` · ${contact.phone}` : ''}
+                                </p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm text-zinc-700">
+                                <div>{contact.role || '-'}</div>
+                                <div className="text-xs text-zinc-500">{contact.department || '-'}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {contact.location_id
+                                ? locationMap.get(contact.location_id) ?? 'Sede rimossa'
+                                : '-'}
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-x-1">
+                                <Badge variant={contact.is_active ? 'default' : 'secondary'}>
+                                  {contact.is_active ? 'Attivo' : 'Inattivo'}
+                                </Badge>
+                                {contact.is_primary ? (
+                                  <Badge variant="outline">Principale</Badge>
+                                ) : null}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <ManageContactSheet
+                                clientId={client.id}
+                                contact={contact}
+                                locations={client.locations.map((location) => ({
+                                  id: location.id,
+                                  name: location.name,
+                                }))}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <div>
+                    <CardTitle>Collaboratori SGIC ({personnel.length})</CardTitle>
+                    <CardDescription>
+                      Team interno collegato al cliente per operatività quotidiana.
+                    </CardDescription>
+                  </div>
+                  <ManagePersonnelSheet clientOptions={clientOptions} defaultClientId={client.id} />
+                </CardHeader>
+                <CardContent>
+                  {personnel.length === 0 ? (
+                    <p className="text-sm text-zinc-500">Nessun collaboratore interno assegnato.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nome</TableHead>
+                          <TableHead>Ruolo</TableHead>
+                          <TableHead>Sede</TableHead>
+                          <TableHead>Stato operativo</TableHead>
+                          <TableHead>Azioni</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {personnel.map((person) => (
+                          <TableRow key={person.id}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium text-zinc-900">
+                                  {person.first_name} {person.last_name}
+                                </p>
+                                <p className="text-xs text-zinc-500">{person.email || '-'}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>{person.role || '-'}</TableCell>
+                            <TableCell>{person.location_name || '-'}</TableCell>
+                            <TableCell>
+                              <PersonnelOperationalBadge status={person.operational_status} />
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-blue-600">
+                                  <Link href={`/personnel/${person.id}`}>Dettagli</Link>
+                                </Button>
+                                <ManagePersonnelSheet
+                                  clientOptions={clientOptions}
+                                  defaultClientId={client.id}
+                                  personnel={person}
+                                />
+                                <PersonnelStateToggleButton
+                                  isActive={person.is_active}
+                                  personnelId={person.id}
+                                />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </CardContent>
               </Card>
             </div>
           ) : null}
 
           {activeTab === 'locations' ? (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                <div>
-                  <CardTitle>Sedi ({client.locations.length})</CardTitle>
-                  <CardDescription>Elenco delle sedi operative del cliente.</CardDescription>
-                </div>
-                <ManageLocationSheet clientId={client.id} />
-              </CardHeader>
-              <CardContent>
-                {client.locations.length === 0 ? (
-                  <p className="text-sm text-zinc-500">Nessuna sede registrata.</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Città</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Stato</TableHead>
-                        <TableHead>Azioni</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {client.locations.map((location) => (
-                        <TableRow key={location.id}>
-                          <TableCell className="font-medium">{location.name}</TableCell>
-                          <TableCell>{location.city || '-'}</TableCell>
-                          <TableCell>{location.type || '-'}</TableCell>
-                          <TableCell>
-                            <Badge variant={(location.is_active ?? true) ? 'default' : 'secondary'}>
-                              {(location.is_active ?? true) ? 'Attivo' : 'Inattivo'}
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <div>
+                    <CardTitle>Sedi operative ({client.locations.length})</CardTitle>
+                    <CardDescription>
+                      Vista sedi arricchita con contesto operativo, audit, task e documenti.
+                    </CardDescription>
+                  </div>
+                  <ManageLocationSheet clientId={client.id} />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {locationInsights.length === 0 ? (
+                    <p className="text-sm text-zinc-500">Nessuna sede registrata.</p>
+                  ) : (
+                    locationInsights.map((item) => (
+                      <div key={item.location.id} className="rounded-lg border border-zinc-200 p-3">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-zinc-900">{item.location.name}</p>
+                            <p className="text-xs text-zinc-500">
+                              {item.location.city || '-'} · {item.location.type || 'Tipo non definito'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Badge variant={(item.location.is_active ?? true) ? 'default' : 'secondary'}>
+                              {(item.location.is_active ?? true) ? 'Attiva' : 'Inattiva'}
                             </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <ManageLocationSheet clientId={client.id} location={location} />
-                              <LocationStateToggleButton
-                                isActive={location.is_active ?? true}
-                                locationId={location.id}
-                              />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {activeTab === 'personnel' ? (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                <div>
-                  <CardTitle>Collaboratori ({personnel.length})</CardTitle>
-                  <CardDescription>Referenti e operatori collegati a questo cliente.</CardDescription>
-                </div>
-                <ManagePersonnelSheet clientOptions={clientOptions} defaultClientId={client.id} />
-              </CardHeader>
-              <CardContent>
-                {personnel.length === 0 ? (
-                  <p className="text-sm text-zinc-500">Nessun collaboratore registrato.</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Ruolo</TableHead>
-                        <TableHead>Sede</TableHead>
-                        <TableHead>Formazione</TableHead>
-                        <TableHead>Stato operativo</TableHead>
-                        <TableHead>Azioni</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {personnel.map((person) => (
-                        <TableRow key={person.id}>
-                          <TableCell className="font-medium">
-                            <div className="flex flex-col">
-                              <span>
-                                {person.first_name} {person.last_name}
-                              </span>
-                              <span className="text-xs text-zinc-500">{person.email || '-'}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{person.role || '-'}</TableCell>
-                          <TableCell>{person.location_name || '-'}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1 text-xs">
-                              <span className="text-zinc-700">
-                                {person.training_record_count} corsi registrati
-                              </span>
-                              {person.training_expired_count > 0 ? (
-                                <span className="text-rose-700">
-                                  {person.training_expired_count} scaduti
-                                </span>
-                              ) : person.training_expiring_count > 0 ? (
-                                <span className="text-amber-700">
-                                  {person.training_expiring_count} in scadenza
-                                </span>
-                              ) : (
-                                <span className="text-zinc-500">Nessuna criticita</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <PersonnelOperationalBadge status={person.operational_status} />
-                              {person.next_expiry_date ? (
-                                <div className="text-xs text-zinc-500">
-                                  Prossima scadenza{' '}
-                                  {new Date(person.next_expiry_date).toLocaleDateString('it-IT')}
-                                </div>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                          <TableCell className="flex items-center gap-1">
-                            <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-blue-600">
-                              <Link href={`/personnel/${person.id}`}>Dettagli</Link>
-                            </Button>
-                            <ManagePersonnelSheet
-                              clientOptions={clientOptions}
-                              defaultClientId={client.id}
-                              personnel={person}
+                            <ManageLocationSheet clientId={client.id} location={item.location} />
+                            <LocationStateToggleButton
+                              isActive={item.location.is_active ?? true}
+                              locationId={item.location.id}
                             />
-                            <PersonnelStateToggleButton
-                              isActive={person.is_active}
-                              personnelId={person.id}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
+                          </div>
+                        </div>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                          <div className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+                            Audit: <span className="font-semibold text-zinc-900">{item.audits}</span>
+                          </div>
+                          <div className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+                            Task aperte:{' '}
+                            <span className="font-semibold text-zinc-900">{item.tasks}</span>
+                          </div>
+                          <div className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+                            Documenti:{' '}
+                            <span className="font-semibold text-zinc-900">{item.documents}</span>
+                          </div>
+                          <div className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+                            Prossima scadenza:{' '}
+                            <span className="font-semibold text-zinc-900">{toDateLabel(item.nextDeadline)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           ) : null}
 
           {activeTab === 'audits' ? (
@@ -428,11 +1421,7 @@ export function ClientDetailWorkspace({
                       Storico audit collegati al cliente e punto di accesso per crearne di nuovi.
                     </CardDescription>
                   </div>
-                  <CreateAuditSheet
-                    defaultClientId={client.id}
-                    hideClientField
-                    triggerLabel="Nuovo Audit"
-                  />
+                  <CreateAuditSheet defaultClientId={client.id} hideClientField triggerLabel="Nuovo Audit" />
                 </CardHeader>
                 <CardContent>
                   {audits.length === 0 ? (
@@ -456,15 +1445,9 @@ export function ClientDetailWorkspace({
                             <TableCell className="font-medium">{audit.title || 'Audit senza titolo'}</TableCell>
                             <TableCell>{audit.location_name || '-'}</TableCell>
                             <TableCell>
-                              <Badge variant="outline" className={statusTone(audit.status)}>
-                                {audit.status}
-                              </Badge>
+                              <Badge variant="outline">{audit.status}</Badge>
                             </TableCell>
-                            <TableCell>
-                              {audit.scheduled_date
-                                ? new Date(audit.scheduled_date).toLocaleDateString('it-IT')
-                                : '-'}
-                            </TableCell>
+                            <TableCell>{toDateLabel(audit.scheduled_date)}</TableCell>
                             <TableCell>
                               {typeof audit.score === 'number' ? `${audit.score.toFixed(1)}%` : '-'}
                             </TableCell>
@@ -496,146 +1479,12 @@ export function ClientDetailWorkspace({
 
           {activeTab === 'documents' ? (
             <div className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <Card className="border-zinc-200">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
-                      Documenti Cliente
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-semibold text-zinc-900">{documents.length}</div>
-                    <p className="mt-2 text-sm text-zinc-500">Archivio documentale complessivo del cliente.</p>
-                  </CardContent>
-                </Card>
-                <Card className="border-zinc-200">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
-                      Sedi da coprire
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-semibold text-sky-700">{client.locations.length}</div>
-                    <p className="mt-2 text-sm text-zinc-500">
-                      Ogni sede potra avere documenti operativi e certificazioni dedicate.
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="border-zinc-200">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
-                      Collaboratori da coprire
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-semibold text-violet-700">{personnel.length}</div>
-                    <p className="mt-2 text-sm text-zinc-500">
-                      Qui confluiranno documenti personali, scadenze e formazione.
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="border-zinc-200">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
-                      Documenti in scadenza
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-semibold text-amber-700">{documentExpiringSoonCount}</div>
-                    <p className="mt-2 text-sm text-zinc-500">
-                      Documenti che scadono entro i prossimi 30 giorni.
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                <Card className="border-dashed">
-                  <CardHeader>
-                    <CardTitle>Roadmap Documentale</CardTitle>
-                    <CardDescription>
-                      Preparazione della Fase 4 con archivio per cliente, sedi e collaboratori.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4 text-sm text-zinc-600">
-                    <div>
-                      <p className="font-medium text-zinc-900">Cosa entrera qui</p>
-                      <ul className="mt-2 list-disc space-y-1 pl-5">
-                        <li>contratti, visure e allegati amministrativi del cliente</li>
-                        <li>manuali, autorizzazioni e certificazioni di sede</li>
-                        <li>documenti individuali, formazione e scadenze collaboratori</li>
-                        <li>versioning, data scadenza e stato validazione</li>
-                      </ul>
-                    </div>
-                    <div className="rounded-lg bg-zinc-50 p-3">
-                      <p className="font-medium text-zinc-900">Stato attuale</p>
-                      <p className="mt-1">
-                        La scheda cliente e gia pronta a raccogliere i tre livelli del futuro archivio:
-                        cliente, sede e collaboratore.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                    <div>
-                    <CardTitle>Checklist preparatoria</CardTitle>
-                    <CardDescription>
-                      Passi consigliati prima di attivare il modulo documenti.
-                    </CardDescription>
-                    </div>
-                    <ManageDocumentSheet
-                      clientOptions={clientOptions}
-                      defaultClientId={client.id}
-                      personnelOptions={personnel}
-                    />
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm">
-                    <div className="rounded-lg border border-zinc-200 p-3">
-                      <p className="font-medium text-zinc-900">1. Struttura cliente</p>
-                      <p className="mt-1 text-zinc-600">
-                        {client.locations.length > 0
-                          ? 'Le sedi sono gia censite e pronte per documenti dedicati.'
-                          : 'Aggiungi almeno una sede per organizzare correttamente i documenti operativi.'}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-zinc-200 p-3">
-                      <p className="font-medium text-zinc-900">2. Referenti operativi</p>
-                      <p className="mt-1 text-zinc-600">
-                        {personnel.length > 0
-                          ? 'I collaboratori sono gia presenti e potranno ricevere documenti e scadenze.'
-                          : 'Aggiungi collaboratori per preparare la gestione di documenti individuali e formazione.'}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-zinc-200 p-3">
-                      <p className="font-medium text-zinc-900">3. Audit e priorita</p>
-                      <p className="mt-1 text-zinc-600">
-                        {openNcCount > 0
-                          ? `Sono presenti ${openNcCount} NC aperte: la futura area documenti potra ospitare anche evidenze di risoluzione.`
-                          : 'Nessuna NC aperta: la scheda e pronta per introdurre archivio e scadenze senza criticita correnti.'}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-zinc-200 p-3">
-                      <p className="font-medium text-zinc-900">4. Scadenze documentali</p>
-                      <p className="mt-1 text-zinc-600">
-                        {documentExpiredCount > 0
-                          ? `${documentExpiredCount} documenti sono gia scaduti e richiedono rinnovo.`
-                          : documentExpiringSoonCount > 0
-                          ? `${documentExpiringSoonCount} documenti sono in scadenza nel breve periodo.`
-                          : 'Nessuna criticita documentale immediata registrata.'}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <div>
-                    <CardTitle>Archivio Documenti ({documents.length})</CardTitle>
+                    <CardTitle>Archivio documentale ({documents.length})</CardTitle>
                     <CardDescription>
-                      Documenti cliente, sede e collaboratore raccolti in un unico registro operativo.
+                      Repository operativo con categorie, stato e livello di contesto.
                     </CardDescription>
                   </div>
                   <ManageDocumentSheet
@@ -644,13 +1493,325 @@ export function ClientDetailWorkspace({
                     personnelOptions={personnel}
                   />
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label>Categoria</Label>
+                      <select
+                        className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm"
+                        value={docCategory}
+                        onChange={(event) => setDocCategory(event.target.value)}
+                      >
+                        <option value="all">Tutte</option>
+                        {categories.map((category) => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Stato</Label>
+                      <select
+                        className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm"
+                        value={docStatus}
+                        onChange={(event) => setDocStatus(event.target.value)}
+                      >
+                        <option value="all">Tutti</option>
+                        <option value="draft">Bozza</option>
+                        <option value="published">Pubblicato</option>
+                        <option value="archived">Archiviato</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Ambito</Label>
+                      <select
+                        className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm"
+                        value={docScope}
+                        onChange={(event) =>
+                          setDocScope(event.target.value as 'all' | 'client' | 'location' | 'personnel')
+                        }
+                      >
+                        <option value="all">Tutti</option>
+                        <option value="client">Cliente</option>
+                        <option value="location">Sede</option>
+                        <option value="personnel">Collaboratore</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <DocumentsTable
                     clientOptions={clientOptions}
-                    documents={documents}
-                    emptyMessage="Nessun documento ancora collegato a questo cliente."
+                    documents={filteredDocuments}
+                    emptyMessage="Nessun documento coerente con i filtri selezionati."
                     personnelOptions={personnel}
                   />
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+
+          {activeTab === 'deadlines' ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-3">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      Totale scadenze aperte
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold text-zinc-900">
+                      {aggregatedDeadlines.filter((deadline) => deadline.status === 'open').length}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      Scadute
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold text-rose-700">{overdueDeadlines.length}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs uppercase tracking-wide text-zinc-500">
+                      Prossimi 30 giorni
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-semibold text-amber-700">{upcomingDeadlines.length}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <div>
+                    <CardTitle>Scadenze aggregate</CardTitle>
+                    <CardDescription>
+                      Unica vista su manuali, contratto, documenti, task e piano audit.
+                    </CardDescription>
+                  </div>
+                  <ManageDeadlineSheet
+                    clientId={client.id}
+                    locations={client.locations.map((location) => ({ id: location.id, name: location.name }))}
+                  />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label>Fonte</Label>
+                      <select
+                        className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm"
+                        value={deadlineSource}
+                        onChange={(event) =>
+                          setDeadlineSource(
+                            event.target.value as 'all' | AggregatedDeadline['source_type']
+                          )
+                        }
+                      >
+                        <option value="all">Tutte</option>
+                        <option value="manual">Manuale</option>
+                        <option value="contract">Contratto</option>
+                        <option value="task">Task</option>
+                        <option value="document">Documento</option>
+                        <option value="audit">Audit</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Stato</Label>
+                      <select
+                        className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm"
+                        value={deadlineStatus}
+                        onChange={(event) =>
+                          setDeadlineStatus(event.target.value as 'all' | AggregatedDeadline['status'])
+                        }
+                      >
+                        <option value="all">Tutti</option>
+                        <option value="open">Aperta</option>
+                        <option value="completed">Completata</option>
+                        <option value="cancelled">Annullata</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Urgenza</Label>
+                      <select
+                        className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm"
+                        value={deadlineUrgency}
+                        onChange={(event) =>
+                          setDeadlineUrgency(event.target.value as 'all' | 'overdue' | 'upcoming')
+                        }
+                      >
+                        <option value="all">Tutte</option>
+                        <option value="overdue">Scadute</option>
+                        <option value="upcoming">Prossimi 30 giorni</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {filteredDeadlines.length === 0 ? (
+                    <p className="text-sm text-zinc-500">Nessuna scadenza coerente con i filtri.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Titolo</TableHead>
+                          <TableHead>Fonte</TableHead>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Priorità</TableHead>
+                          <TableHead>Sede</TableHead>
+                          <TableHead>Stato</TableHead>
+                          <TableHead>Azioni</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredDeadlines.map((deadline) => {
+                          const manualDeadline = manualDeadlines.find((item) => item.id === deadline.id);
+                          return (
+                            <TableRow key={deadline.id}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium text-zinc-900">{deadline.title}</p>
+                                  <p className="text-xs text-zinc-500">{deadline.description || '-'}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className={sourceTypeBadgeClass(deadline.source_type)}>
+                                  {sourceTypeLabel(deadline.source_type)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{toDateLabel(deadline.due_date)}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className={priorityBadgeClass(deadline.priority)}>
+                                  {priorityLabel(deadline.priority)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {deadline.location_id
+                                  ? locationMap.get(deadline.location_id) ?? 'Sede rimossa'
+                                  : '-'}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={deadline.status === 'open' ? 'default' : 'secondary'}>
+                                  {deadline.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  {deadline.href ? (
+                                    <Button asChild variant="outline" size="sm">
+                                      <Link href={deadline.href}>Apri</Link>
+                                    </Button>
+                                  ) : null}
+                                  {manualDeadline ? (
+                                    <ManageDeadlineSheet
+                                      clientId={client.id}
+                                      deadline={manualDeadline}
+                                      locations={client.locations.map((location) => ({
+                                        id: location.id,
+                                        name: location.name,
+                                      }))}
+                                    />
+                                  ) : null}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+
+          {activeTab === 'notes' ? (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <div>
+                    <CardTitle>Note operative ({notes.length})</CardTitle>
+                    <CardDescription>
+                      Timeline interna di warning, decisioni e appunti contestuali.
+                    </CardDescription>
+                  </div>
+                  <ManageNoteSheet
+                    clientId={client.id}
+                    locations={client.locations.map((location) => ({ id: location.id, name: location.name }))}
+                  />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Filtro tipo</Label>
+                      <select
+                        className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm"
+                        value={noteType}
+                        onChange={(event) =>
+                          setNoteType(event.target.value as 'all' | ClientNoteRecord['note_type'])
+                        }
+                      >
+                        <option value="all">Tutte</option>
+                        <option value="operational">Operative</option>
+                        <option value="warning">Warning</option>
+                        <option value="decision">Decisioni</option>
+                        <option value="info">Info</option>
+                      </select>
+                    </div>
+                    <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+                      Uso interno: le note non sono visibili a clienti esterni.
+                    </div>
+                  </div>
+
+                  {filteredNotes.length === 0 ? (
+                    <p className="text-sm text-zinc-500">Nessuna nota coerente con i filtri.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredNotes.map((note) => (
+                        <div
+                          key={note.id}
+                          className={
+                            note.pinned
+                              ? 'rounded-md border border-amber-200 bg-amber-50 p-3'
+                              : 'rounded-md border border-zinc-200 bg-zinc-50 p-3'
+                          }
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-zinc-900">{note.title}</p>
+                                <Badge variant="outline">{note.note_type}</Badge>
+                                {note.pinned ? <Badge>Pinned</Badge> : null}
+                              </div>
+                              <p className="mt-1 text-xs text-zinc-500">
+                                {toDateLabel(note.created_at)} · {note.author_name || 'Autore non disponibile'}
+                                {note.location_id
+                                  ? ` · ${locationMap.get(note.location_id) ?? 'Sede rimossa'}`
+                                  : ''}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <NotePinAction clientId={client.id} note={note} />
+                              <ManageNoteSheet
+                                clientId={client.id}
+                                locations={client.locations.map((location) => ({
+                                  id: location.id,
+                                  name: location.name,
+                                }))}
+                                note={note}
+                              />
+                            </div>
+                          </div>
+                          <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-700">{note.body}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

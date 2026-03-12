@@ -158,6 +158,9 @@ export function DocumentForm({
                     <SelectItem value="Manual">Manuale</SelectItem>
                     <SelectItem value="Instruction">Istruzione</SelectItem>
                     <SelectItem value="Form">Modulo</SelectItem>
+                    <SelectItem value="Contract">Contratto</SelectItem>
+                    <SelectItem value="Certificate">Certificato</SelectItem>
+                    <SelectItem value="Other">Altro</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

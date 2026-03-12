@@ -34,6 +34,27 @@ export type AuditWithChecklists = Audit & {
   score?: number | null;
 };
 
+function asSortedChecklistItems(rawItems: unknown[] | null | undefined) {
+  return [...(rawItems ?? [])].sort((left, right) => {
+    const leftSortOrder =
+      typeof (left as { sort_order?: unknown })?.sort_order === "number"
+        ? ((left as { sort_order?: number }).sort_order ?? 0)
+        : 0;
+    const rightSortOrder =
+      typeof (right as { sort_order?: unknown })?.sort_order === "number"
+        ? ((right as { sort_order?: number }).sort_order ?? 0)
+        : 0;
+
+    if (leftSortOrder !== rightSortOrder) {
+      return leftSortOrder - rightSortOrder;
+    }
+
+    const leftCreatedAt = (left as { created_at?: string | null })?.created_at;
+    const rightCreatedAt = (right as { created_at?: string | null })?.created_at;
+    return (leftCreatedAt ?? "").localeCompare(rightCreatedAt ?? "");
+  });
+}
+
 export async function getAudit(id: string): Promise<AuditWithChecklists | null> {
   const ctx = await getOrganizationContext();
   if (!ctx) return null;
@@ -77,43 +98,96 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
   const { data: rawChecklists, error: checklistError } = await supabase
     .from("checklists")
     .select(
-      "id, title, template_id, created_at, checklist_items(id, question, outcome, notes, evidence_url, audio_url, created_at, checklist_item_media(id, checklist_item_id, audit_id, organization_id, storage_path, mime_type, media_kind, original_name, created_at))"
+      "id, title, template_id, created_at, checklist_items(id, question, outcome, notes, evidence_url, audio_url, created_at, sort_order)"
     )
     .eq("audit_id", id);
 
-  if (!checklistError && rawChecklists) {
-    const storageRefs = rawChecklists.flatMap((rawChecklist) => {
-      const checklist = rawChecklist as {
-        checklist_items?: unknown[] | null;
-      };
+  if (checklistError) {
+    console.error("[getAudit] Unable to load checklists for audit", {
+      auditId: id,
+      error: checklistError,
+    });
+  } else if (rawChecklists) {
+    const itemIds = rawChecklists.flatMap((rawChecklist) => {
+      const checklist = rawChecklist as { checklist_items?: unknown[] | null };
+      return asSortedChecklistItems(checklist.checklist_items).flatMap((rawItem) => {
+        const item = rawItem as { id?: string | number | null };
+        return item.id ? [String(item.id)] : [];
+      });
+    });
 
-      return (checklist.checklist_items ?? []).flatMap((rawItem) => {
-        const item = rawItem as {
-          evidence_url?: string | null;
-          checklist_item_media?: unknown[] | null;
-        };
+    const currentMediaByItemId = new Map<string, ChecklistItemMedia[]>();
+    let mediaErrorMessage: string | null = null;
 
-        const mediaRefs = (item.checklist_item_media ?? []).flatMap((rawMedia) => {
-          const media = rawMedia as {
-            storage_path?: string | null;
-          };
+    if (itemIds.length > 0) {
+      const { data: mediaRows, error: mediaError } = await supabase
+        .from("checklist_item_media")
+        .select(
+          "id, checklist_item_id, audit_id, organization_id, storage_path, mime_type, media_kind, original_name, created_at"
+        )
+        .eq("organization_id", organizationId)
+        .eq("audit_id", id)
+        .in("checklist_item_id", itemIds);
 
-          return media.storage_path
+      if (mediaError) {
+        mediaErrorMessage = mediaError.message;
+        console.error("[getAudit] Unable to load checklist item media; continuing without media", {
+          auditId: id,
+          error: mediaError,
+        });
+      } else {
+        const storageRefs = mediaRows.flatMap((media) =>
+          media.storage_path
             ? [
                 {
                   bucket: CHECKLIST_MEDIA_BUCKET,
                   path: media.storage_path,
                 },
               ]
-            : [];
-        });
+            : []
+        );
 
+        const signedUrlMap = await createSignedUrlMapForObjects(supabase, storageRefs);
+
+        for (const media of mediaRows ?? []) {
+          if (!media.storage_path) continue;
+
+          const checklistItemId = String(media.checklist_item_id);
+          const nextMedia = {
+            id: String(media.id),
+            checklist_item_id: checklistItemId,
+            audit_id: media.audit_id ?? id,
+            organization_id: media.organization_id ?? organizationId,
+            storage_path: media.storage_path,
+            mime_type: media.mime_type ?? null,
+            media_kind: media.media_kind === "video" ? "video" : "image",
+            created_at: media.created_at ?? null,
+            access_url:
+              signedUrlMap.get(
+                getStorageObjectKey({
+                  bucket: CHECKLIST_MEDIA_BUCKET,
+                  path: media.storage_path,
+                })
+              ) ?? null,
+            original_name: media.original_name ?? null,
+            source: "current",
+          } satisfies ChecklistItemMedia;
+
+          const existingMedia = currentMediaByItemId.get(checklistItemId) ?? [];
+          currentMediaByItemId.set(checklistItemId, [...existingMedia, nextMedia]);
+        }
+      }
+    }
+
+    const legacyStorageRefs = rawChecklists.flatMap((rawChecklist) => {
+      const checklist = rawChecklist as { checklist_items?: unknown[] | null };
+      return asSortedChecklistItems(checklist.checklist_items).flatMap((rawItem) => {
+        const item = rawItem as { evidence_url?: string | null };
         const legacyRef = parseStorageObjectFromUrl(item.evidence_url);
-        return legacyRef ? [...mediaRefs, legacyRef] : mediaRefs;
+        return legacyRef ? [legacyRef] : [];
       });
     });
-
-    const signedUrlMap = await createSignedUrlMapForObjects(supabase, storageRefs);
+    const legacySignedUrlMap = await createSignedUrlMapForObjects(supabase, legacyStorageRefs);
 
     checklists = rawChecklists.map((rawChecklist) => {
       const checklist = rawChecklist as {
@@ -124,7 +198,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
         checklist_items?: unknown[] | null;
       };
 
-      const rawItems = checklist.checklist_items ?? [];
+      const rawItems = asSortedChecklistItems(checklist.checklist_items);
       const items: ChecklistItem[] = rawItems.map((rawItem) => {
         const item = rawItem as {
           id?: string | number;
@@ -134,7 +208,6 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
           evidence_url?: string | null;
           audio_url?: string | null;
           created_at?: string | null;
-          checklist_item_media?: unknown[] | null;
         };
 
         const validOutcomes: AuditOutcome[] = [
@@ -148,43 +221,9 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
           ? (rawOutcome as AuditOutcome)
           : "pending";
 
-        const currentMedia = (item.checklist_item_media ?? []).flatMap((rawMedia) => {
-          const media = rawMedia as {
-            id?: string | number;
-            checklist_item_id?: string | null;
-            audit_id?: string | null;
-            organization_id?: string | null;
-            storage_path?: string | null;
-            mime_type?: string | null;
-            media_kind?: string | null;
-            original_name?: string | null;
-            created_at?: string | null;
-          };
-
-          if (!media.storage_path) return [];
-
-          return [
-            {
-              id: String(media.id),
-              checklist_item_id: media.checklist_item_id ?? String(item.id),
-              audit_id: media.audit_id ?? id,
-              organization_id: media.organization_id ?? organizationId,
-              storage_path: media.storage_path,
-              mime_type: media.mime_type ?? null,
-              media_kind: media.media_kind === "video" ? "video" : "image",
-              created_at: media.created_at ?? null,
-              access_url:
-                signedUrlMap.get(
-                  getStorageObjectKey({
-                    bucket: CHECKLIST_MEDIA_BUCKET,
-                    path: media.storage_path,
-                  })
-                ) ?? null,
-              original_name: media.original_name ?? null,
-              source: "current",
-            } satisfies ChecklistItemMedia,
-          ];
-        });
+        const currentMedia = sortChecklistItemMedia(
+          (currentMediaByItemId.get(String(item.id)) ?? []).filter((media) => Boolean(media.access_url))
+        );
 
         const legacyRef = parseStorageObjectFromUrl(item.evidence_url);
         const legacyMedia =
@@ -203,7 +242,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
                   media_kind: "image",
                   created_at: item.created_at ?? null,
                   access_url: legacyRef
-                    ? signedUrlMap.get(getStorageObjectKey(legacyRef)) ?? item.evidence_url
+                    ? legacySignedUrlMap.get(getStorageObjectKey(legacyRef)) ?? item.evidence_url
                     : item.evidence_url,
                   original_name: null,
                   source: "legacy",
@@ -233,6 +272,13 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
         items,
       };
     });
+
+    if (mediaErrorMessage) {
+      console.warn("[getAudit] Checklist media unavailable; checklist returned without media", {
+        auditId: id,
+        mediaErrorMessage,
+      });
+    }
   }
 
   return {

@@ -5,9 +5,17 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
   password: z.string().min(6),
 });
+
+function normalizeLoginError(message: string) {
+  if (message.toLowerCase().includes("invalid login credentials")) {
+    return "Credenziali non valide per il progetto corrente. Verifica email e password attive di Supabase.";
+  }
+
+  return message;
+}
 
 export async function login(formData: FormData) {
   const rawData = {
@@ -25,7 +33,7 @@ export async function login(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword(validation.data);
 
   if (error) {
-    return { error: error.message };
+    return { error: normalizeLoginError(error.message) };
   }
 
   redirect("/");

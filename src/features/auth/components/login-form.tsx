@@ -25,7 +25,7 @@ export function LoginForm() {
     const result = await login(formData);
 
     if (result?.error) {
-      toast.error("Login failed", { description: result.error });
+      toast.error("Accesso non riuscito", { description: result.error });
       setLoading(false);
     }
     // On success the server action redirects — no client-side action needed

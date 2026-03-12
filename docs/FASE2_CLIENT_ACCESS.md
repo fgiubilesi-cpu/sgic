@@ -138,7 +138,8 @@ INSERT INTO profiles (
 
 #### As Inspector:
 ```
-1. Login: inspector@giubilesi.it / password
+1. Login: use an active organization admin/inspector account from Supabase Auth
+   Legacy example `inspector@giubilesi.it / password` is obsolete and no longer valid
 2. You see: /dashboard
 3. Navigation shows: Dashboard, Audit, etc.
 4. Audit detail:

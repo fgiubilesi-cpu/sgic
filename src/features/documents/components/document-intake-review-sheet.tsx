@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bot, Link2, SquarePen } from 'lucide-react';
 import { toast } from 'sonner';
@@ -32,6 +32,18 @@ import type { DocumentIntakeProposal } from '@/features/documents/lib/document-i
 import type { DocumentListItem } from '@/features/documents/queries/get-documents';
 
 type ReviewAction = 'save_review' | 'apply_to_workspace';
+type ReviewCategory =
+  | 'Procedure'
+  | 'Manual'
+  | 'Instruction'
+  | 'Form'
+  | 'Contract'
+  | 'Certificate'
+  | 'Other'
+  | 'OrgChart'
+  | 'Authorization'
+  | 'Registry'
+  | 'Report';
 
 interface DocumentIntakeReviewSheetProps {
   document: DocumentListItem;
@@ -71,6 +83,9 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
   const [createFollowupTask, setCreateFollowupTask] = useState(false);
   const [latestIngestionStatus, setLatestIngestionStatus] = useState<string | null>(document.ingestion_status);
   const [extractedText, setExtractedText] = useState<string | null>(null);
+  const [reviewCategory, setReviewCategory] = useState<ReviewCategory>(
+    (document.category ?? 'Other') as ReviewCategory
+  );
   const router = useRouter();
 
   const canApplyToWorkspace = Boolean(document.client_id);
@@ -92,6 +107,7 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
         setAction((result.data.action as ReviewAction) ?? 'save_review');
         setLatestIngestionStatus(result.data.latestIngestionStatus ?? document.ingestion_status);
         setExtractedText(result.data.extractedText ?? null);
+        setReviewCategory((document.category ?? 'Other') as ReviewCategory);
       })
       .catch(() => {
         if (!active) return;
@@ -106,15 +122,13 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
     };
   }, [document.id, open]);
 
-  const category = useMemo(() => document.category ?? 'Other', [document.category]);
-
   const saveReview = () => {
     if (!proposal) return;
 
     startTransition(async () => {
       const result = await submitDocumentIntakeReview(document.id, {
         action: action === 'apply_to_workspace' && canApplyToWorkspace ? 'apply_to_workspace' : 'save_review',
-        category,
+        category: reviewCategory,
         create_followup_task: createFollowupTask,
         proposal,
         reviewer_notes: reviewerNotes,
@@ -210,6 +224,28 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
     });
   };
 
+  const addEmptyServiceLine = () => {
+    setProposal((prev) => ({
+      ...(prev ?? { confidence: 'medium', parser: 'manual', summary: '' }),
+      service_lines: [
+        ...(prev?.service_lines ?? []),
+        {
+          billing_phase: '',
+          code: '',
+          frequency_label: '',
+          is_recurring: false,
+          notes: '',
+          quantity: '',
+          section: '',
+          title: '',
+          total_price: '',
+          unit: '',
+          unit_price: '',
+        },
+      ],
+    }));
+  };
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
@@ -236,7 +272,8 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
                 Parser {proposal.parser}
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Badge variant="outline">Categoria: {category}</Badge>
+                <Badge variant="outline">Categoria origine: {document.category ?? 'Other'}</Badge>
+                <Badge variant="outline">Categoria corrente: {reviewCategory}</Badge>
                 <Badge variant="outline">Intake: {ingestionLabel(latestIngestionStatus)}</Badge>
                 <Badge variant="outline">Confidenza: {confidenceLabel(proposal.confidence)}</Badge>
               </div>
@@ -260,6 +297,34 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
             </div>
 
             <div className="space-y-2">
+              <Label>Categoria documento</Label>
+              <Select value={reviewCategory} onValueChange={(value) => setReviewCategory(value as ReviewCategory)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    'Contract',
+                    'Procedure',
+                    'Manual',
+                    'Instruction',
+                    'Form',
+                    'OrgChart',
+                    'Certificate',
+                    'Authorization',
+                    'Registry',
+                    'Report',
+                    'Other',
+                  ].map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label>Riassunto operativo</Label>
               <Textarea
                 value={proposal.summary ?? ''}
@@ -274,7 +339,7 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
               />
             </div>
 
-            {proposal.contract ? (
+            {proposal.contract || reviewCategory === 'Contract' ? (
               <div className="space-y-3 rounded-md border border-zinc-200 p-3">
                 <p className="text-sm font-medium text-zinc-900">Dati contratto</p>
                 <div className="grid gap-3 md:grid-cols-2">
@@ -290,6 +355,21 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
                     <Input
                       value={proposal.contract?.activity_frequency ?? ''}
                       onChange={(event) => updateContract('activity_frequency', event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Protocollo / codice offerta</Label>
+                    <Input
+                      value={proposal.contract?.protocol_code ?? ''}
+                      onChange={(event) => updateContract('protocol_code', event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Data emissione / offerta</Label>
+                    <Input
+                      type="date"
+                      value={proposal.contract?.issue_date ?? ''}
+                      onChange={(event) => updateContract('issue_date', event.target.value)}
                     />
                   </div>
                   <div className="space-y-1">
@@ -317,10 +397,45 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
                     />
                   </div>
                   <div className="space-y-1">
+                    <Label>Durata / termini</Label>
+                    <Input
+                      value={proposal.contract?.duration_terms ?? ''}
+                      onChange={(event) => updateContract('duration_terms', event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Validità offerta / note temporali</Label>
+                    <Input
+                      value={proposal.contract?.validity_terms ?? ''}
+                      onChange={(event) => updateContract('validity_terms', event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Attività esercitata</Label>
+                    <Input
+                      value={proposal.contract?.exercised_activity ?? ''}
+                      onChange={(event) => updateContract('exercised_activity', event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Referenti cliente</Label>
+                    <Input
+                      value={proposal.contract?.client_references ?? ''}
+                      onChange={(event) => updateContract('client_references', event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
                     <Label>Owner interno</Label>
                     <Input
                       value={proposal.contract?.internal_owner ?? ''}
                       onChange={(event) => updateContract('internal_owner', event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Supervisore</Label>
+                    <Input
+                      value={proposal.contract?.supervisor_name ?? ''}
+                      onChange={(event) => updateContract('supervisor_name', event.target.value)}
                     />
                   </div>
                 </div>
@@ -335,7 +450,7 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
               </div>
             ) : null}
 
-            {category === 'OrgChart' ? (
+            {reviewCategory === 'OrgChart' ? (
               <div className="space-y-3 rounded-md border border-zinc-200 p-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-zinc-900">Contatto proposto</p>
@@ -377,10 +492,10 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
               </div>
             ) : null}
 
-            {category === 'Manual' ||
-            category === 'Procedure' ||
-            category === 'Instruction' ||
-            category === 'Form' ? (
+            {reviewCategory === 'Manual' ||
+            reviewCategory === 'Procedure' ||
+            reviewCategory === 'Instruction' ||
+            reviewCategory === 'Form' ? (
               <div className="space-y-3 rounded-md border border-zinc-200 p-3">
                 <p className="text-sm font-medium text-zinc-900">Dati revisione documento</p>
                 <div className="grid gap-3 md:grid-cols-2">
@@ -412,13 +527,18 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
 
             {proposal.service_lines?.length ? (
               <div className="space-y-3 rounded-md border border-zinc-200 p-3">
-                <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
                   <p className="text-sm font-medium text-zinc-900">
                     Attività / righe contrattuali ({proposal.service_lines.length})
                   </p>
                   <p className="text-xs text-zinc-500">
                     Correggi le righe importate dal documento prima di applicarle al workspace cliente.
                   </p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={addEmptyServiceLine}>
+                    Aggiungi riga
+                  </Button>
                 </div>
                 <div className="space-y-3">
                   {proposal.service_lines.map((line, index) => (
@@ -498,6 +618,22 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            ) : null}
+
+            {!proposal.service_lines?.length ? (
+              <div className="rounded-md border border-dashed border-zinc-200 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-zinc-900">Attività / righe contrattuali</p>
+                    <p className="text-xs text-zinc-500">
+                      Nessuna riga rilevata. Puoi inserirle manualmente da qui.
+                    </p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={addEmptyServiceLine}>
+                    Aggiungi riga
+                  </Button>
                 </div>
               </div>
             ) : null}

@@ -3,14 +3,21 @@ import { z } from 'zod';
 const optionalText = z.string().trim();
 
 export const clientContractSchema = z.object({
+  client_references: optionalText,
   contract_type: z.string().trim().min(1, 'Tipo contratto obbligatorio'),
+  duration_terms: optionalText,
   status: z.enum(['draft', 'active', 'paused', 'expired']),
   start_date: optionalText,
+  issue_date: optionalText,
   renewal_date: optionalText,
   end_date: optionalText,
+  exercised_activity: optionalText,
+  protocol_code: optionalText,
   service_scope: optionalText,
+  supervisor_name: optionalText,
   activity_frequency: optionalText,
   internal_owner: optionalText,
+  validity_terms: optionalText,
   notes: optionalText,
   attachment_url: z
     .string()

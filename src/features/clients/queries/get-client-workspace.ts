@@ -10,18 +10,25 @@ export interface ClientContractRecord {
   activity_frequency: string | null;
   attachment_url: string | null;
   client_id: string;
+  client_references: string | null;
   contract_type: string;
   created_at: string;
+  duration_terms: string | null;
   end_date: string | null;
+  exercised_activity: string | null;
   id: string;
   internal_owner: string | null;
+  issue_date: string | null;
   notes: string | null;
   organization_id: string;
+  protocol_code: string | null;
   renewal_date: string | null;
   service_scope: string | null;
   start_date: string | null;
   status: ClientContractStatus;
+  supervisor_name: string | null;
   updated_at: string;
+  validity_terms: string | null;
 }
 
 export interface ClientTaskRecord {

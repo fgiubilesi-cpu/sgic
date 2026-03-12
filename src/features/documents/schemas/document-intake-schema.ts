@@ -28,13 +28,20 @@ export const documentCategorySchema = z.enum([
 
 export const contractProposalSchema = z.object({
   activity_frequency: textOptional,
+  client_references: textOptional,
   contract_type: textOptional,
+  duration_terms: textOptional,
   end_date: dateString,
+  exercised_activity: textOptional,
   internal_owner: textOptional,
+  issue_date: dateString,
   notes: textOptional,
+  protocol_code: textOptional,
   renewal_date: dateString,
   service_scope: textOptional,
   start_date: dateString,
+  supervisor_name: textOptional,
+  validity_terms: textOptional,
 });
 
 export const contactProposalSchema = z.object({

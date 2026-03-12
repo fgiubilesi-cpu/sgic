@@ -327,14 +327,21 @@ export function ClientDetailWorkspace({
   const [deadlineUrgency, setDeadlineUrgency] = useState<'all' | 'overdue' | 'upcoming'>('all');
   const [noteType, setNoteType] = useState<'all' | ClientNoteRecord['note_type']>('all');
   const [contractForm, setContractForm] = useState({
+    client_references: contract?.client_references ?? '',
     contract_type: contract?.contract_type ?? 'standard',
+    duration_terms: contract?.duration_terms ?? '',
     status: contract?.status ?? 'active',
     start_date: contract?.start_date ?? '',
+    issue_date: contract?.issue_date ?? '',
     renewal_date: contract?.renewal_date ?? '',
     end_date: contract?.end_date ?? '',
+    exercised_activity: contract?.exercised_activity ?? '',
+    protocol_code: contract?.protocol_code ?? '',
     service_scope: contract?.service_scope ?? '',
+    supervisor_name: contract?.supervisor_name ?? '',
     activity_frequency: contract?.activity_frequency ?? '',
     internal_owner: contract?.internal_owner ?? '',
+    validity_terms: contract?.validity_terms ?? '',
     notes: contract?.notes ?? '',
     attachment_url: contract?.attachment_url ?? '',
   });
@@ -360,14 +367,21 @@ export function ClientDetailWorkspace({
 
   useEffect(() => {
     setContractForm({
+      client_references: contract?.client_references ?? '',
       contract_type: contract?.contract_type ?? 'standard',
+      duration_terms: contract?.duration_terms ?? '',
       status: contract?.status ?? 'active',
       start_date: contract?.start_date ?? '',
+      issue_date: contract?.issue_date ?? '',
       renewal_date: contract?.renewal_date ?? '',
       end_date: contract?.end_date ?? '',
+      exercised_activity: contract?.exercised_activity ?? '',
+      protocol_code: contract?.protocol_code ?? '',
       service_scope: contract?.service_scope ?? '',
+      supervisor_name: contract?.supervisor_name ?? '',
       activity_frequency: contract?.activity_frequency ?? '',
       internal_owner: contract?.internal_owner ?? '',
+      validity_terms: contract?.validity_terms ?? '',
       notes: contract?.notes ?? '',
       attachment_url: contract?.attachment_url ?? '',
     });
@@ -378,8 +392,15 @@ export function ClientDetailWorkspace({
 
     const formIsEmpty =
       !contractForm.start_date &&
+      !contractForm.issue_date &&
       !contractForm.renewal_date &&
       !contractForm.end_date &&
+      !contractForm.protocol_code &&
+      !contractForm.duration_terms &&
+      !contractForm.validity_terms &&
+      !contractForm.exercised_activity &&
+      !contractForm.client_references &&
+      !contractForm.supervisor_name &&
       !contractForm.service_scope &&
       !contractForm.activity_frequency &&
       !contractForm.internal_owner &&
@@ -392,14 +413,22 @@ export function ClientDetailWorkspace({
     contractProposalAutofillRef.current = latestContractDocument.id;
     setContractForm((prev) => ({
       ...prev,
+      client_references: latestContractProposal.client_references?.trim() || prev.client_references,
       contract_type: latestContractProposal.contract_type?.trim() || prev.contract_type,
+      duration_terms: latestContractProposal.duration_terms?.trim() || prev.duration_terms,
       start_date: latestContractProposal.start_date?.trim() || prev.start_date,
+      issue_date: latestContractProposal.issue_date?.trim() || prev.issue_date,
       renewal_date: latestContractProposal.renewal_date?.trim() || prev.renewal_date,
       end_date: latestContractProposal.end_date?.trim() || prev.end_date,
+      exercised_activity:
+        latestContractProposal.exercised_activity?.trim() || prev.exercised_activity,
+      protocol_code: latestContractProposal.protocol_code?.trim() || prev.protocol_code,
       activity_frequency:
         latestContractProposal.activity_frequency?.trim() || prev.activity_frequency,
       service_scope: latestContractProposal.service_scope?.trim() || prev.service_scope,
+      supervisor_name: latestContractProposal.supervisor_name?.trim() || prev.supervisor_name,
       internal_owner: latestContractProposal.internal_owner?.trim() || prev.internal_owner,
+      validity_terms: latestContractProposal.validity_terms?.trim() || prev.validity_terms,
       notes: latestContractProposal.notes?.trim() || prev.notes,
       attachment_url: preferredDocumentAccessUrl(latestContractDocument) ?? prev.attachment_url,
     }));
@@ -727,14 +756,22 @@ export function ClientDetailWorkspace({
 
     setContractForm((prev) => ({
       ...prev,
+      client_references: latestContractProposal.client_references?.trim() || prev.client_references,
       contract_type: latestContractProposal.contract_type?.trim() || prev.contract_type,
+      duration_terms: latestContractProposal.duration_terms?.trim() || prev.duration_terms,
       start_date: latestContractProposal.start_date?.trim() || prev.start_date,
+      issue_date: latestContractProposal.issue_date?.trim() || prev.issue_date,
       renewal_date: latestContractProposal.renewal_date?.trim() || prev.renewal_date,
       end_date: latestContractProposal.end_date?.trim() || prev.end_date,
+      exercised_activity:
+        latestContractProposal.exercised_activity?.trim() || prev.exercised_activity,
+      protocol_code: latestContractProposal.protocol_code?.trim() || prev.protocol_code,
       activity_frequency:
         latestContractProposal.activity_frequency?.trim() || prev.activity_frequency,
       service_scope: latestContractProposal.service_scope?.trim() || prev.service_scope,
+      supervisor_name: latestContractProposal.supervisor_name?.trim() || prev.supervisor_name,
       internal_owner: latestContractProposal.internal_owner?.trim() || prev.internal_owner,
+      validity_terms: latestContractProposal.validity_terms?.trim() || prev.validity_terms,
       notes: latestContractProposal.notes?.trim() || prev.notes,
       attachment_url: preferredDocumentAccessUrl(latestContractDocument) ?? prev.attachment_url,
     }));
@@ -1450,6 +1487,29 @@ export function ClientDetailWorkspace({
                     </div>
                   </div>
 
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Protocollo / codice offerta</Label>
+                      <Input
+                        value={contractForm.protocol_code ?? ''}
+                        onChange={(event) =>
+                          setContractForm((prev) => ({ ...prev, protocol_code: event.target.value }))
+                        }
+                        placeholder="Es. 00001987/90.7.2025/DAR - Rev.0"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Data emissione / offerta</Label>
+                      <Input
+                        type="date"
+                        value={contractForm.issue_date ?? ''}
+                        onChange={(event) =>
+                          setContractForm((prev) => ({ ...prev, issue_date: event.target.value }))
+                        }
+                      />
+                    </div>
+                  </div>
+
                   <div className="grid gap-4 md:grid-cols-3">
                     <div className="space-y-2">
                       <Label>Data inizio</Label>
@@ -1479,6 +1539,52 @@ export function ClientDetailWorkspace({
                         onChange={(event) =>
                           setContractForm((prev) => ({ ...prev, end_date: event.target.value }))
                         }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Durata / termini</Label>
+                      <Input
+                        value={contractForm.duration_terms ?? ''}
+                        onChange={(event) =>
+                          setContractForm((prev) => ({ ...prev, duration_terms: event.target.value }))
+                        }
+                        placeholder="Es. 1 ANNO - Tacito rinnovo"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Validità offerta / note temporali</Label>
+                      <Input
+                        value={contractForm.validity_terms ?? ''}
+                        onChange={(event) =>
+                          setContractForm((prev) => ({ ...prev, validity_terms: event.target.value }))
+                        }
+                        placeholder="Es. 30gg"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Attività esercitata dal cliente</Label>
+                      <Input
+                        value={contractForm.exercised_activity ?? ''}
+                        onChange={(event) =>
+                          setContractForm((prev) => ({ ...prev, exercised_activity: event.target.value }))
+                        }
+                        placeholder="Es. Importazione e distribuzione di MOCA"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Referenti cliente</Label>
+                      <Input
+                        value={contractForm.client_references ?? ''}
+                        onChange={(event) =>
+                          setContractForm((prev) => ({ ...prev, client_references: event.target.value }))
+                        }
+                        placeholder="Es. Nome Cognome, Nome Cognome"
                       />
                     </div>
                   </div>
@@ -1519,6 +1625,17 @@ export function ClientDetailWorkspace({
                         placeholder="Es. f.giubilesi@..."
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Supervisore</Label>
+                    <Input
+                      value={contractForm.supervisor_name ?? ''}
+                      onChange={(event) =>
+                        setContractForm((prev) => ({ ...prev, supervisor_name: event.target.value }))
+                      }
+                      placeholder="Es. Dott. Massimo A. Giubilesi"
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -1568,8 +1685,20 @@ export function ClientDetailWorkspace({
                     <p className="font-medium text-zinc-900">{contractForm.contract_type || '-'}</p>
                   </div>
                   <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">Protocollo</p>
+                    <p className="font-medium text-zinc-900">{contractForm.protocol_code || '-'}</p>
+                  </div>
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">Emissione</p>
+                    <p className="font-medium text-zinc-900">{toDateLabel(contractForm.issue_date)}</p>
+                  </div>
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
                     <p className="text-xs uppercase tracking-wide text-zinc-500">Stato</p>
                     <p className="font-medium text-zinc-900">{contractForm.status}</p>
+                  </div>
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">Durata</p>
+                    <p className="font-medium text-zinc-900">{contractForm.duration_terms || '-'}</p>
                   </div>
                   <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
                     <p className="text-xs uppercase tracking-wide text-zinc-500">Rinnovo</p>
@@ -1582,6 +1711,18 @@ export function ClientDetailWorkspace({
                   <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
                     <p className="text-xs uppercase tracking-wide text-zinc-500">Owner interno</p>
                     <p className="font-medium text-zinc-900">{contractForm.internal_owner || '-'}</p>
+                  </div>
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">Supervisore</p>
+                    <p className="font-medium text-zinc-900">{contractForm.supervisor_name || '-'}</p>
+                  </div>
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 md:col-span-2">
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">Attività esercitata</p>
+                    <p className="font-medium text-zinc-900">{contractForm.exercised_activity || '-'}</p>
+                  </div>
+                  <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 md:col-span-2">
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">Referenti cliente</p>
+                    <p className="font-medium text-zinc-900">{contractForm.client_references || '-'}</p>
                   </div>
                   {contractAttachmentUrl ? (
                     <Button asChild variant="outline" className="w-full">
@@ -1603,6 +1744,14 @@ export function ClientDetailWorkspace({
                           {latestContractProposal.contract_type || '-'}
                         </p>
                         <p>
+                          <span className="font-medium text-zinc-900">Protocollo:</span>{' '}
+                          {latestContractProposal.protocol_code || '-'}
+                        </p>
+                        <p>
+                          <span className="font-medium text-zinc-900">Emissione:</span>{' '}
+                          {toDateLabel(latestContractProposal.issue_date)}
+                        </p>
+                        <p>
                           <span className="font-medium text-zinc-900">Inizio:</span>{' '}
                           {toDateLabel(latestContractProposal.start_date)}
                         </p>
@@ -1617,6 +1766,10 @@ export function ClientDetailWorkspace({
                         <p>
                           <span className="font-medium text-zinc-900">Frequenza:</span>{' '}
                           {latestContractProposal.activity_frequency || '-'}
+                        </p>
+                        <p>
+                          <span className="font-medium text-zinc-900">Owner:</span>{' '}
+                          {latestContractProposal.internal_owner || '-'}
                         </p>
                       </div>
                     </div>

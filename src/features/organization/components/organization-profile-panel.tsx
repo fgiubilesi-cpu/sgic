@@ -5,16 +5,18 @@ import { OrganizationProfileDetailsForm } from "@/features/organization/componen
 import type { Organization } from "@/features/organization/queries/get-organization";
 
 export function OrganizationProfilePanel({
-  canManage,
+  canManageConsole,
+  canManageIdentity,
   organization,
 }: {
-  canManage: boolean;
+  canManageConsole: boolean;
+  canManageIdentity: boolean;
   organization: Organization;
 }) {
   return (
     <div className="space-y-6">
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <OrgSettingsForm canManage={canManage} organization={organization} />
+        <OrgSettingsForm canManage={canManageIdentity} organization={organization} />
         <Card className="border-zinc-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Uso del profilo</CardTitle>
@@ -46,7 +48,7 @@ export function OrganizationProfilePanel({
       </div>
 
       <OrganizationProfileDetailsForm
-        canManage={canManage}
+        canManage={canManageConsole}
         initialValues={organization.config.profile}
       />
     </div>

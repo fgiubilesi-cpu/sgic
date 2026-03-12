@@ -1,10 +1,12 @@
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import {
+  getDefaultOrganizationConsoleConfig,
   parseOrganizationConsoleConfig,
   type OrganizationConsoleConfig,
 } from "@/features/organization/lib/organization-console-config";
 
 export type Organization = {
+  consoleStorageReady: boolean;
   config: OrganizationConsoleConfig;
   id: string;
   logo_url: string | null;
@@ -25,16 +27,35 @@ export async function getOrganization(): Promise<Organization | null> {
     .eq("id", organizationId)
     .single();
 
-  if (orgError || !organization) {
+  if (!orgError && organization) {
+    return {
+      config: parseOrganizationConsoleConfig(organization.settings),
+      consoleStorageReady: true,
+      id: String(organization.id),
+      logo_url: organization.logo_url ?? null,
+      name: organization.name ?? null,
+      vat_number: organization.vat_number ?? null,
+      slug: organization.slug ?? null,
+    };
+  }
+
+  const { data: fallbackOrganization, error: fallbackError } = await supabase
+    .from("organizations")
+    .select("id, name, vat_number, slug")
+    .eq("id", organizationId)
+    .single();
+
+  if (fallbackError || !fallbackOrganization) {
     return null;
   }
 
   return {
-    config: parseOrganizationConsoleConfig(organization.settings),
-    id: String(organization.id),
-    logo_url: organization.logo_url ?? null,
-    name: organization.name ?? null,
-    vat_number: organization.vat_number ?? null,
-    slug: organization.slug ?? null,
+    config: getDefaultOrganizationConsoleConfig(),
+    consoleStorageReady: false,
+    id: String(fallbackOrganization.id),
+    logo_url: null,
+    name: fallbackOrganization.name ?? null,
+    vat_number: fallbackOrganization.vat_number ?? null,
+    slug: fallbackOrganization.slug ?? null,
   };
 }

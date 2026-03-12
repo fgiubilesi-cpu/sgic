@@ -1,5 +1,8 @@
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
-import { parseOrganizationConsoleConfig } from "@/features/organization/lib/organization-console-config";
+import {
+  getDefaultOrganizationConsoleConfig,
+  parseOrganizationConsoleConfig,
+} from "@/features/organization/lib/organization-console-config";
 
 export type OrganizationConsoleMetric = {
   label: string;
@@ -41,7 +44,7 @@ export async function getOrganizationConsoleOverview(): Promise<OrganizationCons
     { count: templatesCount },
     { count: documentsCount },
     { count: trainingCoursesCount },
-    { data: organization },
+    organizationResult,
     { data: roleSummaryRows },
   ] = await Promise.all([
     supabase
@@ -87,9 +90,24 @@ export async function getOrganizationConsoleOverview(): Promise<OrganizationCons
       .eq("organization_id", organizationId),
   ]);
 
+  let organization = organizationResult.data;
+  let config = parseOrganizationConsoleConfig(organization?.settings);
+
+  if (organizationResult.error || !organization) {
+    const { data: fallbackOrganization } = await supabase
+      .from("organizations")
+      .select("name, slug, vat_number")
+      .eq("id", organizationId)
+      .single();
+
+    organization = fallbackOrganization
+      ? { ...fallbackOrganization, logo_url: null, settings: getDefaultOrganizationConsoleConfig() }
+      : null;
+    config = getDefaultOrganizationConsoleConfig();
+  }
+
   const adminCount = (roleSummaryRows ?? []).filter((row) => row.role === "admin").length;
   const operatorCount = (roleSummaryRows ?? []).filter((row) => row.role && row.role !== "admin").length;
-  const config = parseOrganizationConsoleConfig(organization?.settings);
 
   const setupItems: OrganizationSetupItem[] = [
     {

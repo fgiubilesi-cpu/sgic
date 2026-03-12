@@ -60,53 +60,78 @@ export default async function OrganizationPage({ searchParams }: OrganizationPag
   }
 
   const canManage = accessOverview?.canManageAccess ?? false;
+  const canManageConsole = canManage && organization.consoleStorageReady;
 
   return (
-    <OrganizationConsoleShell
-      activeTab={activeTab}
-      accessContent={accessOverview ? <OrganizationAccessPanel overview={accessOverview} /> : null}
-      brandingContent={
-        <OrganizationBrandingPanel
-          canManage={canManage}
-          initialValues={{
-            emailSignature: organization.config.branding.emailSignature,
-            logoUrl: organization.logo_url ?? "",
-            primaryColor: organization.config.branding.primaryColor,
-            reportSubtitle: organization.config.branding.reportSubtitle,
-            reportTitle: organization.config.branding.reportTitle,
-          }}
-        />
-      }
-      notificationsContent={
-        <OrganizationNotificationsPanel
-          canManage={canManage}
-          initialValues={organization.config.notifications}
-        />
-      }
-      organization={organization}
-      overview={
-        consoleOverview ?? {
-          completionPercent: 0,
-          metrics: {
-            users: { label: "Utenti attivi", tone: "warning", value: 0 },
-            clients: { label: "Clienti attivi", tone: "warning", value: 0 },
-            activeAudits: { label: "Audit aperti", tone: "warning", value: 0 },
-            openNCs: { label: "NC aperte", tone: "default", value: 0 },
-          },
-          setupItems: [],
-          statusLabel: "Tenant da configurare",
+    <section className="space-y-4">
+      {!organization.consoleStorageReady ? (
+        <Card className="border-amber-200 bg-amber-50/60">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-sm font-semibold text-amber-900">
+              Organization console in modalita compatibile
+            </CardTitle>
+            <CardDescription className="text-sm text-amber-800">
+              L&apos;organizzazione esiste, ma il database non ha ancora le colonne `settings` e `logo_url`
+              richieste dalla nuova console. La pagina resta accessibile in lettura e i salvataggi avanzati
+              sono temporaneamente disabilitati finche non applichi la migration
+              `20260312090000_add_organization_console_settings.sql`.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : null}
+
+      <OrganizationConsoleShell
+        activeTab={activeTab}
+        accessContent={accessOverview ? <OrganizationAccessPanel overview={accessOverview} /> : null}
+        brandingContent={
+          <OrganizationBrandingPanel
+            canManage={canManageConsole}
+            initialValues={{
+              emailSignature: organization.config.branding.emailSignature,
+              logoUrl: organization.logo_url ?? "",
+              primaryColor: organization.config.branding.primaryColor,
+              reportSubtitle: organization.config.branding.reportSubtitle,
+              reportTitle: organization.config.branding.reportTitle,
+            }}
+          />
         }
-      }
-      profileContent={<OrganizationProfilePanel canManage={canManage} organization={organization} />}
-      rulesContent={
-        <OrganizationRulesPanel
-          canManage={canManage}
-          initialValues={organization.config.rules}
-        />
-      }
-      systemContent={
-        systemSnapshot ? <OrganizationSystemPanel snapshot={systemSnapshot} /> : null
-      }
-    />
+        notificationsContent={
+          <OrganizationNotificationsPanel
+            canManage={canManageConsole}
+            initialValues={organization.config.notifications}
+          />
+        }
+        organization={organization}
+        overview={
+          consoleOverview ?? {
+            completionPercent: 0,
+            metrics: {
+              users: { label: "Utenti attivi", tone: "warning", value: 0 },
+              clients: { label: "Clienti attivi", tone: "warning", value: 0 },
+              activeAudits: { label: "Audit aperti", tone: "warning", value: 0 },
+              openNCs: { label: "NC aperte", tone: "default", value: 0 },
+            },
+            setupItems: [],
+            statusLabel: "Tenant da configurare",
+          }
+        }
+        profileContent={
+          <OrganizationProfilePanel
+            canManageConsole={canManageConsole}
+            canManageIdentity={canManage}
+            organization={organization}
+          />
+        }
+        rulesContent={
+          <OrganizationRulesPanel
+            canManage={canManageConsole}
+            initialValues={organization.config.rules}
+          />
+        }
+        systemContent={
+          systemSnapshot ? <OrganizationSystemPanel snapshot={systemSnapshot} /> : null
+        }
+      />
+    </section>
   );
 }

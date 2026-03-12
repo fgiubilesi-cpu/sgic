@@ -520,3 +520,4 @@ Ordine rigoroso:
 - 2026-03-12: implementati M6 + M8 base con dialog `Governance` per storico versioni/review/link operativi, KPI documentali nel dossier cliente, alert su review queue e mismatch contratto
 - 2026-03-12: completato un passaggio M9 sul tab documenti cliente con riepilogo filtri attivi, reset rapido, preset operativi richiamabili dalle code e empty state azionabile per upload / recovery dei filtri
 - 2026-03-12: sistemata la pipeline CSS globale in dev rimuovendo un import non valido da `globals.css`; UI tornata stabile su `3000`
+- 2026-03-12: aggiunta base QA per il branch con suite Playwright riallineata alla UI corrente, login helper via env (`E2E_EMAIL` / `E2E_PASSWORD`) e smoke test dedicato al workspace documenti cliente

@@ -6,6 +6,19 @@ Automated test suite for SGIC using Playwright.
 
 Tests are already configured in `playwright.config.ts`.
 
+Authenticated suites require these env vars:
+
+```bash
+export E2E_EMAIL="your-user@example.com"
+export E2E_PASSWORD="your-password"
+```
+
+Optional:
+
+```bash
+export E2E_BASE_URL="http://localhost:3000"
+```
+
 ## Running Tests
 
 ```bash
@@ -31,22 +44,19 @@ npx playwright test -g "User can login"
 ## Test Coverage
 
 ### T2: Authentication (auth.spec.ts)
-- T2.1: Login with valid credentials
-- T2.2: Login error handling
-- T2.3: Password validation
-- T2.4: Logout functionality
+- Login with configured credentials
+- Validation on invalid email
 
 ### T3: Audit Workflow (audit-workflow.spec.ts)
-- T3.1: Complete workflow (create → open → fill → verify)
-- T3.2: Score calculation
-- T3.3: Non-conformity auto-creation
+- Audit explorer smoke
 
 ### T4: Clients & Locations CRUD (clients-locations.spec.ts)
-- T4.1: Create new client
-- T4.2: Edit existing client
-- T4.3: Create location under client
-- T4.4: Delete location
-- T4.5: View clients list
+- Clients explorer smoke
+- Access to client workspace
+
+### T5: Client document workspace (document-workspace.spec.ts)
+- Access to client document tab
+- Presence of archive controls and operational presets
 
 ## Configuration
 
@@ -59,10 +69,9 @@ npx playwright test -g "User can login"
 
 ## Notes
 
-- Tests require the app to be running (dev server starts automatically)
-- Test data uses current timestamp for uniqueness
-- Some selectors use data-testid attributes (add these to components for better reliability)
-- Tests are robust to missing elements (use .catch() fallbacks)
+- Tests reuse an existing local server when available, otherwise start `npm run dev:3000`
+- Authenticated suites are skipped automatically if `E2E_EMAIL` / `E2E_PASSWORD` are not set
+- Selectors are aligned to the current production UI copy to reduce drift
 
 ## Debugging
 

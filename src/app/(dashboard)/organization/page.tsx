@@ -7,13 +7,27 @@ import {
 } from "@/components/ui/card";
 import { getOrganization } from "@/features/organization/queries/get-organization";
 import { getOrganizationAccessOverview } from "@/features/organization/queries/get-organization-access";
+import { getOrganizationConsoleOverview } from "@/features/organization/queries/get-organization-console";
+import { OrganizationConsoleShell } from "@/features/organization/components/organization-console-shell";
 import { OrgSettingsForm } from "@/features/organization/components/org-settings-form";
 import { OrganizationAccessPanel } from "@/features/organization/components/organization-access-panel";
 
-export default async function OrganizationPage() {
-  const [organization, accessOverview] = await Promise.all([
+type OrganizationPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function OrganizationPage({ searchParams }: OrganizationPageProps) {
+  const params = await searchParams;
+  const activeTab =
+    typeof params.tab === "string" &&
+    ["profile", "access", "rules", "branding", "notifications", "system"].includes(params.tab)
+      ? (params.tab as "profile" | "access" | "rules" | "branding" | "notifications" | "system")
+      : "profile";
+
+  const [organization, accessOverview, consoleOverview] = await Promise.all([
     getOrganization(),
     getOrganizationAccessOverview(),
+    getOrganizationConsoleOverview(),
   ]);
 
   if (!organization) {
@@ -40,19 +54,24 @@ export default async function OrganizationPage() {
   }
 
   return (
-    <section className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
-          Organisation
-        </h1>
-        <p className="text-sm text-zinc-500">
-          Manage your organisation&apos;s registration details. This data is
-          used in audits, reports, and ISO 9001 traceability.
-        </p>
-      </div>
-
-      <OrgSettingsForm organization={organization} />
-      {accessOverview ? <OrganizationAccessPanel overview={accessOverview} /> : null}
-    </section>
+    <OrganizationConsoleShell
+      activeTab={activeTab}
+      organization={organization}
+      overview={
+        consoleOverview ?? {
+          completionPercent: 0,
+          metrics: {
+            users: { label: "Utenti attivi", tone: "warning", value: 0 },
+            clients: { label: "Clienti attivi", tone: "warning", value: 0 },
+            activeAudits: { label: "Audit aperti", tone: "warning", value: 0 },
+            openNCs: { label: "NC aperte", tone: "default", value: 0 },
+          },
+          setupItems: [],
+          statusLabel: "Tenant da configurare",
+        }
+      }
+      profileContent={<OrgSettingsForm organization={organization} />}
+      accessContent={accessOverview ? <OrganizationAccessPanel overview={accessOverview} /> : null}
+    />
   );
 }

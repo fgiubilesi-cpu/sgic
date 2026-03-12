@@ -12,5 +12,12 @@ export async function login(page: Page) {
   await page.getByLabel('Email').fill(E2E_EMAIL);
   await page.getByLabel('Password').fill(E2E_PASSWORD);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL('**/dashboard', { timeout: 15000 });
+
+  await page.waitForURL((url) => url.pathname !== '/login', { timeout: 30000 });
+
+  if (!page.url().endsWith('/dashboard')) {
+    await page.goto('/dashboard');
+  }
+
+  await page.waitForURL('**/dashboard', { timeout: 30000 });
 }

@@ -10,7 +10,7 @@ test.describe('Authentication', () => {
     await login(page);
 
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByText(/dashboard/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^dashboard$/i })).toBeVisible();
   });
 
   test('user sees validation feedback with invalid email', async ({ page }) => {

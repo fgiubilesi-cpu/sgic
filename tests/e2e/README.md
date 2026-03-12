@@ -58,6 +58,12 @@ npx playwright test -g "User can login"
 - Access to client document tab
 - Presence of archive controls and operational presets
 
+### T6: Template workflows (templates.spec.ts)
+- Template library smoke
+- Import Excel sheet entry point
+- New template editor smoke
+- Audit template tab smoke
+
 ## Configuration
 
 - **Base URL**: http://localhost:3000

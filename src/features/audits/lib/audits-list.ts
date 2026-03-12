@@ -90,6 +90,10 @@ const DEFAULT_AUDITS_LIST_STATE: AuditsListState = {
   viewMode: "table",
 };
 
+type AuditsListDefaults = Partial<
+  Pick<AuditsListState, "groupBy" | "sort" | "viewMode">
+>;
+
 const VALID_STATUSES: AuditStatus[] = ["Scheduled", "In Progress", "Review", "Closed"];
 const VALID_PERIODS: AuditsListPeriod[] = ["all", "upcoming", "past_due", "last_90d", "this_year"];
 const VALID_SCORE_BANDS: AuditsListScoreBand[] = ["all", "lt70", "70_85", "gte85", "unscored"];
@@ -118,7 +122,14 @@ export function parseDate(value: string | null): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function parseAuditsListState(searchParams: SearchParamsLike): AuditsListState {
+export function parseAuditsListState(
+  searchParams: SearchParamsLike,
+  defaults: AuditsListDefaults = {}
+): AuditsListState {
+  const resolvedDefaults = {
+    ...DEFAULT_AUDITS_LIST_STATE,
+    ...defaults,
+  };
   const search = getSingleValue(searchParams.search)?.trim() ?? "";
   const status = getSingleValue(searchParams.status);
   const clientId = getSingleValue(searchParams.client) ?? "all";
@@ -132,17 +143,17 @@ export function parseAuditsListState(searchParams: SearchParamsLike): AuditsList
 
   return {
     search,
-    status: isValidValue(status, VALID_STATUSES) ? status : DEFAULT_AUDITS_LIST_STATE.status,
+    status: isValidValue(status, VALID_STATUSES) ? status : resolvedDefaults.status,
     clientId,
     locationId,
-    period: isValidValue(period, VALID_PERIODS) ? period : DEFAULT_AUDITS_LIST_STATE.period,
+    period: isValidValue(period, VALID_PERIODS) ? period : resolvedDefaults.period,
     hasOpenNc,
     scoreBand: isValidValue(scoreBand, VALID_SCORE_BANDS)
       ? scoreBand
-      : DEFAULT_AUDITS_LIST_STATE.scoreBand,
-    sort: isValidValue(sort, VALID_SORTS) ? sort : DEFAULT_AUDITS_LIST_STATE.sort,
-    groupBy: isValidValue(groupBy, VALID_GROUPS) ? groupBy : DEFAULT_AUDITS_LIST_STATE.groupBy,
-    viewMode: isValidValue(viewMode, VALID_VIEWS) ? viewMode : DEFAULT_AUDITS_LIST_STATE.viewMode,
+      : resolvedDefaults.scoreBand,
+    sort: isValidValue(sort, VALID_SORTS) ? sort : resolvedDefaults.sort,
+    groupBy: isValidValue(groupBy, VALID_GROUPS) ? groupBy : resolvedDefaults.groupBy,
+    viewMode: isValidValue(viewMode, VALID_VIEWS) ? viewMode : resolvedDefaults.viewMode,
   };
 }
 
@@ -571,6 +582,9 @@ export function getScoreBandLabel(scoreBand: AuditsListScoreBand): string {
   }
 }
 
-export function getDefaultAuditsListState(): AuditsListState {
-  return DEFAULT_AUDITS_LIST_STATE;
+export function getDefaultAuditsListState(defaults: AuditsListDefaults = {}): AuditsListState {
+  return {
+    ...DEFAULT_AUDITS_LIST_STATE,
+    ...defaults,
+  };
 }

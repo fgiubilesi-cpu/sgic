@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
+import { parseOrganizationConsoleConfig } from "@/features/organization/lib/organization-console-config";
 
 export interface DashboardFilters {
   clientId?: string;
@@ -366,8 +367,14 @@ export async function getUpcomingAudits(): Promise<UpcomingAudit[]> {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("settings")
+    .eq("id", organizationId)
+    .single();
+  const config = parseOrganizationConsoleConfig(organization?.settings);
   const nextWeek = new Date(today);
-  nextWeek.setDate(nextWeek.getDate() + 7);
+  nextWeek.setDate(nextWeek.getDate() + config.rules.auditAlertDays);
 
   const todayIso = today.toISOString().split("T")[0];
   const nextWeekIso = nextWeek.toISOString().split("T")[0];
@@ -466,9 +473,16 @@ export async function getDashboardActionCenter(
   if (!ctx) return { notifications: [], todos: [] };
   const { supabase, organizationId } = ctx;
 
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("settings")
+    .eq("id", organizationId)
+    .single();
+  const config = parseOrganizationConsoleConfig(organization?.settings);
+
   const today = getStartOfToday();
-  const sevenDaysOut = addDays(today, 7);
-  const thirtyDaysOut = addDays(today, 30);
+  const sevenDaysOut = addDays(today, config.rules.auditAlertDays);
+  const thirtyDaysOut = addDays(today, Math.max(config.rules.documentAlertDays, config.rules.trainingAlertDays));
   const todayIso = today.toISOString().split("T")[0];
   const sevenDaysOutIso = sevenDaysOut.toISOString().split("T")[0];
 
@@ -584,7 +598,7 @@ export async function getDashboardActionCenter(
   const expiringDocuments = (documents ?? []).filter((document: any) => {
     if (!document.expiry_date) return false;
     const expiryDate = new Date(document.expiry_date);
-    return expiryDate >= today && expiryDate <= thirtyDaysOut;
+    return expiryDate >= today && expiryDate <= addDays(today, config.rules.documentAlertDays);
   });
 
   const personNameById = new Map<string, string>(
@@ -602,12 +616,12 @@ export async function getDashboardActionCenter(
   const expiringTraining = (trainingRecords ?? []).filter((record: any) => {
     if (!record.expiry_date) return false;
     const expiryDate = new Date(record.expiry_date);
-    return expiryDate >= today && expiryDate <= thirtyDaysOut;
+    return expiryDate >= today && expiryDate <= addDays(today, config.rules.trainingAlertDays);
   });
 
   const notifications: DashboardNotification[] = [];
 
-  if (overdueCorrectiveActions.length > 0) {
+  if (config.notifications.sendOverdueActions && overdueCorrectiveActions.length > 0) {
     notifications.push({
       id: "overdue-corrective-actions",
       title: `${overdueCorrectiveActions.length} azioni correttive scadute`,
@@ -617,7 +631,7 @@ export async function getDashboardActionCenter(
     });
   }
 
-  if (criticalNCs.length > 0) {
+  if (config.notifications.sendOpenNonConformities && criticalNCs.length > 0) {
     notifications.push({
       id: "critical-ncs",
       title: `${criticalNCs.length} non conformita prioritarie`,
@@ -627,7 +641,7 @@ export async function getDashboardActionCenter(
     });
   }
 
-  if (overdueDocuments.length > 0 || expiringDocuments.length > 0) {
+  if (config.notifications.sendDocumentExpiry && (overdueDocuments.length > 0 || expiringDocuments.length > 0)) {
     notifications.push({
       id: "document-deadlines",
       title:
@@ -643,7 +657,7 @@ export async function getDashboardActionCenter(
     });
   }
 
-  if (expiredTraining.length > 0 || expiringTraining.length > 0) {
+  if (config.notifications.sendTrainingExpiry && (expiredTraining.length > 0 || expiringTraining.length > 0)) {
     notifications.push({
       id: "training-deadlines",
       title:
@@ -659,7 +673,7 @@ export async function getDashboardActionCenter(
     });
   }
 
-  if (upcomingAudits.length > 0) {
+  if (config.notifications.sendAuditUpcoming && upcomingAudits.length > 0) {
     notifications.push({
       id: "upcoming-audits",
       title: `${upcomingAudits.length} audit nei prossimi 7 giorni`,

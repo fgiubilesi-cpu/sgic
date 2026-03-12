@@ -21,7 +21,7 @@ WHERE c.audit_id = a.id
 WITH checklist_template_source AS (
   SELECT
     ci.checklist_id,
-    MIN(tq.template_id) AS template_id,
+    MIN(tq.template_id::text)::uuid AS template_id,
     COUNT(DISTINCT tq.template_id) AS template_count
   FROM public.checklist_items AS ci
   JOIN public.template_questions AS tq ON tq.id = ci.source_question_id
@@ -39,7 +39,7 @@ WHERE c.id = src.checklist_id
 WITH audit_template_source AS (
   SELECT
     c.audit_id,
-    MIN(c.template_id) AS template_id,
+    MIN(c.template_id::text)::uuid AS template_id,
     COUNT(DISTINCT c.template_id) AS template_count
   FROM public.checklists AS c
   WHERE c.template_id IS NOT NULL

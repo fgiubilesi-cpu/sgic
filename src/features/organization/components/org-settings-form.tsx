@@ -51,14 +51,14 @@ export function OrgSettingsForm({ canManage = true, organization }: OrgSettingsF
       const result = await updateOrganization(values);
 
       if (result.error) {
-        toast.error("Failed to update organisation", {
+        toast.error("Aggiornamento organizzazione non riuscito", {
           description: result.error,
         });
         return;
       }
 
-      toast.success("Organisation updated", {
-        description: result.success ?? "Changes saved successfully.",
+      toast.success("Organizzazione aggiornata", {
+        description: result.success ?? "Modifiche salvate correttamente.",
       });
     });
   };
@@ -67,11 +67,11 @@ export function OrgSettingsForm({ canManage = true, organization }: OrgSettingsF
     <Card className="max-w-2xl border-zinc-200 shadow-sm">
       <CardHeader>
         <CardTitle className="text-lg font-semibold">
-          Organisation Settings
+          Anagrafica organizzazione
         </CardTitle>
         <CardDescription className="text-sm text-zinc-500">
-          Update your organisation&apos;s core information. This data is used in
-          audit reports and ISO 9001 documentation.
+          Aggiorna i dati base dell&apos;organizzazione. Queste informazioni vengono usate
+          in report audit, intestazioni e documentazione ISO 9001.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -82,17 +82,17 @@ export function OrgSettingsForm({ canManage = true, organization }: OrgSettingsF
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Company Name</FormLabel>
+                  <FormLabel>Ragione sociale</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
-                      placeholder="e.g. ACME Ltd."
+                      placeholder="Es. Giubilesi Associati"
                       autoComplete="organization"
                       disabled={!canManage || isPending}
                     />
                   </FormControl>
                   <FormDescription>
-                    Legal name of the organisation as it will appear in documents.
+                    Nome legale dell&apos;organizzazione, come apparira nei documenti.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -104,17 +104,17 @@ export function OrgSettingsForm({ canManage = true, organization }: OrgSettingsF
               name="vat_number"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>VAT Number</FormLabel>
+                  <FormLabel>Partita IVA</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
-                      placeholder="e.g. GB123456789"
+                      placeholder="Es. IT12345678900"
                       inputMode="numeric"
                       disabled={!canManage || isPending}
                     />
                   </FormControl>
                   <FormDescription>
-                    Optional. Used for invoicing and fiscal headers.
+                    Facoltativa. Usata per intestazioni fiscali e documentali.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -130,15 +130,15 @@ export function OrgSettingsForm({ canManage = true, organization }: OrgSettingsF
                   <FormControl>
                     <Input
                       {...field}
-                      placeholder="e.g. acme-audit"
+                      placeholder="Es. giubilesi-associati"
                       autoCapitalize="none"
                       autoCorrect="off"
                       disabled={!canManage || isPending}
                     />
                   </FormControl>
                   <FormDescription>
-                    Unique identifier used in URLs (e.g. domain/org/
-                    <span className="font-mono text-xs">acme-audit</span>). Must be unique.
+                    Identificatore univoco usato negli URL (es. domain/org/
+                    <span className="font-mono text-xs">giubilesi-associati</span>). Deve essere univoco.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -147,7 +147,7 @@ export function OrgSettingsForm({ canManage = true, organization }: OrgSettingsF
 
             <div className="flex justify-end gap-3">
               <Button type="submit" disabled={!canManage || isPending}>
-                {isPending ? "Saving..." : "Save changes"}
+                {isPending ? "Salvataggio..." : "Salva anagrafica"}
               </Button>
             </div>
           </form>

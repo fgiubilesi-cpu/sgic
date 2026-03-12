@@ -48,7 +48,7 @@ function getNavItems(role?: string | null): NavItem[] {
   if (role === "client") {
     // Client users see only the client dashboard
     return [
-      { label: "Client Dashboard", href: "/client-dashboard", icon: HomeIcon },
+      { label: "Dashboard cliente", href: "/client-dashboard", icon: HomeIcon },
     ];
   }
 
@@ -57,10 +57,10 @@ function getNavItems(role?: string | null): NavItem[] {
     { label: "Dashboard", href: "/dashboard", icon: HomeIcon },
     { label: "Audit", href: "/audits", icon: ClipboardCheck },
     { label: "Clienti", href: "/clients", icon: Building2 },
-    { label: "Organization", href: "/organization", icon: Building2 },
+    { label: "Organizzazione", href: "/organization", icon: Building2 },
     { label: "Campionamenti", href: null, icon: FlaskConical, disabled: true },
     { label: "Formazione", href: null, icon: GraduationCap, disabled: true },
-    { label: "Settings", href: "/settings", icon: Settings },
+    { label: "Account", href: "/settings", icon: Settings },
   ];
 }
 
@@ -77,7 +77,7 @@ function NavLinks({ role }: { role?: string | null }) {
             <div
               key={item.label}
               className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-400 cursor-not-allowed select-none"
-              title="Coming soon"
+              title="Prossimamente"
             >
               <Icon className="h-4 w-4 text-zinc-300" />
               <span className="flex-1">{item.label}</span>
@@ -85,7 +85,7 @@ function NavLinks({ role }: { role?: string | null }) {
                 variant="secondary"
                 className="text-[10px] px-1.5 py-0 h-4 bg-zinc-100 text-zinc-400 border-zinc-200"
               >
-                coming soon
+                presto
               </Badge>
             </div>
           );
@@ -212,13 +212,13 @@ export default async function DashboardLayout({
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
                       <BreadcrumbPage className="text-xs font-medium">
-                        {dashboardUser.role === "client" ? "Client Dashboard" : "Control Panel"}
+                        {dashboardUser.role === "client" ? "Dashboard cliente" : "Pannello di controllo"}
                       </BreadcrumbPage>
                     </BreadcrumbItem>
                   </BreadcrumbList>
                 </Breadcrumb>
                 <span className="text-sm font-semibold text-zinc-900">
-                  {dashboardUser.role === "client" ? "Audit Viewer" : "Control Panel"}
+                  {dashboardUser.role === "client" ? "Vista audit cliente" : "Pannello di controllo"}
                 </span>
               </div>
             </div>

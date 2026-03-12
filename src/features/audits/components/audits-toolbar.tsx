@@ -37,75 +37,75 @@ type AuditsToolbarProps = {
 };
 
 const STATUS_OPTIONS: Array<{ value: "all" | AuditStatus; label: string }> = [
-  { value: "all", label: "All statuses" },
-  { value: "Scheduled", label: "Scheduled" },
-  { value: "In Progress", label: "In Progress" },
-  { value: "Review", label: "Review" },
-  { value: "Closed", label: "Closed" },
+  { value: "all", label: "Tutti gli stati" },
+  { value: "Scheduled", label: "Pianificato" },
+  { value: "In Progress", label: "In corso" },
+  { value: "Review", label: "In revisione" },
+  { value: "Closed", label: "Chiuso" },
 ];
 
 const PERIOD_OPTIONS: Array<{ value: AuditsListPeriod; label: string }> = [
-  { value: "all", label: "All periods" },
-  { value: "upcoming", label: "Upcoming" },
-  { value: "past_due", label: "Past due" },
-  { value: "last_90d", label: "Last 90 days" },
-  { value: "this_year", label: "This year" },
+  { value: "all", label: "Tutti i periodi" },
+  { value: "upcoming", label: "In arrivo" },
+  { value: "past_due", label: "Scaduti" },
+  { value: "last_90d", label: "Ultimi 90 giorni" },
+  { value: "this_year", label: "Quest'anno" },
 ];
 
 const SCORE_OPTIONS: Array<{ value: AuditsListScoreBand; label: string }> = [
-  { value: "all", label: "All scores" },
+  { value: "all", label: "Tutti gli score" },
   { value: "lt70", label: "Score < 70%" },
   { value: "70_85", label: "Score 70-84%" },
   { value: "gte85", label: "Score >= 85%" },
-  { value: "unscored", label: "Unscored" },
+  { value: "unscored", label: "Senza score" },
 ];
 
 const SORT_OPTIONS: Array<{ value: AuditsListSort; label: string }> = [
-  { value: "scheduled_desc", label: "Newest first" },
-  { value: "scheduled_asc", label: "Oldest first" },
-  { value: "score_desc", label: "Highest score" },
-  { value: "score_asc", label: "Lowest score" },
-  { value: "nc_desc", label: "Most NC" },
-  { value: "title_asc", label: "Title A-Z" },
+  { value: "scheduled_desc", label: "Più recenti prima" },
+  { value: "scheduled_asc", label: "Più vecchi prima" },
+  { value: "score_desc", label: "Score più alto" },
+  { value: "score_asc", label: "Score più basso" },
+  { value: "nc_desc", label: "Più NC aperte" },
+  { value: "title_asc", label: "Titolo A-Z" },
 ];
 
 const GROUP_OPTIONS: Array<{ value: AuditsListGroupBy; label: string }> = [
-  { value: "none", label: "No grouping" },
-  { value: "month", label: "Month" },
-  { value: "client", label: "Client" },
-  { value: "location", label: "Location" },
-  { value: "status", label: "Status" },
+  { value: "none", label: "Nessun raggruppamento" },
+  { value: "month", label: "Mese" },
+  { value: "client", label: "Cliente" },
+  { value: "location", label: "Sede" },
+  { value: "status", label: "Stato" },
 ];
 
 const VIEW_OPTIONS: Array<{ value: AuditsListViewMode; label: string }> = [
-  { value: "table", label: "Table" },
-  { value: "cards", label: "Cards" },
+  { value: "table", label: "Tabella" },
+  { value: "cards", label: "Schede" },
 ];
 
 const SAVED_VIEWS = [
   {
     id: "all",
-    label: "All",
+    label: "Tutti",
     params: {},
   },
   {
     id: "open_nc",
-    label: "Open NC",
+    label: "NC aperte",
     params: { hasOpenNc: "true", sort: "nc_desc" },
   },
   {
     id: "low_score",
-    label: "Low score",
+    label: "Score basso",
     params: { scoreBand: "lt70", sort: "score_asc" },
   },
   {
     id: "upcoming",
-    label: "Upcoming",
+    label: "In arrivo",
     params: { period: "upcoming", sort: "scheduled_asc" },
   },
   {
     id: "by_client",
-    label: "By client",
+    label: "Per cliente",
     params: { groupBy: "client", view: "cards" },
   },
 ] as const;
@@ -191,10 +191,10 @@ export function AuditsToolbar({
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-sm font-medium text-zinc-900">
               <SlidersHorizontal className="h-4 w-4 text-zinc-500" />
-              Audit Explorer
+              Explorer audit
             </div>
             <p className="text-sm text-zinc-500">
-              Showing {filteredCount} of {totalCount} audits
+              Mostra {filteredCount} audit su {totalCount}
             </p>
           </div>
 
@@ -268,7 +268,7 @@ export function AuditsToolbar({
               }
               disabled={isPending}
             >
-              Open NC only
+              Solo NC aperte
             </Button>
 
             <Button
@@ -279,7 +279,7 @@ export function AuditsToolbar({
               onClick={resetAllFilters}
               disabled={isPending}
             >
-              Reset all
+              Resetta tutto
             </Button>
 
             <AuditsExportButton audits={audits} />
@@ -293,7 +293,7 @@ export function AuditsToolbar({
               <Input
                 value={searchValue}
                 onChange={(event) => setSearchValue(event.target.value)}
-                placeholder="Search title, client or location..."
+                placeholder="Cerca titolo, cliente o sede..."
                 className="pl-9"
               />
             </div>
@@ -301,7 +301,7 @@ export function AuditsToolbar({
 
           <Select value={state.status} onValueChange={(value) => updateParams({ status: value })}>
             <SelectTrigger>
-              <SelectValue placeholder="Status" />
+              <SelectValue placeholder="Stato" />
             </SelectTrigger>
             <SelectContent>
               {STATUS_OPTIONS.map((option) => (
@@ -314,10 +314,10 @@ export function AuditsToolbar({
 
           <Select value={state.clientId} onValueChange={(value) => updateParams({ client: value })}>
             <SelectTrigger>
-              <SelectValue placeholder="Client" />
+              <SelectValue placeholder="Cliente" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All clients</SelectItem>
+              <SelectItem value="all">Tutti i clienti</SelectItem>
               {options.clients.map((client) => (
                 <SelectItem key={client.id} value={client.id}>
                   {client.label}
@@ -331,10 +331,10 @@ export function AuditsToolbar({
             onValueChange={(value) => updateParams({ location: value })}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Location" />
+              <SelectValue placeholder="Sede" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All locations</SelectItem>
+              <SelectItem value="all">Tutte le sedi</SelectItem>
               {options.locations.map((location) => (
                 <SelectItem key={location.id} value={location.id}>
                   {location.label}
@@ -345,7 +345,7 @@ export function AuditsToolbar({
 
           <Select value={state.period} onValueChange={(value) => updateParams({ period: value })}>
             <SelectTrigger>
-              <SelectValue placeholder="Period" />
+              <SelectValue placeholder="Periodo" />
             </SelectTrigger>
             <SelectContent>
               {PERIOD_OPTIONS.map((option) => (
@@ -363,7 +363,7 @@ export function AuditsToolbar({
             onValueChange={(value) => updateParams({ scoreBand: value })}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Score band" />
+              <SelectValue placeholder="Fascia score" />
             </SelectTrigger>
             <SelectContent>
               {SCORE_OPTIONS.map((option) => (
@@ -376,7 +376,7 @@ export function AuditsToolbar({
 
           <Select value={state.sort} onValueChange={(value) => updateParams({ sort: value })}>
             <SelectTrigger>
-              <SelectValue placeholder="Sort" />
+              <SelectValue placeholder="Ordinamento" />
             </SelectTrigger>
             <SelectContent>
               {SORT_OPTIONS.map((option) => (
@@ -389,7 +389,7 @@ export function AuditsToolbar({
 
           <Select value={state.groupBy} onValueChange={(value) => updateParams({ groupBy: value })}>
             <SelectTrigger>
-              <SelectValue placeholder="Group by" />
+              <SelectValue placeholder="Raggruppa per" />
             </SelectTrigger>
             <SelectContent>
               {GROUP_OPTIONS.map((option) => (
@@ -414,7 +414,7 @@ export function AuditsToolbar({
                   type="button"
                   className="text-zinc-400 transition-colors hover:text-zinc-700"
                   onClick={() => clearFilter(filter.key)}
-                  aria-label={`Clear ${filter.label}`}
+                  aria-label={`Rimuovi filtro ${filter.label}`}
                 >
                   <X className="h-3 w-3" />
                 </button>

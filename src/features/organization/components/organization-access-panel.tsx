@@ -45,11 +45,11 @@ const roleMeta: Record<string, { badgeClassName: string; label: string }> = {
   },
   client: {
     badgeClassName: "border-sky-200 bg-sky-50 text-sky-700",
-    label: "Client",
+    label: "Cliente",
   },
   inspector: {
     badgeClassName: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    label: "Inspector",
+    label: "Ispettore",
   },
 };
 
@@ -101,8 +101,8 @@ function MemberRow({ canManageAccess, clients, currentUserId, member }: MemberRo
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="inspector">Inspector</SelectItem>
-                <SelectItem value="client">Client</SelectItem>
+                <SelectItem value="inspector">Ispettore</SelectItem>
+                <SelectItem value="client">Cliente</SelectItem>
               </SelectContent>
             </Select>
 
@@ -177,8 +177,8 @@ export function OrganizationAccessPanel({
             </div>
             <ul className="mt-2 space-y-1 text-xs text-zinc-500">
               <li>Non puoi modificare il tuo stesso ruolo da questa schermata.</li>
-              <li>Gli utenti client devono essere associati a un cliente.</li>
-              <li>Admin e inspector operano su tutta l&apos;organizzazione.</li>
+              <li>Gli utenti cliente devono essere associati a un cliente.</li>
+              <li>Admin e ispettori operano su tutta l&apos;organizzazione.</li>
             </ul>
           </div>
 
@@ -188,7 +188,7 @@ export function OrganizationAccessPanel({
               <p className="text-sm font-semibold text-zinc-900">Perimetro accessi</p>
             </div>
             <p className="mt-2 text-xs text-zinc-500">
-              Il ruolo <span className="font-medium text-zinc-700">client</span> limita l&apos;esperienza al cliente associato. Le viste dashboard e audit continuano a rispettare questo perimetro.
+              Il ruolo <span className="font-medium text-zinc-700">cliente</span> limita l&apos;esperienza al cliente associato. Dashboard e audit continuano a rispettare questo perimetro.
             </p>
           </div>
         </div>

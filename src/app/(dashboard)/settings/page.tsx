@@ -4,8 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { SettingsPage } from '@/features/settings/components/settings-page';
 
 export const metadata = {
-  title: 'Impostazioni - SGIC',
-  description: 'Impostazioni account e organizzazione',
+  title: 'Account - SGIC',
+  description: 'Profilo utente e scorciatoie amministrative',
 };
 
 export default async function SettingsRoute() {

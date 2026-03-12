@@ -110,7 +110,7 @@ export function OrganizationConsoleShell({
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Badge className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700">
-                Admin console
+                Console admin
               </Badge>
               <Badge
                 className={cn(
@@ -128,7 +128,7 @@ export function OrganizationConsoleShell({
 
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
-                {organization.name || "Organization"}
+                {organization.name || "Organizzazione"}
               </h1>
               <p className="mt-2 max-w-3xl text-sm text-zinc-500">
                 Console di governo del tenant: identita, accessi, regole operative, notifiche e salute del sistema.
@@ -162,7 +162,7 @@ export function OrganizationConsoleShell({
               <CardTitle className="text-lg font-semibold">Tenant setup checklist</CardTitle>
             </div>
             <CardDescription>
-              Una vista sintetica per capire se il tenant e configurato in modo amministrabile.
+              Una vista sintetica per capire se il tenant è configurato in modo amministrabile.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -203,7 +203,7 @@ export function OrganizationConsoleShell({
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Area attiva</CardTitle>
             <CardDescription>
-              La console e organizzata per aree di governo, non come semplice pagina settings.
+              La console è organizzata per aree di governo, non come semplice pagina impostazioni.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -213,7 +213,7 @@ export function OrganizationConsoleShell({
             </div>
             <div className="grid gap-2">
               <Button asChild className="justify-start">
-                <Link href="/organization?tab=profile">Apri profilo tenant</Link>
+                <Link href="/organization?tab=profile">Apri profilo organizzazione</Link>
               </Button>
               <Button asChild variant="outline" className="justify-start">
                 <Link href="/organization?tab=access">Apri utenti e ruoli</Link>

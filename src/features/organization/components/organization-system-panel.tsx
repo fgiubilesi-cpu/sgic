@@ -11,7 +11,7 @@ export function OrganizationSystemPanel({
     <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
       <Card className="border-zinc-200 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Tenant system snapshot</CardTitle>
+          <CardTitle className="text-lg font-semibold">Snapshot sistema tenant</CardTitle>
           <CardDescription>
             Stato tecnico leggibile dell&apos;istanza senza dover uscire da SGIC.
           </CardDescription>
@@ -40,7 +40,7 @@ export function OrganizationSystemPanel({
 
       <Card className="border-zinc-200 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Release discipline</CardTitle>
+          <CardTitle className="text-lg font-semibold">Disciplina di rilascio</CardTitle>
           <CardDescription>
             Promemoria operativo per mantenere il tenant rilasciabile.
           </CardDescription>
@@ -55,9 +55,9 @@ export function OrganizationSystemPanel({
             <p className="mt-1 font-mono text-xs text-zinc-500">{snapshot.releaseCommand}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge className="rounded-full border border-zinc-200 bg-white text-zinc-700">Build before merge</Badge>
-            <Badge className="rounded-full border border-zinc-200 bg-white text-zinc-700">Migration before feature DB</Badge>
-            <Badge className="rounded-full border border-zinc-200 bg-white text-zinc-700">Main stays stable</Badge>
+            <Badge className="rounded-full border border-zinc-200 bg-white text-zinc-700">Build prima del merge</Badge>
+            <Badge className="rounded-full border border-zinc-200 bg-white text-zinc-700">Migration prima delle feature DB</Badge>
+            <Badge className="rounded-full border border-zinc-200 bg-white text-zinc-700">Main sempre stabile</Badge>
           </div>
         </CardContent>
       </Card>

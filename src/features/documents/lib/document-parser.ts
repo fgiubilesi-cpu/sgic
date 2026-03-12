@@ -1,5 +1,13 @@
 import 'server-only';
 
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+
 function normalizeExtractedText(text: string | null | undefined) {
   if (!text) return null;
   const normalized = text
@@ -22,6 +30,9 @@ function inferFormat(fileName: string | null | undefined, mimeType: string | nul
     lowerName.endsWith('.docx')
   ) {
     return 'docx';
+  }
+  if (lowerMime.includes('msword') || lowerName.endsWith('.doc')) {
+    return 'doc';
   }
   if (
     lowerMime.startsWith('text/') ||
@@ -64,6 +75,30 @@ export async function extractTextFromDocumentBuffer(options: {
       parserType: 'docx_text_v1',
       text: normalizeExtractedText(result.value),
     };
+  }
+
+  if (format === 'doc') {
+    const tempDir = await mkdtemp(join(tmpdir(), 'sgic-doc-'));
+    const extension = options.fileName?.toLowerCase().endsWith('.doc') ? '.doc' : '.doc';
+    const inputPath = join(tempDir, `input${extension}`);
+
+    try {
+      await writeFile(inputPath, options.buffer);
+      const { stdout } = await execFileAsync('textutil', ['-convert', 'txt', '-stdout', inputPath], {
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      return {
+        parserType: 'doc_text_v1',
+        text: normalizeExtractedText(stdout),
+      };
+    } catch {
+      return {
+        parserType: 'doc_text_v1',
+        text: null,
+      };
+    } finally {
+      await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+    }
   }
 
   if (format === 'text') {

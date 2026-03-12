@@ -261,6 +261,44 @@ function lineMatching(lines: string[], matcher: RegExp) {
   return lines.find((line) => matcher.test(line)) ?? null;
 }
 
+function cleanQuotedLabelValue(value: string | null | undefined) {
+  const compacted = compact(value);
+  if (!compacted) return null;
+  return compacted
+    .replace(/\s*-\s*durata\s+\d+\s+anni?/i, '')
+    .replace(/[“”"]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function firstNonEmptyParagraph(input: string, minLength = 24) {
+  const paragraphs = input
+    .split(/\n\s*\n/)
+    .map((paragraph) => normalizeCompactSpaces(paragraph))
+    .filter(Boolean);
+
+  return paragraphs.find((paragraph) => paragraph.length >= minLength) ?? null;
+}
+
+function bulletListBetweenHeadings(lines: string[], startMatchers: RegExp[], endMatchers: RegExp[]) {
+  const startIndex = lines.findIndex((line) => startMatchers.some((matcher) => matcher.test(line)));
+  if (startIndex < 0) return [];
+
+  const collected: string[] = [];
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (endMatchers.some((matcher) => matcher.test(line))) break;
+    if (
+      /^([a-zàèéìòù].{8,}|supporto|monitoraggio|revisione|consulenza|assistenza|formazione|redazione|gestione|verifica|audit)/i.test(
+        line
+      )
+    ) {
+      collected.push(line.replace(/^[•\-–]\s*/, '').trim());
+    }
+  }
+  return collected;
+}
+
 function sectionBetweenHeadings(lines: string[], startMatchers: RegExp[], endMatchers: RegExp[]) {
   const startIndex = lines.findIndex((line) => startMatchers.some((matcher) => matcher.test(line)));
   if (startIndex < 0) return null;
@@ -531,12 +569,23 @@ export function buildIntakeProposalFromDocument(source: DocumentProposalSource):
 
   if (shouldBuildContractProposal) {
     const projectType =
-      lineAfterExactLabel(lines, ['Tipologia progetto']) ??
-      firstLabeledValue(fullText, ['tipologia progetto', 'tipologia contratto']);
-    const projectScope =
+      cleanQuotedLabelValue(lineAfterExactLabel(lines, ['Tipologia progetto', 'Tipologia offerta'])) ??
+      cleanQuotedLabelValue(firstLabeledValue(fullText, ['tipologia progetto', 'tipologia contratto', 'tipologia offerta']));
+    const contractScopeFromFrontispiece =
       lineAfterExactLabel(lines, ['Progetto di Consulenza']) ??
-      lineAfterExactLabel(lines, ['Prestazioni']) ??
+      lineMatching(lines, /^Contratto di consulenza/i) ??
+      null;
+    const objectiveSection =
       sectionBetweenHeadings(lines, [/^OBIETTIVI DEL PROGETTO$/i], [/^CONSULENZA SPECIALISTICA$/i, /^CAP\.\s*\d+/i]) ??
+      null;
+    const listedDeliverables = bulletListBetweenHeadings(
+      lines,
+      [/^Attività di consulenza specialistica/i, /^Attività di consulenza forfetaria permanente/i],
+      [/^NB:/i, /^CAP\.\s*\d+/i, /^DURATA$/i, /^ESCLUSIONI$/i]
+    );
+    const projectScope =
+      contractScopeFromFrontispiece ??
+      firstNonEmptyParagraph(objectiveSection ?? '') ??
       sectionBetweenHeadings(lines, [/^Consulenza Specialistica e Servizi Integrati$/i], [/^OBIETTIVI DEL PROGETTO$/i]) ??
       extractSectionAfterLabels(fullText, ['oggetto', 'servizi inclusi', 'servizio', 'attivita', 'attività', 'prestazioni']) ??
       firstLabeledValue(fullText, ['oggetto', 'servizi inclusi', 'servizio', 'attivita', 'attività']) ??
@@ -545,7 +594,8 @@ export function buildIntakeProposalFromDocument(source: DocumentProposalSource):
       null;
     const durationHeader =
       lineAfterExactLabel(lines, ['Durata del Progetto', 'DURATA']) ??
-      firstLabeledValue(fullText, ['durata del progetto', 'durata contratto', 'durata']);
+      lineAfterExactLabel(lines, ['Data e validità offerta']) ??
+      firstLabeledValue(fullText, ['durata del progetto', 'durata contratto', 'durata', 'data e validità offerta']);
     const durationSection = sectionBetweenHeadings(
       lines,
       [/^DURATA$/i],
@@ -557,52 +607,62 @@ export function buildIntakeProposalFromDocument(source: DocumentProposalSource):
       firstLabeledValue(fullText, ['frequenza', 'cadenza', 'periodicita', 'periodicità', 'sopralluoghi']);
     const teamLeaderLine = lineMatching(lines, /^Team Leader:/i);
     const supervisorLine = lineMatching(lines, /^Supervisore:/i);
+    const customerContactsLine = lineAfterExactLabel(lines, ['Referenti Cliente']);
     const internalOwner =
       firstRegexGroup(teamLeaderLine ?? '', /^Team Leader:\s*(.+)$/i) ??
       firstRegexGroup(supervisorLine ?? '', /^Supervisore:\s*(.+)$/i) ??
       firstLabeledValue(fullText, ['referente interno', 'owner interno', 'referente commerciale', 'account manager']);
-
+    const quoteDateValue = lineAfterExactLabel(lines, ['Data prima emissione', 'Data e validità offerta']);
+    const quoteDate = parseDateCandidate(quoteDateValue);
     const startDate =
       firstLabeledDate(fullText, ['data inizio', 'decorrenza', 'inizio servizio', 'validita dal', 'validità dal']);
+    const tacitRenewal =
+      (durationHeader ?? '').toLowerCase().includes('tacito rinnovo') ||
+      (durationSection ?? '').toLowerCase().includes('tacitamente rinnovato');
     const renewalDate =
       firstLabeledDate(fullText, ['data rinnovo', 'renewal']) ??
-      (durationHeader?.toLowerCase().includes('tacito rinnovo') || (durationSection ?? '').toLowerCase().includes('tacitamente rinnovato')
-        ? null
-        : expiryDate);
-    const derivedEndDate = deriveEndDateFromDuration(durationHeader ?? durationSection ?? fullText, startDate);
+      (tacitRenewal ? null : expiryDate);
+    const derivedEndDate = deriveEndDateFromDuration(durationHeader ?? durationSection ?? fullText, startDate ?? quoteDate);
     const endDate =
       firstLabeledDate(fullText, ['data scadenza', 'scadenza', 'termine contratto', 'fine contratto', 'valido fino al']) ??
-      derivedEndDate ??
+      (startDate ? derivedEndDate : null) ??
       renewalDate ??
       expiryDate;
+    const conciseNotes = [
+      quoteDateValue ? `Data offerta: ${quoteDateValue}` : null,
+      durationHeader,
+      customerContactsLine ? `Referenti cliente: ${customerContactsLine}` : null,
+    ]
+      .filter((value): value is string => Boolean(compact(value)))
+      .join('\n');
 
     payload.contract = {
       contract_type: projectType ?? deriveContractType(lower),
       start_date: startDate,
       renewal_date: renewalDate,
       end_date: endDate,
-      activity_frequency: explicitFrequency ?? deriveFrequency(lower),
+      activity_frequency:
+        explicitFrequency ??
+        (serviceLines.length > 0
+          ? Array.from(
+              new Set(
+                serviceLines
+                  .map((line) => compact(line.frequency_label))
+                  .filter((value): value is string => Boolean(value))
+              )
+            ).join(', ')
+          : deriveFrequency(lower)),
       service_scope: projectScope,
       internal_owner: internalOwner,
       notes:
+        conciseNotes ||
         [durationHeader, durationSection]
           .filter((value): value is string => Boolean(value))
           .join('\n\n')
-          .trim() || extractedText?.slice(0, 500) || description || null,
+          .trim() ||
+        description ||
+        null,
     };
-
-    if ((!payload.contract.activity_frequency || payload.contract.activity_frequency === '') && serviceLines.length > 0) {
-      const frequencies = Array.from(
-        new Set(
-          serviceLines
-            .map((line) => compact(line.frequency_label))
-            .filter((value): value is string => Boolean(value))
-        )
-      );
-      if (frequencies.length > 0) {
-        payload.contract.activity_frequency = frequencies.join(', ');
-      }
-    }
 
     if ((!payload.contract.service_scope || payload.contract.service_scope === '') && serviceLines.length > 0) {
       payload.contract.service_scope = serviceLines

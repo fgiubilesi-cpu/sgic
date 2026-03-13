@@ -1,0 +1,69 @@
+{
+  "organization_slug": "sgic-demo",
+  "source_system": "filemaker",
+  "sync_scope": "direction",
+  "sync_mode": "incremental",
+  "dry_run": true,
+  "clients": [
+    {
+      "source_record_id": "CLI-001",
+      "client_code": "C001",
+      "name": "Cliente Demo",
+      "status": "active",
+      "account_owner": "Direzione SGIC",
+      "service_model": "Audit + documentale"
+    }
+  ],
+  "service_lines": [
+    {
+      "source_record_id": "SER-001",
+      "client_source_record_id": "CLI-001",
+      "service_name": "Audit periodici",
+      "service_area": "Audit",
+      "cadence": "mensile",
+      "status": "active",
+      "annual_value": 12000
+    },
+    {
+      "source_record_id": "SER-002",
+      "client_source_record_id": "CLI-001",
+      "service_name": "Presidio documentale",
+      "service_area": "Documenti",
+      "cadence": "trimestrale",
+      "status": "active",
+      "annual_value": 4800
+    }
+  ],
+  "contracts": [
+    {
+      "source_record_id": "CON-001",
+      "client_source_record_id": "CLI-001",
+      "contract_code": "CTR-2026-001",
+      "contract_type": "service",
+      "status": "active",
+      "renewal_date": "2026-12-31"
+    }
+  ],
+  "deadlines": [
+    {
+      "source_record_id": "DDL-001",
+      "client_source_record_id": "CLI-001",
+      "deadline_type": "renewal",
+      "title": "Rinnovo incarico annuale",
+      "status": "open",
+      "priority": "high",
+      "due_date": "2026-12-15"
+    }
+  ],
+  "capacity": [
+    {
+      "source_record_id": "CAP-001",
+      "client_source_record_id": "CLI-001",
+      "owner_name": "Coordinamento SGIC",
+      "period_start": "2026-03-01",
+      "period_end": "2026-03-31",
+      "planned_hours": 24,
+      "status": "planned"
+    }
+  ]
+}

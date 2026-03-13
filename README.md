@@ -44,6 +44,11 @@ Minimo richiesto:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
+Per il bridge FileMaker -> staging management:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `MANAGEMENT_SYNC_API_KEY` oppure `INTERNAL_API_KEY`
+
 Per gli script demo:
 
 - `DATABASE_URL`

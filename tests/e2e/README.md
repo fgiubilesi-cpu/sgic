@@ -64,6 +64,11 @@ npx playwright test -g "User can login"
 - New template editor smoke
 - Audit template tab smoke
 
+### T7: Management route (management.spec.ts)
+- `/management` resolves without runtime overlay
+- Admin users see the direction dashboard
+- Non-admin users are redirected safely to `/dashboard`
+
 ## Configuration
 
 - **Base URL**: http://localhost:3000

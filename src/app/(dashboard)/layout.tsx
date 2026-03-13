@@ -27,6 +27,7 @@ import {
   FlaskConical,
   GraduationCap,
   Building2,
+  BriefcaseBusiness,
   Settings,
 } from "lucide-react";
 
@@ -54,7 +55,7 @@ function getNavItems(role?: string | null): NavItem[] {
   }
 
   // Inspector and admin users see the full menu
-  return [
+  const items: NavItem[] = [
     { label: "Dashboard", href: "/dashboard", icon: HomeIcon },
     { label: "Audit", href: "/audits", icon: ClipboardCheck },
     { label: "Clienti", href: "/clients", icon: Building2 },
@@ -63,6 +64,16 @@ function getNavItems(role?: string | null): NavItem[] {
     { label: "Formazione", href: null, icon: GraduationCap, disabled: true },
     { label: "Account", href: "/settings", icon: Settings },
   ];
+
+  if (role === "admin") {
+    items.splice(1, 0, {
+      label: "Direzione",
+      href: "/management",
+      icon: BriefcaseBusiness,
+    });
+  }
+
+  return items;
 }
 
 function NavLinks({ role }: { role?: string | null }) {

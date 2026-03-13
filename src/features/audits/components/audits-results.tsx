@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight, MoreHorizontal, Table2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +56,46 @@ const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = {
   scheduled: true,
 };
 
+const SMART_LIST_ACTIONS = [
+  {
+    id: "all",
+    label: "Tutti",
+    updates: {
+      period: "all",
+      hasOpenNc: "false",
+      scoreBand: "all",
+      groupBy: "none",
+      view: "table",
+      sort: "scheduled_desc",
+    },
+  },
+  {
+    id: "this_month",
+    label: "Questo mese",
+    updates: { period: "this_month", sort: "scheduled_asc", groupBy: "month" },
+  },
+  {
+    id: "upcoming",
+    label: "In arrivo",
+    updates: { period: "upcoming", sort: "scheduled_asc" },
+  },
+  {
+    id: "open_nc",
+    label: "NC aperte",
+    updates: { hasOpenNc: "true", sort: "nc_desc" },
+  },
+  {
+    id: "low_score",
+    label: "Score basso",
+    updates: { scoreBand: "lt70", sort: "score_asc" },
+  },
+  {
+    id: "by_client",
+    label: "Per cliente",
+    updates: { groupBy: "client", view: "cards" },
+  },
+] as const;
+
 function formatStatus(status: AuditStatus): { label: string; className: string } {
   switch (status) {
     case "Scheduled":
@@ -84,6 +124,8 @@ function formatDate(value: string | null): string {
 
 export function AuditsResults({ sections, viewMode, groupBy }: AuditsResultsProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(DEFAULT_VISIBLE_COLUMNS);
@@ -98,6 +140,54 @@ export function AuditsResults({ sections, viewMode, groupBy }: AuditsResultsProp
     setSelectedIds((current) => current.filter((id) => allAuditIds.includes(id)));
     setExpandedIds((current) => current.filter((id) => allAuditIds.includes(id)));
   }, [allAuditIds.join("|")]);
+
+  function replaceParams(
+    updates: Partial<
+      Record<
+        | "status"
+        | "client"
+        | "location"
+        | "period"
+        | "hasOpenNc"
+        | "scoreBand"
+        | "sort"
+        | "groupBy"
+        | "view",
+        string
+      >
+    >
+  ) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (!value || value === "all" || value === "false" || value === "none" || value === "table") {
+        nextParams.delete(key);
+      } else {
+        nextParams.set(key, value);
+      }
+    }
+
+    const nextUrl = nextParams.toString() ? `${pathname}?${nextParams.toString()}` : pathname;
+    router.replace(nextUrl);
+  }
+
+  function isSmartActionActive(
+    updates: Partial<Record<"period" | "hasOpenNc" | "scoreBand" | "sort" | "groupBy" | "view", string>>
+  ): boolean {
+    return Object.entries(updates).every(([key, value]) => {
+      const currentValue = searchParams.get(key) ?? "";
+      if (currentValue === value) return true;
+
+      const isDefaultValue =
+        value === "all" ||
+        value === "false" ||
+        value === "none" ||
+        value === "table" ||
+        value === "scheduled_desc";
+
+      return isDefaultValue && currentValue === "";
+    });
+  }
 
   if (sections.every((section) => section.audits.length === 0)) {
     return (
@@ -226,6 +316,21 @@ export function AuditsResults({ sections, viewMode, groupBy }: AuditsResultsProp
             {allSelected ? "Clear selection" : "Select all"}
           </Button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+        {SMART_LIST_ACTIONS.map((action) => (
+          <Button
+            key={action.id}
+            type="button"
+            size="sm"
+            variant={isSmartActionActive(action.updates) ? "default" : "outline"}
+            className="h-8 rounded-full px-3"
+            onClick={() => replaceParams(action.updates)}
+          >
+            {action.label}
+          </Button>
+        ))}
       </div>
 
       {sections.map((section) => (

@@ -48,6 +48,7 @@ const PERIOD_OPTIONS: Array<{ value: AuditsListPeriod; label: string }> = [
   { value: "all", label: "Tutti i periodi" },
   { value: "upcoming", label: "In arrivo" },
   { value: "past_due", label: "Scaduti" },
+  { value: "this_month", label: "Questo mese" },
   { value: "last_90d", label: "Ultimi 90 giorni" },
   { value: "this_year", label: "Quest'anno" },
 ];
@@ -102,6 +103,11 @@ const SAVED_VIEWS = [
     id: "upcoming",
     label: "In arrivo",
     params: { period: "upcoming", sort: "scheduled_asc" },
+  },
+  {
+    id: "this_month",
+    label: "Questo mese",
+    params: { period: "this_month", sort: "scheduled_asc", groupBy: "month" },
   },
   {
     id: "by_client",

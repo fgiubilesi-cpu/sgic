@@ -10,7 +10,13 @@ export type AuditsListSort =
   | "score_asc"
   | "nc_desc"
   | "title_asc";
-export type AuditsListPeriod = "all" | "upcoming" | "past_due" | "last_90d" | "this_year";
+export type AuditsListPeriod =
+  | "all"
+  | "upcoming"
+  | "past_due"
+  | "this_month"
+  | "last_90d"
+  | "this_year";
 export type AuditsListScoreBand = "all" | "lt70" | "70_85" | "gte85" | "unscored";
 
 export type AuditsListState = {
@@ -52,7 +58,7 @@ export type AuditsListSection = {
   audits: AuditWithNCCount[];
 };
 
-export type AuditsWorkweekDay = {
+export type AuditsPlannerDay = {
   id: string;
   date: string;
   label: string;
@@ -82,7 +88,14 @@ type AuditsListDefaults = Partial<
 >;
 
 const VALID_STATUSES: AuditStatus[] = ["Scheduled", "In Progress", "Review", "Closed"];
-const VALID_PERIODS: AuditsListPeriod[] = ["all", "upcoming", "past_due", "last_90d", "this_year"];
+const VALID_PERIODS: AuditsListPeriod[] = [
+  "all",
+  "upcoming",
+  "past_due",
+  "this_month",
+  "last_90d",
+  "this_year",
+];
 const VALID_SCORE_BANDS: AuditsListScoreBand[] = ["all", "lt70", "70_85", "gte85", "unscored"];
 const VALID_SORTS: AuditsListSort[] = [
   "scheduled_desc",
@@ -175,6 +188,8 @@ export function filterAndSortAudits(
   const normalizedSearch = state.search.toLowerCase();
   const today = new Date();
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
+  const monthEnd = new Date(todayStart.getFullYear(), todayStart.getMonth() + 1, 0);
   const last90Days = new Date(todayStart);
   last90Days.setDate(todayStart.getDate() - 90);
 
@@ -199,6 +214,10 @@ export function filterAndSortAudits(
         auditDate !== null &&
         auditDate < todayStart &&
         audit.status !== "Closed") ||
+      (state.period === "this_month" &&
+        auditDate !== null &&
+        auditDate >= monthStart &&
+        auditDate <= monthEnd) ||
       (state.period === "last_90d" &&
         auditDate !== null &&
         auditDate >= last90Days &&
@@ -344,15 +363,45 @@ export function getAuditsListKpis(audits: AuditWithNCCount[]): AuditsListKpis {
 export function getAuditsWorkweek(
   audits: AuditWithNCCount[],
   referenceDate = new Date()
-): AuditsWorkweekDay[] {
+): AuditsPlannerDay[] {
   const startDate = getNextBusinessDay(referenceDate);
-  const days: AuditsWorkweekDay[] = [];
+  const dates: Date[] = [];
 
   for (let index = 0; index < 5; index += 1) {
-    const dayDate = addBusinessDays(startDate, index);
+    dates.push(addBusinessDays(startDate, index));
+  }
+
+  return buildPlannerDays(audits, dates, referenceDate);
+}
+
+export function getAuditsMonth(
+  audits: AuditWithNCCount[],
+  referenceDate = new Date()
+): AuditsPlannerDay[] {
+  const monthStart = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+  const cursor = new Date(monthStart);
+  const dates: Date[] = [];
+
+  while (cursor.getMonth() === monthStart.getMonth()) {
+    if (!isWeekend(cursor)) {
+      dates.push(new Date(cursor));
+    }
+
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return buildPlannerDays(audits, dates, referenceDate);
+}
+
+function buildPlannerDays(
+  audits: AuditWithNCCount[],
+  dates: Date[],
+  referenceDate: Date
+): AuditsPlannerDay[] {
+  const days: AuditsPlannerDay[] = dates.map((dayDate) => {
     const isoDate = formatIsoDate(dayDate);
 
-    days.push({
+    return {
       id: isoDate,
       date: isoDate,
       label: new Intl.DateTimeFormat("it-IT", {
@@ -365,8 +414,8 @@ export function getAuditsWorkweek(
       }).format(dayDate),
       isToday: isSameDay(dayDate, referenceDate),
       audits: [],
-    });
-  }
+    };
+  });
 
   const dayMap = new Map(days.map((day) => [day.date, day]));
 
@@ -550,6 +599,8 @@ export function getPeriodLabel(period: AuditsListPeriod): string {
       return "Upcoming";
     case "past_due":
       return "Past due";
+    case "this_month":
+      return "This month";
     case "last_90d":
       return "Last 90 days";
     case "this_year":

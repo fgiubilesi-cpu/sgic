@@ -74,11 +74,11 @@ function confidenceLabel(value: DocumentIntakeProposal['confidence']) {
 }
 
 function inferReviewCategory(
-  document: DocumentListItem,
+  documentMeta: Pick<DocumentListItem, 'category' | 'file_name' | 'title'>,
   proposal: DocumentIntakeProposal | null
 ): ReviewCategory {
   if (proposal?.contract || (proposal?.service_lines?.length ?? 0) > 0) return 'Contract';
-  const lower = `${document.title ?? ''} ${document.file_name ?? ''}`.toLowerCase();
+  const lower = `${documentMeta.title ?? ''} ${documentMeta.file_name ?? ''}`.toLowerCase();
   if (
     lower.includes('offerta') ||
     lower.includes('contratto') ||
@@ -86,32 +86,76 @@ function inferReviewCategory(
   ) {
     return 'Contract';
   }
-  return (document.category ?? 'Other') as ReviewCategory;
+  return (documentMeta.category ?? 'Other') as ReviewCategory;
+}
+
+function defaultReviewAction(
+  documentContext: Pick<DocumentListItem, 'client_id' | 'linked_entity_count'>,
+  latestAction: ReviewAction | null | undefined
+): ReviewAction {
+  if (!documentContext.client_id) return 'save_review';
+  if (documentContext.linked_entity_count > 0) return 'save_review';
+  if (latestAction === 'apply_to_workspace') return 'save_review';
+  return 'apply_to_workspace';
 }
 
 export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewSheetProps) {
+  const documentCategory = document.category;
+  const documentClientId = document.client_id;
+  const documentFileName = document.file_name;
+  const documentId = document.id;
+  const documentIngestionStatus = document.ingestion_status;
+  const documentLastReviewAction = document.last_review_action as ReviewAction | null;
+  const documentLinkedEntityCount = document.linked_entity_count;
+  const documentTitle = document.title;
+
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pending, startTransition] = useTransition();
   const [proposal, setProposal] = useState<DocumentIntakeProposal | null>(null);
   const [reviewerNotes, setReviewerNotes] = useState('');
-  const [action, setAction] = useState<ReviewAction>('save_review');
-  const [createFollowupTask, setCreateFollowupTask] = useState(false);
-  const [latestIngestionStatus, setLatestIngestionStatus] = useState<string | null>(document.ingestion_status);
-  const [extractedText, setExtractedText] = useState<string | null>(null);
-  const [reviewCategory, setReviewCategory] = useState<ReviewCategory>(
-    (document.category ?? 'Other') as ReviewCategory
+  const [action, setAction] = useState<ReviewAction>(
+    defaultReviewAction(
+      { client_id: documentClientId, linked_entity_count: documentLinkedEntityCount },
+      documentLastReviewAction
+    )
   );
+  const [createFollowupTask, setCreateFollowupTask] = useState(false);
+  const [latestIngestionStatus, setLatestIngestionStatus] = useState<string | null>(documentIngestionStatus);
+  const [extractedText, setExtractedText] = useState<string | null>(null);
+  const [reviewCategory, setReviewCategory] = useState<ReviewCategory>((documentCategory ?? 'Other') as ReviewCategory);
   const router = useRouter();
 
-  const canApplyToWorkspace = Boolean(document.client_id);
+  const canApplyToWorkspace = Boolean(documentClientId);
+  const needsWorkspaceApply = canApplyToWorkspace && documentLinkedEntityCount === 0;
+  const hasSavedReviewOnly = needsWorkspaceApply && documentLastReviewAction === 'save_review';
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      setLoading(true);
+      setProposal(null);
+      setReviewerNotes('');
+      setAction(
+        defaultReviewAction(
+          { client_id: documentClientId, linked_entity_count: documentLinkedEntityCount },
+          documentLastReviewAction
+        )
+      );
+      setCreateFollowupTask(false);
+      setLatestIngestionStatus(documentIngestionStatus);
+      setExtractedText(null);
+      setReviewCategory((documentCategory ?? 'Other') as ReviewCategory);
+      return;
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
     if (!open) return;
     let active = true;
 
-    setLoading(true);
-    getDocumentIntakeData(document.id)
+    getDocumentIntakeData(documentId)
       .then((result) => {
         if (!active) return;
         if (!result.success) {
@@ -120,10 +164,20 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
         }
         setProposal(result.data.proposal);
         setReviewerNotes(result.data.reviewerNotes ?? '');
-        setAction((result.data.action as ReviewAction) ?? 'save_review');
-        setLatestIngestionStatus(result.data.latestIngestionStatus ?? document.ingestion_status);
+        setAction(
+          defaultReviewAction(
+            { client_id: documentClientId, linked_entity_count: documentLinkedEntityCount },
+            (result.data.action as ReviewAction) ?? null
+          )
+        );
+        setLatestIngestionStatus(result.data.latestIngestionStatus ?? documentIngestionStatus);
         setExtractedText(result.data.extractedText ?? null);
-        setReviewCategory(inferReviewCategory(document, result.data.proposal));
+        setReviewCategory(
+          inferReviewCategory(
+            { category: documentCategory, file_name: documentFileName, title: documentTitle },
+            result.data.proposal
+          )
+        );
       })
       .catch(() => {
         if (!active) return;
@@ -136,13 +190,22 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
     return () => {
       active = false;
     };
-  }, [document.id, open]);
+  }, [
+    documentCategory,
+    documentClientId,
+    documentFileName,
+    documentId,
+    documentIngestionStatus,
+    documentLinkedEntityCount,
+    documentTitle,
+    open,
+  ]);
 
   const saveReview = () => {
     if (!proposal) return;
 
     startTransition(async () => {
-      const result = await submitDocumentIntakeReview(document.id, {
+      const result = await submitDocumentIntakeReview(documentId, {
         action: action === 'apply_to_workspace' && canApplyToWorkspace ? 'apply_to_workspace' : 'save_review',
         category: reviewCategory,
         create_followup_task: createFollowupTask,
@@ -270,7 +333,7 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetTrigger asChild>
         <Button variant="ghost" size="sm" className="h-8 px-2 text-violet-700">
           <SquarePen className="mr-2 h-3.5 w-3.5" />
@@ -299,6 +362,7 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
                 <Badge variant="outline">Categoria corrente: {reviewCategory}</Badge>
                 <Badge variant="outline">Intake: {ingestionLabel(latestIngestionStatus)}</Badge>
                 <Badge variant="outline">Confidenza: {confidenceLabel(proposal.confidence)}</Badge>
+                <Badge variant="outline">Link operativi: {document.linked_entity_count}</Badge>
               </div>
               <p className="mt-2">Documento: {document.title || 'Senza titolo'}</p>
               <p>Contesto: {scopeHint(document)}</p>
@@ -318,6 +382,19 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
                 ? "Puoi correggere la proposta e applicarla al workspace cliente. Nessuna scrittura viene fatta senza questa conferma."
                 : "Il documento non è collegato a un cliente. Puoi validare la proposta, ma non applicarla ancora al workspace."}
             </div>
+
+            {hasSavedReviewOnly ? (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                La review risulta gia salvata, ma il documento non ha ancora creato collegamenti operativi nel
+                workspace cliente.
+                Se confermi `Applica al workspace cliente`, verranno scritti i record relazionali collegati.
+              </div>
+            ) : needsWorkspaceApply ? (
+              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+                Questo documento e collegato a un cliente ma non ha ancora generato contratti, contatti, scadenze o
+                attivita nel workspace.
+              </div>
+            ) : null}
 
             <div className="space-y-2">
               <Label>Categoria documento</Label>
@@ -757,6 +834,10 @@ export function DocumentIntakeReviewSheet({ document }: DocumentIntakeReviewShee
             {!canApplyToWorkspace ? (
               <p className="text-xs text-amber-700">
                 Questo documento non è collegato a un cliente: puoi solo salvare la review.
+              </p>
+            ) : action === 'save_review' && needsWorkspaceApply ? (
+              <p className="text-xs text-amber-700">
+                Con `Salva review` confermi solo il payload estratto. I record del workspace cliente non verranno ancora creati o aggiornati.
               </p>
             ) : null}
 

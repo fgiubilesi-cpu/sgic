@@ -70,6 +70,26 @@ function expiryTone(expiryDate: string | null) {
   return 'text-emerald-700';
 }
 
+function workflowTone(document: DocumentListItem) {
+  if (document.linked_entity_count > 0) {
+    return 'border-violet-200 bg-violet-50 text-violet-700';
+  }
+  if (document.client_id && document.review_count > 0) {
+    return 'border-amber-200 bg-amber-50 text-amber-700';
+  }
+  if (document.client_id) {
+    return 'border-sky-200 bg-sky-50 text-sky-700';
+  }
+  return 'border-zinc-200 bg-zinc-50 text-zinc-600';
+}
+
+function workflowLabel(document: DocumentListItem) {
+  if (document.linked_entity_count > 0) return 'Applicato al workspace';
+  if (document.client_id && document.review_count > 0) return 'Review salvata, manca apply';
+  if (document.client_id) return 'Pronto per il workspace';
+  return 'Solo archivio documento';
+}
+
 export function DocumentsTable({
   clientOptions,
   documents,
@@ -132,6 +152,9 @@ export function DocumentsTable({
                 </Badge>
                 <Badge variant="outline" className={ingestionTone(document.ingestion_status)}>
                   {ingestionLabel(document.ingestion_status)}
+                </Badge>
+                <Badge variant="outline" className={workflowTone(document)}>
+                  {workflowLabel(document)}
                 </Badge>
                 {document.linked_entity_count > 0 ? (
                   <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-700">

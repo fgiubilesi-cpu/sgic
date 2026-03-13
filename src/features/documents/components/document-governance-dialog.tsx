@@ -61,11 +61,20 @@ export function DocumentGovernanceDialog({ document }: DocumentGovernanceDialogP
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<DocumentGovernanceData | null>(null);
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      setLoading(true);
+      setData(null);
+      return;
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
     if (!open) return;
     let active = true;
 
-    setLoading(true);
     getDocumentGovernanceData(document.id)
       .then((result) => {
         if (!active) return;
@@ -85,7 +94,7 @@ export function DocumentGovernanceDialog({ document }: DocumentGovernanceDialogP
   }, [document.id, open]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" className="h-8 px-2 text-zinc-700">
           <History className="mr-2 h-3.5 w-3.5" />
@@ -104,6 +113,12 @@ export function DocumentGovernanceDialog({ document }: DocumentGovernanceDialogP
           <div className="py-8 text-sm text-zinc-500">Caricamento governance...</div>
         ) : data ? (
           <div className="space-y-6">
+            {document.client_id && data.reviews.length > 0 && data.entities.length === 0 ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Review presente ma nessun collegamento operativo creato: il documento risulta validato, non ancora applicato al workspace cliente.
+              </div>
+            ) : null}
+
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-semibold text-zinc-900">{data.document.title || 'Documento senza titolo'}</p>

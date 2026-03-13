@@ -8,8 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { ClientOption } from '@/features/clients/queries/get-client-options';
 import type { ClientWithStats } from '@/features/clients/queries/get-clients';
+import type { DailyExecutionOverview } from '@/features/clients/queries/get-daily-execution-overview';
 import { ClientsKpiStrip } from './clients-kpi-strip';
 import { ClientTable } from './client-table';
+import { DailyExecutionCockpit } from './daily-execution-cockpit';
 
 type StatusFilter = 'all' | 'active' | 'inactive';
 type StructureFilter =
@@ -17,15 +19,29 @@ type StructureFilter =
   | 'missing-locations'
   | 'missing-personnel'
   | 'complete'
-  | 'open-nc';
-type SortBy = 'name' | 'last-audit' | 'locations' | 'personnel' | 'audits' | 'open-nc';
+  | 'open-nc'
+  | 'service-attention'
+  | 'service-link-gap';
+type SortBy =
+  | 'name'
+  | 'last-audit'
+  | 'locations'
+  | 'personnel'
+  | 'audits'
+  | 'open-nc'
+  | 'service-coverage';
 
 interface ClientsExplorerProps {
   clientOptions: ClientOption[];
   clients: ClientWithStats[];
+  dailyExecutionOverview: DailyExecutionOverview;
 }
 
-export function ClientsExplorer({ clientOptions, clients }: ClientsExplorerProps) {
+export function ClientsExplorer({
+  clientOptions,
+  clients,
+  dailyExecutionOverview,
+}: ClientsExplorerProps) {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [structure, setStructure] = useState<StructureFilter>('all');
@@ -47,6 +63,8 @@ export function ClientsExplorer({ clientOptions, clients }: ClientsExplorerProps
         return false;
       }
       if (structure === 'open-nc' && client.open_nc_count === 0) return false;
+      if (structure === 'service-attention' && client.service_attention_count === 0) return false;
+      if (structure === 'service-link-gap' && client.service_link_gap_count === 0) return false;
 
       if (!normalizedSearch) return true;
 
@@ -82,6 +100,20 @@ export function ClientsExplorer({ clientOptions, clients }: ClientsExplorerProps
         return right.open_nc_count - left.open_nc_count || left.name.localeCompare(right.name, 'it');
       }
 
+      if (sortBy === 'service-coverage') {
+        const leftPriority = left.service_attention_count > 0 ? 0 : left.service_line_count > 0 ? 1 : 2;
+        const rightPriority = right.service_attention_count > 0 ? 0 : right.service_line_count > 0 ? 1 : 2;
+        if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+
+        const leftCoverage = left.service_coverage_rate ?? -1;
+        const rightCoverage = right.service_coverage_rate ?? -1;
+        return (
+          leftCoverage - rightCoverage ||
+          right.service_attention_count - left.service_attention_count ||
+          left.name.localeCompare(right.name, 'it')
+        );
+      }
+
       const leftDate = left.last_audit_date ? new Date(left.last_audit_date).getTime() : 0;
       const rightDate = right.last_audit_date ? new Date(right.last_audit_date).getTime() : 0;
       return rightDate - leftDate || left.name.localeCompare(right.name, 'it');
@@ -103,6 +135,7 @@ export function ClientsExplorer({ clientOptions, clients }: ClientsExplorerProps
   return (
     <div className="space-y-5">
       <ClientsKpiStrip clients={clients} />
+      <DailyExecutionCockpit overview={dailyExecutionOverview} />
 
       <div className="rounded-xl border border-zinc-200 bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
@@ -161,6 +194,8 @@ export function ClientsExplorer({ clientOptions, clients }: ClientsExplorerProps
               <SelectItem value="missing-personnel">Senza collaboratori</SelectItem>
               <SelectItem value="complete">Struttura completa</SelectItem>
               <SelectItem value="open-nc">Con NC aperte</SelectItem>
+              <SelectItem value="service-attention">Servizi da presidiare</SelectItem>
+              <SelectItem value="service-link-gap">Dati operativi incompleti</SelectItem>
             </SelectContent>
           </Select>
 
@@ -175,6 +210,7 @@ export function ClientsExplorer({ clientOptions, clients }: ClientsExplorerProps
               <SelectItem value="personnel">Numero collaboratori</SelectItem>
               <SelectItem value="audits">Numero audit</SelectItem>
               <SelectItem value="open-nc">NC aperte</SelectItem>
+              <SelectItem value="service-coverage">Copertura servizi</SelectItem>
             </SelectContent>
           </Select>
 

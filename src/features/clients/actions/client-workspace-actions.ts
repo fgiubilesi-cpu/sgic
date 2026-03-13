@@ -90,6 +90,34 @@ async function ensureAuditAccess(
   return data.id;
 }
 
+async function ensureServiceLineAccess(
+  supabase: Awaited<ReturnType<typeof createSupabaseClient>>,
+  organizationId: string,
+  clientId: string,
+  serviceLineId: string | null,
+  locationId: string | null
+) {
+  if (!serviceLineId) return null;
+
+  const { data, error } = await supabase
+    .from('client_service_lines')
+    .select('id, location_id')
+    .eq('id', serviceLineId)
+    .eq('organization_id', organizationId)
+    .eq('client_id', clientId)
+    .single();
+
+  if (error || !data) {
+    throw new Error('La linea servizio selezionata non appartiene al cliente');
+  }
+
+  if (data.location_id && locationId && data.location_id !== locationId) {
+    throw new Error('La linea servizio selezionata non e coerente con la sede indicata');
+  }
+
+  return data.id;
+}
+
 function revalidateClientWorkspace(clientId: string) {
   revalidatePath('/clients');
   revalidatePath(`/clients/${clientId}`);
@@ -179,6 +207,13 @@ export async function createClientTask(clientId: string, input: ClientTaskInput)
       clientId,
       normalizeOptionalString(validated.audit_id)
     );
+    const serviceLineId = await ensureServiceLineAccess(
+      supabase,
+      ctx.organizationId,
+      clientId,
+      normalizeOptionalString(validated.service_line_id),
+      locationId
+    );
 
     const shouldComplete = validated.status === 'done';
     const { data, error } = await supabase
@@ -194,6 +229,7 @@ export async function createClientTask(clientId: string, input: ClientTaskInput)
         owner_name: normalizeOptionalString(validated.owner_name),
         location_id: locationId,
         audit_id: auditId,
+        service_line_id: serviceLineId,
         is_recurring: validated.is_recurring,
         recurrence_label: normalizeOptionalString(validated.recurrence_label),
         completed_at: shouldComplete ? new Date().toISOString() : null,
@@ -233,6 +269,13 @@ export async function updateClientTask(taskId: string, clientId: string, input: 
       clientId,
       normalizeOptionalString(validated.audit_id)
     );
+    const serviceLineId = await ensureServiceLineAccess(
+      supabase,
+      ctx.organizationId,
+      clientId,
+      normalizeOptionalString(validated.service_line_id),
+      locationId
+    );
 
     const shouldComplete = validated.status === 'done';
     const { data, error } = await supabase
@@ -246,6 +289,7 @@ export async function updateClientTask(taskId: string, clientId: string, input: 
         owner_name: normalizeOptionalString(validated.owner_name),
         location_id: locationId,
         audit_id: auditId,
+        service_line_id: serviceLineId,
         is_recurring: validated.is_recurring,
         recurrence_label: normalizeOptionalString(validated.recurrence_label),
         completed_at: shouldComplete ? new Date().toISOString() : null,
@@ -292,6 +336,57 @@ export async function setClientTaskStatus(taskId: string, clientId: string, stat
     return {
       success: false,
       error: normalizeActionError(error, "Errore aggiornamento stato attività"),
+    };
+  }
+}
+
+export async function setClientTaskServiceLine(
+  taskId: string,
+  clientId: string,
+  serviceLineIdInput: string | null
+) {
+  try {
+    const ctx = await getOrganizationContext();
+    if (!ctx) throw new Error('Unauthorized');
+    const supabase = await createSupabaseClient();
+    await ensureClientAccess(supabase, ctx.organizationId, clientId);
+
+    const { data: task, error: taskError } = await supabase
+      .from('client_tasks')
+      .select('id, location_id')
+      .eq('id', taskId)
+      .eq('client_id', clientId)
+      .eq('organization_id', ctx.organizationId)
+      .single();
+
+    if (taskError || !task) throw new Error('Attività non valida');
+
+    const serviceLineId = await ensureServiceLineAccess(
+      supabase,
+      ctx.organizationId,
+      clientId,
+      serviceLineIdInput,
+      task.location_id
+    );
+
+    const { data, error } = await supabase
+      .from('client_tasks')
+      .update({
+        service_line_id: serviceLineId,
+      })
+      .eq('id', taskId)
+      .eq('client_id', clientId)
+      .eq('organization_id', ctx.organizationId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    revalidateClientWorkspace(clientId);
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      error: normalizeActionError(error, 'Errore aggiornamento linea servizio attività'),
     };
   }
 }
@@ -415,6 +510,57 @@ export async function deleteClientContact(contactId: string, clientId: string) {
   }
 }
 
+export async function setClientDeadlineServiceLine(
+  deadlineId: string,
+  clientId: string,
+  serviceLineIdInput: string | null
+) {
+  try {
+    const ctx = await getOrganizationContext();
+    if (!ctx) throw new Error('Unauthorized');
+    const supabase = await createSupabaseClient();
+    await ensureClientAccess(supabase, ctx.organizationId, clientId);
+
+    const { data: deadline, error: deadlineError } = await supabase
+      .from('client_deadlines')
+      .select('id, location_id')
+      .eq('id', deadlineId)
+      .eq('client_id', clientId)
+      .eq('organization_id', ctx.organizationId)
+      .single();
+
+    if (deadlineError || !deadline) throw new Error('Scadenza non valida');
+
+    const serviceLineId = await ensureServiceLineAccess(
+      supabase,
+      ctx.organizationId,
+      clientId,
+      serviceLineIdInput,
+      deadline.location_id
+    );
+
+    const { data, error } = await supabase
+      .from('client_deadlines')
+      .update({
+        service_line_id: serviceLineId,
+      })
+      .eq('id', deadlineId)
+      .eq('client_id', clientId)
+      .eq('organization_id', ctx.organizationId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    revalidateClientWorkspace(clientId);
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      error: normalizeActionError(error, 'Errore aggiornamento linea servizio scadenza'),
+    };
+  }
+}
+
 export async function createClientDeadline(clientId: string, input: ClientDeadlineInput) {
   try {
     const ctx = await getOrganizationContext();
@@ -430,6 +576,13 @@ export async function createClientDeadline(clientId: string, input: ClientDeadli
       clientId,
       normalizeOptionalString(validated.location_id)
     );
+    const serviceLineId = await ensureServiceLineAccess(
+      supabase,
+      ctx.organizationId,
+      clientId,
+      normalizeOptionalString(validated.service_line_id),
+      locationId
+    );
 
     const { data, error } = await supabase
       .from('client_deadlines')
@@ -443,6 +596,7 @@ export async function createClientDeadline(clientId: string, input: ClientDeadli
         priority: validated.priority,
         status: validated.status,
         location_id: locationId,
+        service_line_id: serviceLineId,
         created_by: ctx.userId,
       })
       .select()
@@ -478,6 +632,13 @@ export async function updateClientDeadline(
       clientId,
       normalizeOptionalString(validated.location_id)
     );
+    const serviceLineId = await ensureServiceLineAccess(
+      supabase,
+      ctx.organizationId,
+      clientId,
+      normalizeOptionalString(validated.service_line_id),
+      locationId
+    );
 
     const { data, error } = await supabase
       .from('client_deadlines')
@@ -488,6 +649,7 @@ export async function updateClientDeadline(
         priority: validated.priority,
         status: validated.status,
         location_id: locationId,
+        service_line_id: serviceLineId,
       })
       .eq('id', deadlineId)
       .eq('client_id', clientId)

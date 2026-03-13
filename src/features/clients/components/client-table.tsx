@@ -9,26 +9,36 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Database } from '@/types/database.types';
 import { Button } from '@/components/ui/button';
 import { ManageLocationSheet } from './manage-location-sheet';
 import { ManagePersonnelSheet } from '@/features/personnel/components/manage-personnel-sheet';
 import type { ClientOption } from '@/features/clients/queries/get-client-options';
 import { ClientStateToggleButton } from './client-state-toggle-button';
-
-type ClientRow = Database['public']['Tables']['clients']['Row'];
-
-interface ClientWithStats extends ClientRow {
-  audit_count: number;
-  location_count: number;
-  open_nc_count: number;
-  personnel_count: number;
-  last_audit_date: string | null;
-}
+import type { ClientWithStats } from '@/features/clients/queries/get-clients';
 
 interface ClientTableProps {
   clientOptions: ClientOption[];
   clients: ClientWithStats[];
+}
+
+function serviceOverviewLabel(client: ClientWithStats) {
+  if (client.service_overview_status === 'critical') return 'Scoperta';
+  if (client.service_overview_status === 'warning') return 'Da presidiare';
+  if (client.service_overview_status === 'covered') return 'Presidiata';
+  return 'Non tracciata';
+}
+
+function serviceOverviewClassName(client: ClientWithStats) {
+  if (client.service_overview_status === 'critical') {
+    return 'border-rose-200 bg-rose-50 text-rose-700';
+  }
+  if (client.service_overview_status === 'warning') {
+    return 'border-amber-200 bg-amber-50 text-amber-700';
+  }
+  if (client.service_overview_status === 'covered') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  }
+  return 'border-zinc-200 bg-zinc-50 text-zinc-600';
 }
 
 export function ClientTable({ clientOptions, clients }: ClientTableProps) {
@@ -42,6 +52,7 @@ export function ClientTable({ clientOptions, clients }: ClientTableProps) {
             <TableHead className="text-center">Sedi</TableHead>
             <TableHead className="text-center">Collaboratori</TableHead>
             <TableHead className="text-center">NC Aperte</TableHead>
+            <TableHead>Copertura servizi</TableHead>
             <TableHead>Ultimo Audit</TableHead>
             <TableHead>Stato</TableHead>
             <TableHead className="w-[320px]">Gestione</TableHead>
@@ -84,6 +95,31 @@ export function ClientTable({ clientOptions, clients }: ClientTableProps) {
                   >
                     {client.open_nc_count}
                   </span>
+                </TableCell>
+                <TableCell>
+                  {client.service_line_count === 0 ? (
+                    <span className="text-sm text-zinc-500">Nessuna linea</span>
+                  ) : (
+                    <div className="space-y-1">
+                      <Badge variant="outline" className={serviceOverviewClassName(client)}>
+                        {serviceOverviewLabel(client)}
+                      </Badge>
+                      <p className="text-xs text-zinc-500">
+                        {client.service_guarded_count}/{client.service_line_count} presidiate
+                        {client.service_coverage_rate !== null ? ` · ${client.service_coverage_rate}%` : ''}
+                      </p>
+                      {client.service_link_gap_count > 0 ? (
+                        <p className="text-xs text-amber-700">
+                          {client.service_link_gap_count} task/scadenze senza linea servizio
+                        </p>
+                      ) : null}
+                      {client.service_attention_count > 0 ? (
+                        <p className="text-xs text-rose-600">
+                          {client.service_attention_count} da attenzionare
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell>
                   {client.last_audit_date

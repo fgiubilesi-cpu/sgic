@@ -46,6 +46,7 @@ export interface ClientTaskRecord {
   owner_profile_id: string | null;
   priority: ClientTaskPriority;
   recurrence_label: string | null;
+  service_line_id: string | null;
   status: ClientTaskStatus;
   title: string;
   updated_at: string;
@@ -68,7 +69,7 @@ export interface ClientContactRecord {
   updated_at: string;
 }
 
-export interface ClientManualDeadlineRecord {
+export interface ClientDeadlineRecord {
   client_id: string;
   created_at: string;
   created_by: string | null;
@@ -78,12 +79,15 @@ export interface ClientManualDeadlineRecord {
   location_id: string | null;
   organization_id: string;
   priority: ClientTaskPriority;
+  service_line_id: string | null;
   source_id: string | null;
   source_type: 'manual' | 'contract' | 'task' | 'document' | 'audit';
   status: ClientDeadlineStatus;
   title: string;
   updated_at: string;
 }
+
+export type ClientManualDeadlineRecord = ClientDeadlineRecord;
 
 export interface ClientNoteRecord {
   body: string;
@@ -126,6 +130,7 @@ export interface ClientServiceLineRecord {
 export interface ClientWorkspaceData {
   contacts: ClientContactRecord[];
   contract: ClientContractRecord | null;
+  deadlines: ClientDeadlineRecord[];
   manualDeadlines: ClientManualDeadlineRecord[];
   notes: ClientNoteRecord[];
   serviceLines: ClientServiceLineRecord[];
@@ -134,8 +139,14 @@ export interface ClientWorkspaceData {
 }
 
 function isTableMissingError(error: unknown) {
-  const candidate = error as { code?: string };
-  return candidate?.code === '42P01' || candidate?.code === '42703';
+  const candidate = error as { code?: string; message?: string | null };
+  return (
+    candidate?.code === '42P01' ||
+    candidate?.code === '42703' ||
+    candidate?.code === 'PGRST205' ||
+    candidate?.message?.includes('Could not find the table') === true ||
+    candidate?.message?.includes('Could not find the column') === true
+  );
 }
 
 export async function getClientWorkspaceData(
@@ -145,7 +156,7 @@ export async function getClientWorkspaceData(
   const supabase = await createClient();
   const missingTables = new Set<string>();
 
-  const [contractResult, tasksResult, contactsResult, manualDeadlinesResult, notesResult, serviceLinesResult] =
+  const [contractResult, tasksResult, contactsResult, deadlinesResult, notesResult, serviceLinesResult] =
     await Promise.all([
       supabase
         .from('client_contracts')
@@ -174,7 +185,6 @@ export async function getClientWorkspaceData(
         .select('*')
         .eq('organization_id', organizationId)
         .eq('client_id', clientId)
-        .eq('source_type', 'manual')
         .order('due_date', { ascending: true })
         .order('created_at', { ascending: false }),
       supabase
@@ -197,8 +207,8 @@ export async function getClientWorkspaceData(
   if (contractResult.error && !isTableMissingError(contractResult.error)) throw contractResult.error;
   if (tasksResult.error && !isTableMissingError(tasksResult.error)) throw tasksResult.error;
   if (contactsResult.error && !isTableMissingError(contactsResult.error)) throw contactsResult.error;
-  if (manualDeadlinesResult.error && !isTableMissingError(manualDeadlinesResult.error)) {
-    throw manualDeadlinesResult.error;
+  if (deadlinesResult.error && !isTableMissingError(deadlinesResult.error)) {
+    throw deadlinesResult.error;
   }
   if (notesResult.error && !isTableMissingError(notesResult.error)) throw notesResult.error;
   if (serviceLinesResult.error && !isTableMissingError(serviceLinesResult.error)) {
@@ -208,7 +218,7 @@ export async function getClientWorkspaceData(
   if (contractResult.error && isTableMissingError(contractResult.error)) missingTables.add('client_contracts');
   if (tasksResult.error && isTableMissingError(tasksResult.error)) missingTables.add('client_tasks');
   if (contactsResult.error && isTableMissingError(contactsResult.error)) missingTables.add('client_contacts');
-  if (manualDeadlinesResult.error && isTableMissingError(manualDeadlinesResult.error)) {
+  if (deadlinesResult.error && isTableMissingError(deadlinesResult.error)) {
     missingTables.add('client_deadlines');
   }
   if (notesResult.error && isTableMissingError(notesResult.error)) missingTables.add('client_notes');
@@ -245,11 +255,14 @@ export async function getClientWorkspaceData(
     location_id: contact.location_id ?? null,
   }));
 
+  const deadlines = (deadlinesResult.data as ClientDeadlineRecord[] | null) ?? [];
+
   return {
     contract: (contractResult.data as ClientContractRecord | null) ?? null,
     tasks: (tasksResult.data as ClientTaskRecord[]) ?? [],
     contacts,
-    manualDeadlines: (manualDeadlinesResult.data as ClientManualDeadlineRecord[]) ?? [],
+    deadlines,
+    manualDeadlines: deadlines.filter((deadline) => deadline.source_type === 'manual'),
     notes,
     serviceLines: (serviceLinesResult.data as ClientServiceLineRecord[]) ?? [],
     missingTables: Array.from(missingTables),

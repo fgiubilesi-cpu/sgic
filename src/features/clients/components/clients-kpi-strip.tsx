@@ -1,4 +1,4 @@
-import { Building2, ClipboardCheck, MapPin, TriangleAlert, Users } from 'lucide-react';
+import { Building2, ClipboardCheck, MapPin, ShieldAlert, TriangleAlert, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ClientWithStats } from '@/features/clients/queries/get-clients';
 
@@ -17,8 +17,18 @@ export function ClientsKpiStrip({ clients }: ClientsKpiStripProps) {
   const totalPersonnel = clients.reduce((sum, client) => sum + client.personnel_count, 0);
   const totalAudits = clients.reduce((sum, client) => sum + client.audit_count, 0);
   const totalOpenNc = clients.reduce((sum, client) => sum + client.open_nc_count, 0);
+  const totalServiceLinkGaps = clients.reduce(
+    (sum, client) => sum + client.service_link_gap_count,
+    0
+  );
   const clientsWithoutStructure = clients.filter(
     (client) => client.location_count === 0 || client.personnel_count === 0
+  ).length;
+  const clientsWithServiceAttention = clients.filter(
+    (client) => client.service_attention_count > 0
+  ).length;
+  const clientsWithServiceLinkGaps = clients.filter(
+    (client) => client.service_link_gap_count > 0
   ).length;
 
   const items = [
@@ -64,10 +74,22 @@ export function ClientsKpiStrip({ clients }: ClientsKpiStripProps) {
       icon: TriangleAlert,
       tone: 'text-orange-700',
     },
+    {
+      label: 'Servizi Da Presidiare',
+      value: formatValue(clientsWithServiceAttention),
+      icon: ShieldAlert,
+      tone: 'text-rose-700',
+    },
+    {
+      label: 'Link Servizio Mancanti',
+      value: formatValue(totalServiceLinkGaps),
+      icon: TriangleAlert,
+      tone: clientsWithServiceLinkGaps > 0 ? 'text-amber-700' : 'text-emerald-700',
+    },
   ];
 
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-9">
       {items.map((item) => {
         const Icon = item.icon;
 

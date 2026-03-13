@@ -93,6 +93,7 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
       }))}
       client={client}
       clientOptions={clientOptions}
+      deadlines={workspace.deadlines}
       documents={documents}
       manualDeadlines={workspace.manualDeadlines}
       missingWorkspaceTables={workspace.missingTables}

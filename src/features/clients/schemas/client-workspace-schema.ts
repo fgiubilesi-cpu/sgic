@@ -37,6 +37,7 @@ export const clientTaskSchema = z.object({
   owner_name: optionalText,
   location_id: optionalText,
   audit_id: optionalText,
+  service_line_id: optionalText,
   is_recurring: z.boolean().default(false),
   recurrence_label: optionalText,
 });
@@ -66,6 +67,7 @@ export const clientDeadlineSchema = z.object({
   priority: z.enum(['low', 'medium', 'high', 'critical']),
   status: z.enum(['open', 'completed', 'cancelled']).default('open'),
   location_id: optionalText,
+  service_line_id: optionalText,
 });
 
 export const clientNoteSchema = z.object({

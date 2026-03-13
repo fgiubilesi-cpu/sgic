@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { Plus, SquarePen, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,8 @@ import {
   deleteClientDeadline,
   deleteClientNote,
   setClientNotePinned,
+  setClientDeadlineServiceLine,
+  setClientTaskServiceLine,
   setClientTaskStatus,
   updateClientContact,
   updateClientDeadline,
@@ -49,10 +51,17 @@ interface AuditOption {
   title: string | null;
 }
 
+interface ServiceLineOption {
+  id: string;
+  location_id: string | null;
+  title: string;
+}
+
 interface ManageTaskSheetProps {
   audits: AuditOption[];
   clientId: string;
   locations: LocationOption[];
+  serviceLines: ServiceLineOption[];
   task?: ClientTaskRecord;
 }
 
@@ -60,7 +69,13 @@ function normalizeSelectValue(value: string) {
   return value === 'none' ? '' : value;
 }
 
-export function ManageTaskSheet({ audits, clientId, locations, task }: ManageTaskSheetProps) {
+export function ManageTaskSheet({
+  audits,
+  clientId,
+  locations,
+  serviceLines,
+  task,
+}: ManageTaskSheetProps) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const isEditing = Boolean(task);
@@ -73,6 +88,7 @@ export function ManageTaskSheet({ audits, clientId, locations, task }: ManageTas
     owner_name: task?.owner_name ?? '',
     location_id: task?.location_id ?? '',
     audit_id: task?.audit_id ?? '',
+    service_line_id: task?.service_line_id ?? '',
     is_recurring: task?.is_recurring ?? false,
     recurrence_label: task?.recurrence_label ?? '',
   });
@@ -220,6 +236,34 @@ export function ManageTaskSheet({ audits, clientId, locations, task }: ManageTas
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Linea servizio</Label>
+            <select
+              className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm"
+              value={form.service_line_id || 'none'}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  service_line_id: normalizeSelectValue(event.target.value),
+                }))
+              }
+            >
+              <option value="none">Nessuna linea servizio</option>
+              {serviceLines.map((serviceLine) => {
+                const locationName = serviceLine.location_id
+                  ? locations.find((location) => location.id === serviceLine.location_id)?.name ?? null
+                  : null;
+
+                return (
+                  <option key={serviceLine.id} value={serviceLine.id}>
+                    {serviceLine.title}
+                    {locationName ? ` · ${locationName}` : ''}
+                  </option>
+                );
+              })}
+            </select>
           </div>
 
           <div className="space-y-2">
@@ -479,9 +523,15 @@ interface ManageDeadlineSheetProps {
   clientId: string;
   deadline?: ClientManualDeadlineRecord;
   locations: LocationOption[];
+  serviceLines: ServiceLineOption[];
 }
 
-export function ManageDeadlineSheet({ clientId, deadline, locations }: ManageDeadlineSheetProps) {
+export function ManageDeadlineSheet({
+  clientId,
+  deadline,
+  locations,
+  serviceLines,
+}: ManageDeadlineSheetProps) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const isEditing = Boolean(deadline);
@@ -492,6 +542,7 @@ export function ManageDeadlineSheet({ clientId, deadline, locations }: ManageDea
     priority: deadline?.priority ?? 'medium',
     status: deadline?.status ?? 'open',
     location_id: deadline?.location_id ?? '',
+    service_line_id: deadline?.service_line_id ?? '',
   });
 
   const submit = () => {
@@ -623,6 +674,34 @@ export function ManageDeadlineSheet({ clientId, deadline, locations }: ManageDea
                 <option value="cancelled">Annullata</option>
               </select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Linea servizio</Label>
+            <select
+              className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm"
+              value={form.service_line_id || 'none'}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  service_line_id: normalizeSelectValue(event.target.value),
+                }))
+              }
+            >
+              <option value="none">Nessuna linea servizio</option>
+              {serviceLines.map((serviceLine) => {
+                const locationName = serviceLine.location_id
+                  ? locations.find((location) => location.id === serviceLine.location_id)?.name ?? null
+                  : null;
+
+                return (
+                  <option key={serviceLine.id} value={serviceLine.id}>
+                    {serviceLine.title}
+                    {locationName ? ` · ${locationName}` : ''}
+                  </option>
+                );
+              })}
+            </select>
           </div>
 
           <div className="space-y-2">
@@ -862,6 +941,131 @@ export function TaskStatusQuickAction({
     >
       {label}
     </Button>
+  );
+}
+
+function filterServiceLinesForScope(
+  serviceLines: ServiceLineOption[],
+  locationId: string | null
+) {
+  if (!locationId) return serviceLines;
+
+  return serviceLines.filter(
+    (serviceLine) => !serviceLine.location_id || serviceLine.location_id === locationId
+  );
+}
+
+function ServiceLineQuickAction({
+  clientId,
+  deadlineId,
+  locationId,
+  serviceLineId,
+  serviceLines,
+  taskId,
+}: {
+  clientId: string;
+  deadlineId?: string;
+  locationId: string | null;
+  serviceLineId: string | null;
+  serviceLines: ServiceLineOption[];
+  taskId?: string;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [value, setValue] = useState(serviceLineId ?? '');
+
+  useEffect(() => {
+    setValue(serviceLineId ?? '');
+  }, [serviceLineId]);
+
+  const availableServiceLines = useMemo(() => {
+    const scoped = filterServiceLinesForScope(serviceLines, locationId);
+    if (!serviceLineId) return scoped;
+    if (scoped.some((serviceLine) => serviceLine.id === serviceLineId)) return scoped;
+    const current = serviceLines.find((serviceLine) => serviceLine.id === serviceLineId);
+    return current ? [current, ...scoped] : scoped;
+  }, [locationId, serviceLineId, serviceLines]);
+
+  return (
+    <select
+      className="h-8 min-w-44 rounded-md border border-zinc-200 bg-white px-2 text-xs text-zinc-700"
+      value={value || 'none'}
+      disabled={pending}
+      onChange={(event) => {
+        const nextValue = normalizeSelectValue(event.target.value);
+        const previousValue = value;
+        if (nextValue === previousValue) return;
+        setValue(nextValue);
+
+        startTransition(async () => {
+          const result = taskId
+            ? await setClientTaskServiceLine(taskId, clientId, nextValue || null)
+            : await setClientDeadlineServiceLine(deadlineId!, clientId, nextValue || null);
+
+          if (!result.success) {
+            setValue(previousValue);
+            toast.error(result.error ?? 'Impossibile aggiornare linea servizio');
+            return;
+          }
+
+          toast.success(nextValue ? 'Linea servizio collegata' : 'Collegamento rimosso');
+        });
+      }}
+    >
+      <option value="none">Nessuna linea</option>
+      {availableServiceLines.map((serviceLine) => (
+        <option key={serviceLine.id} value={serviceLine.id}>
+          {serviceLine.title}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+export function TaskServiceLineQuickAction({
+  clientId,
+  locationId,
+  serviceLineId,
+  serviceLines,
+  taskId,
+}: {
+  clientId: string;
+  locationId: string | null;
+  serviceLineId: string | null;
+  serviceLines: ServiceLineOption[];
+  taskId: string;
+}) {
+  return (
+    <ServiceLineQuickAction
+      clientId={clientId}
+      locationId={locationId}
+      serviceLineId={serviceLineId}
+      serviceLines={serviceLines}
+      taskId={taskId}
+    />
+  );
+}
+
+export function DeadlineServiceLineQuickAction({
+  clientId,
+  deadlineId,
+  locationId,
+  serviceLineId,
+  serviceLines,
+}: {
+  clientId: string;
+  deadlineId: string;
+  locationId: string | null;
+  serviceLineId: string | null;
+  serviceLines: ServiceLineOption[];
+}) {
+  return (
+    <ServiceLineQuickAction
+      clientId={clientId}
+      deadlineId={deadlineId}
+      locationId={locationId}
+      serviceLineId={serviceLineId}
+      serviceLines={serviceLines}
+    />
   );
 }
 

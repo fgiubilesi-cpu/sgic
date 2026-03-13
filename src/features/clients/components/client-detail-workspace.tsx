@@ -45,6 +45,9 @@ import { PersonnelOperationalBadge } from '@/features/personnel/components/perso
 import { PersonnelStateToggleButton } from '@/features/personnel/components/personnel-state-toggle-button';
 import type { AuditTimelineEvent } from '@/features/audits/queries/get-audit-timeline';
 import { ClientAuditInsights } from './client-audit-insights';
+import { ClientActivityTimelineCard } from './client-activity-timeline-card';
+import { ClientOperationalHygieneCard } from './client-operational-hygiene-card';
+import { ClientServiceCoverageCard } from './client-service-coverage-card';
 import type { DocumentListItem } from '@/features/documents/queries/get-documents';
 import { ManageDocumentSheet } from '@/features/documents/components/manage-document-sheet';
 import { DocumentsTable } from '@/features/documents/components/documents-table';
@@ -52,19 +55,28 @@ import { DocumentIntakeReviewSheet } from '@/features/documents/components/docum
 import { reprocessDocumentIntake } from '@/features/documents/actions/document-actions';
 import type { ContractProposal, ServiceLineProposal } from '@/features/documents/lib/document-intelligence';
 import {
+  DeadlineServiceLineQuickAction,
   ManageContactSheet,
   ManageDeadlineSheet,
   ManageNoteSheet,
   ManageTaskSheet,
   NotePinAction,
+  TaskServiceLineQuickAction,
   TaskStatusQuickAction,
 } from '@/features/clients/components/client-workspace-controls';
 import {
   upsertClientContract,
 } from '@/features/clients/actions/client-workspace-actions';
+import {
+  buildClientServiceCoverage,
+  getServiceCoverageStatusClassName,
+  getServiceCoverageStatusLabel,
+} from '@/features/clients/lib/client-service-coverage';
+import { buildClientActivityTimeline } from '@/features/clients/lib/client-activity-timeline';
 import type {
   ClientContactRecord,
   ClientContractRecord,
+  ClientDeadlineRecord,
   ClientManualDeadlineRecord,
   ClientNoteRecord,
   ClientServiceLineRecord,
@@ -101,6 +113,7 @@ interface ClientDetailWorkspaceProps {
   clientOptions: ClientOption[];
   contacts: ClientContactRecord[];
   contract: ClientContractRecord | null;
+  deadlines: ClientDeadlineRecord[];
   documents: DocumentListItem[];
   manualDeadlines: ClientManualDeadlineRecord[];
   missingWorkspaceTables: string[];
@@ -119,6 +132,7 @@ type AggregatedDeadline = {
   id: string;
   location_id: string | null;
   priority: ClientTaskPriority;
+  service_line_id: string | null;
   source_type: 'manual' | 'contract' | 'task' | 'document' | 'audit';
   status: 'open' | 'completed' | 'cancelled';
   title: string;
@@ -198,6 +212,12 @@ function sourceTypeBadgeClass(sourceType: AggregatedDeadline['source_type']) {
   if (sourceType === 'document') return 'border-amber-200 bg-amber-50 text-amber-700';
   if (sourceType === 'audit') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
   return 'border-zinc-200 bg-zinc-50 text-zinc-700';
+}
+
+function serviceCoverageSecondaryLine(nextPlannedAt: string | null, lastEvidenceAt: string | null) {
+  if (nextPlannedAt) return `Prossimo presidio ${toDateLabel(nextPlannedAt)}`;
+  if (lastEvidenceAt) return `Ultima evidenza ${toDateLabel(lastEvidenceAt)}`;
+  return 'Nessun presidio rilevato';
 }
 
 function asObject(value: unknown): Record<string, unknown> | null {
@@ -300,6 +320,7 @@ export function ClientDetailWorkspace({
   clientOptions,
   contacts,
   contract,
+  deadlines,
   documents,
   manualDeadlines,
   missingWorkspaceTables,
@@ -436,17 +457,27 @@ export function ClientDetailWorkspace({
 
   const aggregatedDeadlines = useMemo<AggregatedDeadline[]>(() => {
     const list: AggregatedDeadline[] = [];
+    const existingDocumentDeadlineIds = new Set<string>();
 
-    for (const deadline of manualDeadlines) {
+    for (const deadline of deadlines) {
+      if (deadline.source_type === 'document' && deadline.source_id) {
+        existingDocumentDeadlineIds.add(deadline.source_id);
+      }
+
+      if (deadline.source_type !== 'manual' && deadline.source_type !== 'document') {
+        continue;
+      }
+
       list.push({
         id: deadline.id,
-        source_type: 'manual',
+        source_type: deadline.source_type,
         title: deadline.title,
         description: deadline.description,
         due_date: deadline.due_date,
         priority: deadline.priority,
         status: deadline.status,
         location_id: deadline.location_id,
+        service_line_id: deadline.service_line_id,
         href: null,
       });
     }
@@ -461,6 +492,7 @@ export function ClientDetailWorkspace({
         priority: 'high',
         status: contract.status === 'expired' ? 'cancelled' : 'open',
         location_id: null,
+        service_line_id: null,
         href: null,
       });
     }
@@ -475,6 +507,7 @@ export function ClientDetailWorkspace({
         priority: 'critical',
         status: contract.status === 'expired' ? 'completed' : 'open',
         location_id: null,
+        service_line_id: null,
         href: null,
       });
     }
@@ -490,12 +523,14 @@ export function ClientDetailWorkspace({
         priority: task.priority,
         status: task.status === 'done' ? 'completed' : 'open',
         location_id: task.location_id,
+        service_line_id: task.service_line_id,
         href: null,
       });
     }
 
     for (const document of documents) {
       if (!document.expiry_date) continue;
+      if (existingDocumentDeadlineIds.has(document.id)) continue;
       const due = toDateStart(document.expiry_date);
       const diffDays = Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       list.push({
@@ -507,6 +542,7 @@ export function ClientDetailWorkspace({
         priority: diffDays <= 14 ? 'high' : diffDays <= 30 ? 'medium' : 'low',
         status: document.status === 'archived' ? 'completed' : 'open',
         location_id: document.location_id,
+        service_line_id: null,
         href: null,
       });
     }
@@ -523,6 +559,7 @@ export function ClientDetailWorkspace({
         priority: audit.status === 'In Progress' ? 'high' : 'medium',
         status: 'open',
         location_id: audit.location_id,
+        service_line_id: null,
         href: `/audits/${audit.id}`,
       });
     }
@@ -530,7 +567,7 @@ export function ClientDetailWorkspace({
     return list.sort((left, right) => {
       return toDateStart(left.due_date).getTime() - toDateStart(right.due_date).getTime();
     });
-  }, [audits, client.id, contract, documents, manualDeadlines, tasks, today]);
+  }, [audits, client.id, contract, deadlines, documents, tasks, today]);
 
   const documentExpiringSoonCount = documents.filter((document) => {
     if (!document.expiry_date) return false;
@@ -640,10 +677,52 @@ export function ClientDetailWorkspace({
     new Set(tasks.map((task) => task.owner_name).filter((owner): owner is string => Boolean(owner)))
   );
   const activeServiceLines = serviceLines.filter((line) => line.active);
+  const hasTrackedServiceLines = activeServiceLines.length > 0;
+  const unlinkedOpenTasksCount = hasTrackedServiceLines
+    ? openTasks.filter((task) => !task.service_line_id).length
+    : 0;
+  const unlinkedOpenManualDeadlinesCount = hasTrackedServiceLines
+    ? manualDeadlines.filter((deadline) => deadline.status === 'open' && !deadline.service_line_id)
+        .length
+    : 0;
+  const serviceLineMap = useMemo(
+    () => new Map(activeServiceLines.map((line) => [line.id, line.title])),
+    [activeServiceLines]
+  );
+  const serviceLineOptions = useMemo(
+    () =>
+      activeServiceLines.map((line) => ({
+        id: line.id,
+        location_id: line.location_id,
+        title: line.title,
+      })),
+    [activeServiceLines]
+  );
   const recurringServiceLinesCount = activeServiceLines.filter((line) => line.is_recurring).length;
   const serviceLineDocumentUrl = preferredDocumentAccessUrl(latestActivityPlanDocument);
   const serviceLineDocumentName = latestActivityPlanDocument?.title || 'Allegato attività';
   const serviceLineTotalValue = activeServiceLines.reduce((sum, line) => sum + (line.total_price ?? 0), 0);
+  const serviceCoverage = useMemo(
+    () =>
+      buildClientServiceCoverage({
+        audits,
+        deadlines,
+        documents,
+        locations: client.locations.map((location) => ({
+          id: location.id,
+          is_active: location.is_active ?? true,
+          name: location.name,
+        })),
+        serviceLines: activeServiceLines,
+        tasks,
+        today,
+      }),
+    [activeServiceLines, audits, client.locations, deadlines, documents, tasks, today]
+  );
+  const serviceCoverageByLineId = useMemo(
+    () => new Map(serviceCoverage.items.map((item) => [item.lineId, item])),
+    [serviceCoverage.items]
+  );
 
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
@@ -710,6 +789,18 @@ export function ClientDetailWorkspace({
   });
 
   const filteredNotes = notes.filter((note) => noteType === 'all' || note.note_type === noteType);
+  const activityTimeline = useMemo(
+    () =>
+      buildClientActivityTimeline({
+        deadlines,
+        documents,
+        locationMap,
+        notes,
+        tasks,
+        timelineEvents,
+      }),
+    [deadlines, documents, locationMap, notes, tasks, timelineEvents]
+  );
   const expiredDocuments = documents.filter((document) => {
     if (!document.expiry_date) return false;
     return toDateStart(document.expiry_date) < today;
@@ -855,6 +946,7 @@ export function ClientDetailWorkspace({
             audits={audits.map((audit) => ({ id: audit.id, title: audit.title }))}
             clientId={client.id}
             locations={client.locations.map((location) => ({ id: location.id, name: location.name }))}
+            serviceLines={serviceLineOptions}
           />
           <ManageLocationSheet clientId={client.id} />
           <CreateAuditSheet defaultClientId={client.id} hideClientField triggerLabel="Nuovo Audit" />
@@ -971,6 +1063,21 @@ export function ClientDetailWorkspace({
                   </CardContent>
                 </Card>
               </div>
+
+              <ClientServiceCoverageCard
+                coverage={serviceCoverage}
+                onOpenActivities={() => setActiveTab('activities')}
+                onOpenDeadlines={() => setActiveTab('deadlines')}
+              />
+
+              <ClientOperationalHygieneCard
+                hasTrackedServiceLines={hasTrackedServiceLines}
+                onOpenActivities={() => setActiveTab('activities')}
+                onOpenContract={() => setActiveTab('contract')}
+                onOpenDeadlines={() => setActiveTab('deadlines')}
+                unlinkedOpenManualDeadlinesCount={unlinkedOpenManualDeadlinesCount}
+                unlinkedOpenTasksCount={unlinkedOpenTasksCount}
+              />
 
               <div className="grid gap-4 xl:grid-cols-[1fr_1fr_1fr]">
                 <Card>
@@ -1137,6 +1244,22 @@ export function ClientDetailWorkspace({
                     </div>
                   </div>
 
+                  {serviceCoverage.summary.total > 0 ? (
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+                      <span className="font-medium text-zinc-900">
+                        {serviceCoverage.summary.guarded}/{serviceCoverage.summary.total}
+                      </span>{' '}
+                      linee risultano presidiate o già pianificate.
+                      {serviceCoverage.summary.missing + serviceCoverage.summary.overdue > 0 ? (
+                        <span className="text-rose-700">
+                          {' '}
+                          {serviceCoverage.summary.missing + serviceCoverage.summary.overdue} sono
+                          scoperte o in ritardo.
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                   {activeServiceLines.length === 0 ? (
                     <p className="text-sm text-zinc-500">
                       Nessuna attività contrattuale importata. Dopo l’upload, apri la review del documento e applica le righe al workspace cliente.
@@ -1149,29 +1272,56 @@ export function ClientDetailWorkspace({
                           <TableHead>Sezione</TableHead>
                           <TableHead>Frequenza</TableHead>
                           <TableHead>Q.tà</TableHead>
+                          <TableHead>Copertura</TableHead>
                           <TableHead>Fase</TableHead>
                           <TableHead>Valore</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {activeServiceLines.map((line) => (
-                          <TableRow key={line.id}>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium text-zinc-900">{line.title}</p>
-                                <p className="text-xs text-zinc-500">
-                                  {line.code || 'Codice n.d.'}
-                                  {line.notes ? ` · ${line.notes}` : ''}
-                                </p>
-                              </div>
-                            </TableCell>
-                            <TableCell>{line.section || '-'}</TableCell>
-                            <TableCell>{line.frequency_label || '-'}</TableCell>
-                            <TableCell>{line.quantity ? `${line.quantity} ${line.unit || ''}`.trim() : '-'}</TableCell>
-                            <TableCell>{line.billing_phase || '-'}</TableCell>
-                            <TableCell>{toCurrencyLabel(line.total_price ?? line.unit_price)}</TableCell>
-                          </TableRow>
-                        ))}
+                        {activeServiceLines.map((line) => {
+                          const coverage = serviceCoverageByLineId.get(line.id);
+
+                          return (
+                            <TableRow key={line.id}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium text-zinc-900">{line.title}</p>
+                                  <p className="text-xs text-zinc-500">
+                                    {line.code || 'Codice n.d.'}
+                                    {line.notes ? ` · ${line.notes}` : ''}
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell>{line.section || '-'}</TableCell>
+                              <TableCell>{line.frequency_label || '-'}</TableCell>
+                              <TableCell>
+                                {line.quantity ? `${line.quantity} ${line.unit || ''}`.trim() : '-'}
+                              </TableCell>
+                              <TableCell>
+                                {coverage ? (
+                                  <div className="space-y-1">
+                                    <Badge
+                                      variant="outline"
+                                      className={getServiceCoverageStatusClassName(coverage.status)}
+                                    >
+                                      {getServiceCoverageStatusLabel(coverage.status)}
+                                    </Badge>
+                                    <p className="text-xs text-zinc-500">
+                                      {serviceCoverageSecondaryLine(
+                                        coverage.nextPlannedAt,
+                                        coverage.lastEvidenceAt
+                                      )}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-zinc-500">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell>{line.billing_phase || '-'}</TableCell>
+                              <TableCell>{toCurrencyLabel(line.total_price ?? line.unit_price)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   )}
@@ -1188,6 +1338,7 @@ export function ClientDetailWorkspace({
                     audits={audits.map((audit) => ({ id: audit.id, title: audit.title }))}
                     clientId={client.id}
                     locations={client.locations.map((location) => ({ id: location.id, name: location.name }))}
+                    serviceLines={serviceLineOptions}
                   />
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -1290,10 +1441,23 @@ export function ClientDetailWorkspace({
                                     : '-'}
                                 </div>
                                 <div>Audit: {task.audit_id ? 'Collegato' : '-'}</div>
+                                <div>
+                                  Servizio:{' '}
+                                  {task.service_line_id
+                                    ? serviceLineMap.get(task.service_line_id) ?? 'Linea rimossa'
+                                    : '-'}
+                                </div>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-wrap items-center gap-1">
+                                <TaskServiceLineQuickAction
+                                  clientId={client.id}
+                                  locationId={task.location_id}
+                                  serviceLineId={task.service_line_id}
+                                  serviceLines={serviceLineOptions}
+                                  taskId={task.id}
+                                />
                                 <TaskStatusQuickAction
                                   clientId={client.id}
                                   status={task.status}
@@ -1306,6 +1470,7 @@ export function ClientDetailWorkspace({
                                     id: location.id,
                                     name: location.name,
                                   }))}
+                                  serviceLines={serviceLineOptions}
                                   task={task}
                                 />
                               </div>
@@ -2518,6 +2683,7 @@ export function ClientDetailWorkspace({
                   <ManageDeadlineSheet
                     clientId={client.id}
                     locations={client.locations.map((location) => ({ id: location.id, name: location.name }))}
+                    serviceLines={serviceLineOptions}
                   />
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -2590,12 +2756,19 @@ export function ClientDetailWorkspace({
                       <TableBody>
                         {filteredDeadlines.map((deadline) => {
                           const manualDeadline = manualDeadlines.find((item) => item.id === deadline.id);
+                          const workspaceDeadline = deadlines.find((item) => item.id === deadline.id);
                           return (
                             <TableRow key={deadline.id}>
                               <TableCell>
                                 <div>
                                   <p className="font-medium text-zinc-900">{deadline.title}</p>
                                   <p className="text-xs text-zinc-500">{deadline.description || '-'}</p>
+                                  {deadline.service_line_id ? (
+                                    <p className="text-xs text-zinc-500">
+                                      Servizio:{' '}
+                                      {serviceLineMap.get(deadline.service_line_id) ?? 'Linea rimossa'}
+                                    </p>
+                                  ) : null}
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -2626,6 +2799,15 @@ export function ClientDetailWorkspace({
                                       <Link href={deadline.href}>Apri</Link>
                                     </Button>
                                   ) : null}
+                                  {workspaceDeadline ? (
+                                    <DeadlineServiceLineQuickAction
+                                      clientId={client.id}
+                                      deadlineId={workspaceDeadline.id}
+                                      locationId={workspaceDeadline.location_id}
+                                      serviceLineId={workspaceDeadline.service_line_id}
+                                      serviceLines={serviceLineOptions}
+                                    />
+                                  ) : null}
                                   {manualDeadline ? (
                                     <ManageDeadlineSheet
                                       clientId={client.id}
@@ -2634,6 +2816,7 @@ export function ClientDetailWorkspace({
                                         id: location.id,
                                         name: location.name,
                                       }))}
+                                      serviceLines={serviceLineOptions}
                                     />
                                   ) : null}
                                 </div>
@@ -2651,6 +2834,8 @@ export function ClientDetailWorkspace({
 
           {activeTab === 'notes' ? (
             <div className="space-y-4">
+              <ClientActivityTimelineCard events={activityTimeline} />
+
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <div>

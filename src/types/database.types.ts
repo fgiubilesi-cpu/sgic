@@ -2507,21 +2507,56 @@ export type Database = {
       }
       samplings: {
         Row: {
+          client_id: string | null
           created_at: string | null
           id: string
+          location_id: string | null
+          matrix: string | null
+          operator_name: string | null
           organization_id: string
+          sampling_date: string | null
+          status: string | null
+          title: string | null
         }
         Insert: {
+          client_id?: string | null
           created_at?: string | null
           id?: string
+          location_id?: string | null
+          matrix?: string | null
+          operator_name?: string | null
           organization_id: string
+          sampling_date?: string | null
+          status?: string | null
+          title?: string | null
         }
         Update: {
+          client_id?: string | null
           created_at?: string | null
           id?: string
+          location_id?: string | null
+          matrix?: string | null
+          operator_name?: string | null
           organization_id?: string
+          sampling_date?: string | null
+          status?: string | null
+          title?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "samplings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "samplings_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "samplings_organization_id_fkey"
             columns: ["organization_id"]

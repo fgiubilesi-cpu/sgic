@@ -48,7 +48,6 @@ export function CreateSamplingSheet() {
             title: "",
             matrix: "",
             sampling_date: new Date().toISOString().split("T")[0],
-            location: "",
             operator_name: "",
             status: "planned",
         } as any,
@@ -131,20 +130,6 @@ export function CreateSamplingSheet() {
                                     <FormLabel>Data Campionamento</FormLabel>
                                     <FormControl>
                                         <Input type="date" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="location"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Luogo (Opzionale)</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Es. Reparto Produzione" {...field} value={field.value ?? ""} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

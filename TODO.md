@@ -1,20 +1,28 @@
 # SGIC — TODO.md
-> Aggiornato: 2026-03-09 | Sprint 8
+> Aggiornato: 2026-03-21 | Sprint 9
 
 ---
 
-## CURRENT SPRINT — Completamento flusso audit end-to-end
+## CURRENT SPRINT — Sprint 9: Client Filter + Documenti
 
-### A — Fix critici NC/AC
+### Completato in Sprint 9
 
-- [x] **A0** XLS export — già completo (3 fogli: checklist, NC, AC)
-- [x] **A0b** Bozza mail post-audit — già completo (testo deterministico da copiare)
-- [ ] **A1** Fix AC multipla: permettere l'aggiunta di più AC per la stessa NC
-- [ ] **A2** Implementare Delete AC (soft delete con deleted_at)
-- [ ] **A3** Cambio stato NC dall'UI (open → pending_verification → closed) nel pannello espanso
-- [ ] **A4** Includere AC nel testo bozza mail (attualmente mostra solo NC)
+- [x] **CF1** Componente ClientFilter globale in header (dropdown + URL params)
+- [x] **CF2** Query get-clients-list per opzioni filtro
+- [x] **D1** Pagina /documents con tabella, KPI strip, filtro per cliente
+- [x] **D2** Nav link "Documenti" attivato in sidebar
+- [x] **D3** Nav link "Personale" attivato in sidebar
 
-### Test manuali end-to-end (dopo A1-A4)
+### Fix tecnici Sprint 9
+
+- [x] Fix `import { type Foo }` → `import type { Foo }` su 22 file (webpack compat)
+- [x] Eliminati 38 file duplicati (spazio nel nome)
+- [x] Eliminati 6 file extensionless (parse error webpack)
+- [x] Creata tabella `checklist_item_media` su Supabase
+- [x] Fix audio-recorder.tsx type error
+- [x] Build 0 errori TypeScript
+
+### Test manuali end-to-end (da Sprint 8, ancora da validare)
 
 - [ ] **V1** Flusso audit completo: crea audit da template → compila 1 OK + 1 NOK + 1 N/A → verifica score aggiornato + NC auto-creata → tab NC mostra la NC
 - [ ] **V2** Flusso NC→AC: apri NC → aggiungi AC → aggiungi seconda AC → cambia stato NC → verifica badge scadenza
@@ -23,13 +31,40 @@
 - [ ] **V5** Template: crea → aggiungi domande → reorder ↑↓ → import CSV → crea audit da template
 - [ ] **V6** Portale cliente: accedi con ruolo client → sola lettura → banner corretto
 
-### Commit e Tag
+---
 
-- [ ] **G1** commit + tag `v0.6-sprint8`
+## NEXT — Sprint 10: Personale + Visite Mediche
+
+- [ ] **P1** Tabella `medical_visits` (personnel_id, visit_date, expiry_date, fitness_status, doctor, protocol)
+- [ ] **P2** Tab visite mediche nella scheda personale (/personnel/[id])
+- [ ] **P3** Filtro per cliente nella lista personale
+- [ ] **P4** Cross-link formazione nella scheda personale
+- [ ] **P5** Widget scadenze visite in dashboard
+
+## Sprint 11: Formazione
+
+- [ ] **F1** Migrazione: aggiungere `client_id` e `location_id` a `training_courses`
+- [ ] **F2** Pagina /training con lista corsi filtrabili per cliente
+- [ ] **F3** Pagina /training/[id] con registrazioni
+- [ ] **F4** Attivare voce "Formazione" in sidebar
+- [ ] **F5** Scadenze attestati: alert basati su validity_months + completion_date
+
+## Sprint 12: Campionamenti e Analisi
+
+- [ ] **S1** Migrazione: aggiungere `client_id`, `location_id`, `title`, `matrix`, `sampling_date`, `status` a `samplings`
+- [ ] **S2** Pagina /samplings con lista filtrabili per cliente
+- [ ] **S3** Attivare voce "Campionamenti" in sidebar
+- [ ] **S4** Export risultati lab XLS per cliente
+
+## Sprint 13+: Knowledge Base
+
+- [ ] Ricerca full-text nei documenti (basata su extracted_text)
+- [ ] Cross-reference audit/NC → documenti di riferimento
+- [ ] Suggerimento procedure durante compilazione checklist
 
 ---
 
-## BACKLOG — Sprint Futuri
+## BACKLOG
 
 - [ ] Ricerca globale: verificare se già funzionante (feature scaffoldata in `src/features/search/`)
 - [ ] CI/CD GitHub Actions (lint + typecheck + test e2e su PR)

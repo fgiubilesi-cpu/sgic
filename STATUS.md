@@ -1,6 +1,6 @@
 ---
 type: status
-date: 2026-03-20
+date: 2026-03-21
 status: active
 tags: [dashboard, stato, sgic]
 author: claude-strategy
@@ -9,19 +9,21 @@ author: claude-strategy
 # STATUS.md — Dashboard stato SGIC
 
 > Aggiornato da: ogni agente che completa uno sprint o milestone
-> Ultimo aggiornamento: 2026-03-20
+> Ultimo aggiornamento: 2026-03-21
 
 ## Stato progetto
 
 | Area | Stato | Prossimo passo | Ultimo update |
 |---|---|---|---|
-| Core app | 🟢 stabile | Sprint 8 | 2026-03-20 |
+| Core app | 🟢 stabile | Sprint 9 | 2026-03-21 |
+| Client Filter | 🟢 stabile | Componente attivo in header | 2026-03-21 |
+| Documenti | 🟢 stabile | Pagina /documents attiva | 2026-03-21 |
+| Personale | 🟡 ready | Visite mediche (Sprint 10) | 2026-03-21 |
+| Formazione | 🟡 ready | Pagina + client_id (Sprint 11) | 2026-03-21 |
+| Campionamenti | 🟡 ready | Pagina + client_id (Sprint 12) | 2026-03-21 |
 | Portale cliente | ✅ done | — | Sprint 7 |
-| PDF report | 🟡 ready | R1-R4 in TODO.md | 2026-03-20 |
-| Email notifiche | 🟡 ready | E1-E4 in TODO.md | 2026-03-20 |
-| Ricerca globale | 🟡 ready | S1-S3 in TODO.md | 2026-03-20 |
 | Test manuali e2e | 🟡 ready | V1-V6 in TODO.md | 2026-03-20 |
-| CI/CD | ⚪ parked | Sprint 9 | 2026-03-20 |
+| CI/CD | ⚪ parked | — | 2026-03-20 |
 
 ## Legenda
 
@@ -36,7 +38,7 @@ author: claude-strategy
 ## Info rapide
 
 - **Tag stabile:** v0.5-sprint7
-- **Sprint corrente:** 8
+- **Sprint corrente:** 9
 - **Stack:** Next.js 16 + TypeScript + Supabase + Tailwind + shadcn/ui
 - **Porta:** 3000
 - **Percorso:** `~/sgic`

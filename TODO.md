@@ -33,13 +33,13 @@
 
 ---
 
-## NEXT — Sprint 10: Personale + Visite Mediche
+## Completato — Sprint 10: Personale + Visite Mediche
 
-- [ ] **P1** Tabella `medical_visits` (personnel_id, visit_date, expiry_date, fitness_status, doctor, protocol)
-- [ ] **P2** Tab visite mediche nella scheda personale (/personnel/[id])
-- [ ] **P3** Filtro per cliente nella lista personale
-- [ ] **P4** Cross-link formazione nella scheda personale
-- [ ] **P5** Widget scadenze visite in dashboard
+- [x] **P1** Tabella `medical_visits` (personnel_id, visit_date, expiry_date, fitness_status, doctor, protocol)
+- [x] **P2** Tab visite mediche nella scheda personale (/personnel/[id])
+- [x] **P3** Pagina /personnel con filtro per cliente e KPI strip
+- [x] **P4** Cross-link formazione nella scheda personale (già presente)
+- [ ] **P5** Widget scadenze visite in dashboard (sprint futuro)
 
 ## Sprint 11: Formazione
 

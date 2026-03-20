@@ -18,7 +18,7 @@ author: claude-strategy
 | Core app | 🟢 stabile | Sprint 9 | 2026-03-21 |
 | Client Filter | 🟢 stabile | Componente attivo in header | 2026-03-21 |
 | Documenti | 🟢 stabile | Pagina /documents attiva | 2026-03-21 |
-| Personale | 🟡 ready | Visite mediche (Sprint 10) | 2026-03-21 |
+| Personale + Visite | 🟢 stabile | Pagina lista + visite mediche | 2026-03-21 |
 | Formazione | 🟡 ready | Pagina + client_id (Sprint 11) | 2026-03-21 |
 | Campionamenti | 🟡 ready | Pagina + client_id (Sprint 12) | 2026-03-21 |
 | Portale cliente | ✅ done | — | Sprint 7 |
@@ -38,7 +38,7 @@ author: claude-strategy
 ## Info rapide
 
 - **Tag stabile:** v0.5-sprint7
-- **Sprint corrente:** 9
+- **Sprint corrente:** 10
 - **Stack:** Next.js 16 + TypeScript + Supabase + Tailwind + shadcn/ui
 - **Porta:** 3000
 - **Percorso:** `~/sgic`

@@ -41,20 +41,20 @@
 - [x] **P4** Cross-link formazione nella scheda personale (già presente)
 - [ ] **P5** Widget scadenze visite in dashboard (sprint futuro)
 
-## Sprint 11: Formazione
+## Completato — Sprint 11: Formazione
 
-- [ ] **F1** Migrazione: aggiungere `client_id` e `location_id` a `training_courses`
-- [ ] **F2** Pagina /training con lista corsi filtrabili per cliente
-- [ ] **F3** Pagina /training/[id] con registrazioni
-- [ ] **F4** Attivare voce "Formazione" in sidebar
-- [ ] **F5** Scadenze attestati: alert basati su validity_months + completion_date
+- [x] **F1** Migrazione: aggiunto `client_id` e `location_id` a `training_courses`
+- [x] **F2** Pagina /training con catalogo corsi e registrazioni recenti
+- [x] **F4** Voce "Formazione" attivata in sidebar
+- [ ] **F3** Pagina /training/[id] con dettaglio corso (sprint futuro)
+- [ ] **F5** Scadenze attestati: alert basati su validity_months + completion_date (sprint futuro)
 
-## Sprint 12: Campionamenti e Analisi
+## Completato — Sprint 12: Campionamenti e Analisi
 
-- [ ] **S1** Migrazione: aggiungere `client_id`, `location_id`, `title`, `matrix`, `sampling_date`, `status` a `samplings`
-- [ ] **S2** Pagina /samplings con lista filtrabili per cliente
-- [ ] **S3** Attivare voce "Campionamenti" in sidebar
-- [ ] **S4** Export risultati lab XLS per cliente
+- [x] **S1** Migrazione: aggiunto `client_id`, `location_id`, `title`, `matrix`, `sampling_date`, `status` a `samplings`
+- [x] **S2** Pagina /samplings con lista filtrabili per cliente
+- [x] **S3** Voce "Campionamenti" attivata in sidebar
+- [ ] **S4** Export risultati lab XLS per cliente (sprint futuro)
 
 ## Sprint 13+: Knowledge Base
 

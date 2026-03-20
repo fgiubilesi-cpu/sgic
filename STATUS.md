@@ -19,8 +19,8 @@ author: claude-strategy
 | Client Filter | 🟢 stabile | Componente attivo in header | 2026-03-21 |
 | Documenti | 🟢 stabile | Pagina /documents attiva | 2026-03-21 |
 | Personale + Visite | 🟢 stabile | Pagina lista + visite mediche | 2026-03-21 |
-| Formazione | 🟡 ready | Pagina + client_id (Sprint 11) | 2026-03-21 |
-| Campionamenti | 🟡 ready | Pagina + client_id (Sprint 12) | 2026-03-21 |
+| Formazione | 🟢 stabile | Pagina /training attiva | 2026-03-21 |
+| Campionamenti | 🟢 stabile | Pagina /samplings attiva | 2026-03-21 |
 | Portale cliente | ✅ done | — | Sprint 7 |
 | Test manuali e2e | 🟡 ready | V1-V6 in TODO.md | 2026-03-20 |
 | CI/CD | ⚪ parked | — | 2026-03-20 |
@@ -38,7 +38,7 @@ author: claude-strategy
 ## Info rapide
 
 - **Tag stabile:** v0.5-sprint7
-- **Sprint corrente:** 10
+- **Sprint corrente:** 12
 - **Stack:** Next.js 16 + TypeScript + Supabase + Tailwind + shadcn/ui
 - **Porta:** 3000
 - **Percorso:** `~/sgic`

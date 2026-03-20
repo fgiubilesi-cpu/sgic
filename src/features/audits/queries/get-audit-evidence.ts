@@ -1,6 +1,7 @@
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import { getAudit } from "@/features/audits/queries/get-audit";
-import { isVideoMedia, type ChecklistMediaKind } from "@/features/audits/lib/checklist-media";
+import type { ChecklistMediaKind } from "@/features/audits/lib/checklist-media";
+import { isVideoMedia } from "@/features/audits/lib/checklist-media";
 
 export type EvidenceItem = {
   id: string;

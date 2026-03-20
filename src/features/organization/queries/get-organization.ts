@@ -1,8 +1,8 @@
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
+import type { OrganizationConsoleConfig } from "@/features/organization/lib/organization-console-config";
 import {
   getDefaultOrganizationConsoleConfig,
   parseOrganizationConsoleConfig,
-  type OrganizationConsoleConfig,
 } from "@/features/organization/lib/organization-console-config";
 
 export type Organization = {

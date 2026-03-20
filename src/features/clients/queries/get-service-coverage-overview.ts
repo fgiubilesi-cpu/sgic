@@ -1,4 +1,5 @@
-import { getClients, type ClientServiceOverviewStatus } from '@/features/clients/queries/get-clients';
+import type { ClientServiceOverviewStatus } from '@/features/clients/queries/get-clients';
+import { getClients } from '@/features/clients/queries/get-clients';
 
 export interface ServiceCoverageOverviewClientItem {
   client_id: string;

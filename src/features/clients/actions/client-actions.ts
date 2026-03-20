@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseClient } from '@/lib/supabase/server';
 import { getOrganizationContext } from '@/lib/supabase/get-org-context';
-import { clientSchema, locationSchema, type ClientFormInput, type LocationFormInput } from '../schemas/client-schema';
+import type { ClientFormInput, LocationFormInput } from '../schemas/client-schema';
+import { clientSchema, locationSchema } from '../schemas/client-schema';
 
 function normalizeOptionalString(value: string) {
   const trimmed = value.trim();

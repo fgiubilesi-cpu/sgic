@@ -1,4 +1,5 @@
-import { buildClientServiceCoverage, type ServiceCoverageAuditInput, type ServiceCoverageDocumentInput } from '@/features/clients/lib/client-service-coverage';
+import type { ServiceCoverageAuditInput, ServiceCoverageDocumentInput } from '@/features/clients/lib/client-service-coverage';
+import { buildClientServiceCoverage } from '@/features/clients/lib/client-service-coverage';
 import type {
   ClientDeadlineRecord,
   ClientServiceLineRecord,

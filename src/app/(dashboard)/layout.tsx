@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { NetworkStatus } from "@/components/network-status";
 import {
   ClipboardCheck,
+  FileText,
   Home as HomeIcon,
   Menu,
   FlaskConical,
@@ -29,7 +30,10 @@ import {
   Building2,
   BriefcaseBusiness,
   Settings,
+  Users,
 } from "lucide-react";
+import { ClientFilter } from "@/features/clients/components/client-filter";
+import { getClientsList } from "@/features/clients/queries/get-clients-list";
 
 type DashboardLayoutProps = {
   children: ReactNode;
@@ -59,9 +63,11 @@ function getNavItems(role?: string | null): NavItem[] {
     { label: "Dashboard", href: "/dashboard", icon: HomeIcon },
     { label: "Audit", href: "/audits", icon: ClipboardCheck },
     { label: "Clienti", href: "/clients", icon: Building2 },
-    { label: "Organizzazione", href: "/organization", icon: Building2 },
-    { label: "Campionamenti", href: null, icon: FlaskConical, disabled: true },
+    { label: "Personale", href: "/personnel", icon: Users },
+    { label: "Documenti", href: "/documents", icon: FileText },
     { label: "Formazione", href: null, icon: GraduationCap, disabled: true },
+    { label: "Campionamenti", href: null, icon: FlaskConical, disabled: true },
+    { label: "Organizzazione", href: "/organization", icon: Building2 },
     { label: "Account", href: "/settings", icon: Settings },
   ];
 
@@ -169,6 +175,8 @@ export default async function DashboardLayout({
     role: profile?.role ?? null,
   };
 
+  const clients = dashboardUser.role !== "client" ? await getClientsList() : [];
+
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
       <div className="flex h-screen">
@@ -237,6 +245,12 @@ export default async function DashboardLayout({
 
             {/* User menu desktop */}
             <div className="hidden md:flex items-center gap-3 flex-1 justify-end">
+              {clients.length > 0 && (
+                <>
+                  <ClientFilter clients={clients} />
+                  <Separator orientation="vertical" className="h-6" />
+                </>
+              )}
               <NetworkStatus />
               <Separator orientation="vertical" className="h-6" />
               <GlobalSearchLauncher />

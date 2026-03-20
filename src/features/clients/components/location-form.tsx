@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { locationSchema, type LocationFormInput } from '../schemas/client-schema';
+import type { LocationFormInput } from '../schemas/client-schema';
+import { locationSchema } from '../schemas/client-schema';
 import { createLocation, updateLocation } from '../actions/client-actions';
 import {
   Form,

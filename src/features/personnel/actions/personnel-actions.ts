@@ -3,13 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseClient } from '@/lib/supabase/server';
 import { getOrganizationContext } from '@/lib/supabase/get-org-context';
-import { personnelSchema, type PersonnelFormInput } from '../schemas/personnel-schema';
+import type { PersonnelFormInput } from '../schemas/personnel-schema';
+import { personnelSchema } from '../schemas/personnel-schema';
 import type { Tables } from '@/types/database.types';
+import type { OperationalStatus } from '@/features/personnel/lib/personnel-status';
 import {
   buildPersonnelTimeline,
   getPersonnelOperationalStatus,
   getTrainingWindowSummary,
-  type OperationalStatus,
 } from '@/features/personnel/lib/personnel-status';
 
 type TrainingRecordRow = Tables<'training_records'> & {

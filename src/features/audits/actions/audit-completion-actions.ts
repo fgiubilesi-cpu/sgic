@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getOrganizationContext, type OrgContext } from "@/lib/supabase/get-org-context";
+import type { OrgContext } from "@/lib/supabase/get-org-context";
+import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import { z } from "zod";
 
 const completeAuditSchema = z.object({

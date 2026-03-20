@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
-import { trainingCourseSchema, type TrainingCourse } from "../schemas/training-courses.schema";
-import { trainingRecordSchema, type TrainingRecord } from "../schemas/training-records.schema";
+import type { TrainingCourse } from "../schemas/training-courses.schema";
+import { trainingCourseSchema } from "../schemas/training-courses.schema";
+import type { TrainingRecord } from "../schemas/training-records.schema";
+import { trainingRecordSchema } from "../schemas/training-records.schema";
 
 export async function createTrainingCourse(values: TrainingCourse): Promise<void> {
   const validated = trainingCourseSchema.parse(values);

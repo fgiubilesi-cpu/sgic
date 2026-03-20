@@ -1,10 +1,10 @@
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import type { Audit } from "@/features/audits/queries/get-audits";
 import type { AuditStatus, AuditOutcome } from "@/features/audits/schemas/audit-schema";
+import type { ChecklistItemMedia } from "@/features/audits/lib/checklist-media";
 import {
   CHECKLIST_MEDIA_BUCKET,
   createSignedUrlMapForObjects,
-  type ChecklistItemMedia,
   parseStorageObjectFromUrl,
   sortChecklistItemMedia,
   getStorageObjectKey,

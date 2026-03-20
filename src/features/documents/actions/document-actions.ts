@@ -3,12 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import type { Tables } from '@/types/database.types';
 import { getOrganizationContext } from '@/lib/supabase/get-org-context';
-import { documentSchema, type DocumentFormInput } from '@/features/documents/schemas/document-schema';
-import {
-  buildIntakeProposalFromDocument,
-  type DocumentIntakeProposal,
-  type ServiceLineProposal,
-} from '@/features/documents/lib/document-intelligence';
+import type { DocumentFormInput } from '@/features/documents/schemas/document-schema';
+import { documentSchema } from '@/features/documents/schemas/document-schema';
+import type { DocumentIntakeProposal, ServiceLineProposal } from '@/features/documents/lib/document-intelligence';
+import { buildIntakeProposalFromDocument } from '@/features/documents/lib/document-intelligence';
 import { extractTextFromDocumentBuffer } from '@/features/documents/lib/document-parser';
 import {
   documentIntakeProposalSchema,

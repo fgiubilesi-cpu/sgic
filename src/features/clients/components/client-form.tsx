@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { clientSchema, type ClientFormInput } from '../schemas/client-schema';
+import type { ClientFormInput } from '../schemas/client-schema';
+import { clientSchema } from '../schemas/client-schema';
 import { createClient, updateClient } from '../actions/client-actions';
 import {
   Form,

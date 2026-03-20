@@ -2,7 +2,8 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { trainingRecordSchema, type TrainingRecord } from "../schemas/training-records.schema";
+import type { TrainingRecord } from "../schemas/training-records.schema";
+import { trainingRecordSchema } from "../schemas/training-records.schema";
 import {
     Form,
     FormControl,

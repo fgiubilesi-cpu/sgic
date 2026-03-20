@@ -1,9 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import type { Tables } from '@/types/database.types';
+import type { OperationalStatus } from '@/features/personnel/lib/personnel-status';
 import {
   getPersonnelOperationalStatus,
   getTrainingWindowSummary,
-  type OperationalStatus,
 } from '@/features/personnel/lib/personnel-status';
 
 type PersonnelRow = Tables<'personnel'>;

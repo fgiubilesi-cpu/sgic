@@ -251,6 +251,32 @@ CREATE POLICY "nome" ON tabella FOR ALL
 
 ---
 
+## 8b. Definition of Done (DoD) — Governance condivisa GEA
+
+> Questa sezione allinea SGIC alla governance condivisa con gea-kb e ga-content.
+
+⚠️ **Nessun task è completo finché tutti questi step non sono eseguiti:**
+
+1. ✅ Il deliverable è creato/modificato come richiesto
+2. ✅ `TODO.md` è aggiornato (task marcato [x] o spostato in COMPLETATO)
+3. ✅ `STATUS.md` è aggiornato SE lo stato macro di un'area è cambiato
+4. ✅ `npx tsc --noEmit` passa con 0 errori
+5. ✅ Commit semantico eseguito
+6. ✅ Se sprint completato → tag Git (`v0.X-sprintN`)
+
+**Formato commit:**
+```
+tipo(area): descrizione
+
+Tipi: feat, fix, docs, chore, refactor, test
+Area: audit, checklist, nc, ac, dashboard, template, client-portal, infra
+```
+
+**Note:**
+- SGIC usa `TODO.md` come backlog (sprint-based), non file `backlog/*.md` come gea-kb
+- Il CLAUDE.md di SGIC mantiene le sue regole specifiche (schema DB, pattern, errori noti)
+- Per la vista unificata su tutti i progetti → vedi `~/gea-kb/_fil/COCKPIT.md`
+
 ## 9. Comandi Utili
 
 ```bash

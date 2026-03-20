@@ -205,14 +205,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "audits_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "audits_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "checklist_templates"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      checklist_item_media: {
+        Row: {
+          audit_id: string
+          checklist_item_id: string
+          created_at: string
+          id: string
+          media_kind: string
+          mime_type: string | null
+          organization_id: string
+          original_name: string | null
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          audit_id: string
+          checklist_item_id: string
+          created_at?: string
+          id?: string
+          media_kind?: string
+          mime_type?: string | null
+          organization_id: string
+          original_name?: string | null
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          audit_id?: string
+          checklist_item_id?: string
+          created_at?: string
+          id?: string
+          media_kind?: string
+          mime_type?: string | null
+          organization_id?: string
+          original_name?: string | null
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
           {
-            foreignKeyName: "audits_organization_id_fkey"
+            foreignKeyName: "checklist_item_media_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_item_media_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_item_media_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -300,67 +361,6 @@ export type Database = {
           },
         ]
       }
-      checklist_item_media: {
-        Row: {
-          audit_id: string
-          checklist_item_id: string
-          created_at: string
-          id: string
-          media_kind: string
-          mime_type: string | null
-          organization_id: string
-          original_name: string | null
-          storage_path: string
-          updated_at: string
-        }
-        Insert: {
-          audit_id: string
-          checklist_item_id: string
-          created_at?: string
-          id?: string
-          media_kind?: string
-          mime_type?: string | null
-          organization_id: string
-          original_name?: string | null
-          storage_path: string
-          updated_at?: string
-        }
-        Update: {
-          audit_id?: string
-          checklist_item_id?: string
-          created_at?: string
-          id?: string
-          media_kind?: string
-          mime_type?: string | null
-          organization_id?: string
-          original_name?: string | null
-          storage_path?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "checklist_item_media_audit_id_fkey"
-            columns: ["audit_id"]
-            isOneToOne: false
-            referencedRelation: "audits"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "checklist_item_media_checklist_item_id_fkey"
-            columns: ["checklist_item_id"]
-            isOneToOne: false
-            referencedRelation: "checklist_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "checklist_item_media_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       checklist_templates: {
         Row: {
           client_id: string | null
@@ -437,17 +437,545 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "checklists_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "checklists_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "checklist_templates"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      client_contacts: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          department: string | null
+          email: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          is_primary: boolean | null
+          location_id: string | null
+          notes: string | null
+          organization_id: string
+          phone: string | null
+          role: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          department?: string | null
+          email?: string | null
+          full_name: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean | null
+          location_id?: string | null
+          notes?: string | null
+          organization_id: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          department?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean | null
+          location_id?: string | null
+          notes?: string | null
+          organization_id?: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
           {
-            foreignKeyName: "checklists_organization_id_fkey"
+            foreignKeyName: "client_contacts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_contacts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_contacts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_contracts: {
+        Row: {
+          activity_frequency: string | null
+          attachment_url: string | null
+          client_id: string
+          client_references: string | null
+          contract_type: string
+          created_at: string
+          duration_terms: string | null
+          end_date: string | null
+          exercised_activity: string | null
+          id: string
+          internal_owner: string | null
+          issue_date: string | null
+          notes: string | null
+          organization_id: string
+          protocol_code: string | null
+          renewal_date: string | null
+          service_scope: string | null
+          start_date: string | null
+          status: string
+          supervisor_name: string | null
+          updated_at: string
+          validity_terms: string | null
+        }
+        Insert: {
+          activity_frequency?: string | null
+          attachment_url?: string | null
+          client_id: string
+          client_references?: string | null
+          contract_type?: string
+          created_at?: string
+          duration_terms?: string | null
+          end_date?: string | null
+          exercised_activity?: string | null
+          id?: string
+          internal_owner?: string | null
+          issue_date?: string | null
+          notes?: string | null
+          organization_id: string
+          protocol_code?: string | null
+          renewal_date?: string | null
+          service_scope?: string | null
+          start_date?: string | null
+          status?: string
+          supervisor_name?: string | null
+          updated_at?: string
+          validity_terms?: string | null
+        }
+        Update: {
+          activity_frequency?: string | null
+          attachment_url?: string | null
+          client_id?: string
+          client_references?: string | null
+          contract_type?: string
+          created_at?: string
+          duration_terms?: string | null
+          end_date?: string | null
+          exercised_activity?: string | null
+          id?: string
+          internal_owner?: string | null
+          issue_date?: string | null
+          notes?: string | null
+          organization_id?: string
+          protocol_code?: string | null
+          renewal_date?: string | null
+          service_scope?: string | null
+          start_date?: string | null
+          status?: string
+          supervisor_name?: string | null
+          updated_at?: string
+          validity_terms?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_contracts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_contracts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_deadlines: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string
+          id: string
+          location_id: string | null
+          organization_id: string
+          priority: string
+          service_line_id: string | null
+          source_id: string | null
+          source_type: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date: string
+          id?: string
+          location_id?: string | null
+          organization_id: string
+          priority?: string
+          service_line_id?: string | null
+          source_id?: string | null
+          source_type?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string
+          id?: string
+          location_id?: string | null
+          organization_id?: string
+          priority?: string
+          service_line_id?: string | null
+          source_id?: string | null
+          source_type?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_deadlines_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_deadlines_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_deadlines_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_deadlines_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_deadlines_service_line_id_fkey"
+            columns: ["service_line_id"]
+            isOneToOne: false
+            referencedRelation: "client_service_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_notes: {
+        Row: {
+          body: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          location_id: string | null
+          note_type: string
+          organization_id: string
+          pinned: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id?: string | null
+          note_type?: string
+          organization_id: string
+          pinned?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id?: string | null
+          note_type?: string
+          organization_id?: string
+          pinned?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_notes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_notes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_notes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_notes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_service_lines: {
+        Row: {
+          active: boolean
+          billing_phase: string | null
+          client_id: string
+          code: string | null
+          created_at: string
+          frequency_label: string | null
+          id: string
+          is_recurring: boolean
+          location_id: string | null
+          notes: string | null
+          organization_id: string
+          quantity: number | null
+          section: string | null
+          sort_order: number
+          source_document_id: string | null
+          title: string
+          total_price: number | null
+          unit: string | null
+          unit_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          billing_phase?: string | null
+          client_id: string
+          code?: string | null
+          created_at?: string
+          frequency_label?: string | null
+          id?: string
+          is_recurring?: boolean
+          location_id?: string | null
+          notes?: string | null
+          organization_id: string
+          quantity?: number | null
+          section?: string | null
+          sort_order?: number
+          source_document_id?: string | null
+          title: string
+          total_price?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          billing_phase?: string | null
+          client_id?: string
+          code?: string | null
+          created_at?: string
+          frequency_label?: string | null
+          id?: string
+          is_recurring?: boolean
+          location_id?: string | null
+          notes?: string | null
+          organization_id?: string
+          quantity?: number | null
+          section?: string | null
+          sort_order?: number
+          source_document_id?: string | null
+          title?: string
+          total_price?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_service_lines_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_service_lines_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_service_lines_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_service_lines_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_tasks: {
+        Row: {
+          audit_id: string | null
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          is_recurring: boolean
+          location_id: string | null
+          organization_id: string
+          owner_name: string | null
+          owner_profile_id: string | null
+          priority: string
+          recurrence_label: string | null
+          service_line_id: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          audit_id?: string | null
+          client_id: string
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_recurring?: boolean
+          location_id?: string | null
+          organization_id: string
+          owner_name?: string | null
+          owner_profile_id?: string | null
+          priority?: string
+          recurrence_label?: string | null
+          service_line_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          audit_id?: string | null
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_recurring?: boolean
+          location_id?: string | null
+          organization_id?: string
+          owner_name?: string | null
+          owner_profile_id?: string | null
+          priority?: string
+          recurrence_label?: string | null
+          service_line_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_tasks_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_tasks_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_tasks_owner_profile_id_fkey"
+            columns: ["owner_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_tasks_service_line_id_fkey"
+            columns: ["service_line_id"]
+            isOneToOne: false
+            referencedRelation: "client_service_lines"
             referencedColumns: ["id"]
           },
         ]
@@ -574,229 +1102,76 @@ export type Database = {
           },
         ]
       }
-      document_versions: {
+      document_entities: {
         Row: {
-          created_at: string | null
-          document_id: string
-          id: string
-          organization_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          document_id: string
-          id?: string
-          organization_id: string
-        }
-        Update: {
-          created_at?: string | null
-          document_id?: string
-          id?: string
-          organization_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "document_versions_document_id_fkey"
-            columns: ["document_id"]
-            isOneToOne: false
-            referencedRelation: "documents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "document_versions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      documents: {
-        Row: {
-          category: Database["public"]["Enums"]["document_category"] | null
-          client_id: string | null
-          created_at: string | null
-          created_by: string | null
-          description: string | null
-          expiry_date: string | null
-          extracted_payload: Json | null
-          file_name: string | null
-          file_size_bytes: number | null
-          file_url: string | null
-          id: string
-          ingestion_status: string
-          issue_date: string | null
-          location_id: string | null
-          mime_type: string | null
-          organization_id: string
-          personnel_id: string | null
-          storage_path: string | null
-          status: Database["public"]["Enums"]["document_status"] | null
-          title: string | null
-          updated_at: string | null
-          version: string | null
-        }
-        Insert: {
-          category?: Database["public"]["Enums"]["document_category"] | null
-          client_id?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          expiry_date?: string | null
-          extracted_payload?: Json | null
-          file_name?: string | null
-          file_size_bytes?: number | null
-          file_url?: string | null
-          id?: string
-          ingestion_status?: string
-          issue_date?: string | null
-          location_id?: string | null
-          mime_type?: string | null
-          organization_id: string
-          personnel_id?: string | null
-          storage_path?: string | null
-          status?: Database["public"]["Enums"]["document_status"] | null
-          title?: string | null
-          updated_at?: string | null
-          version?: string | null
-        }
-        Update: {
-          category?: Database["public"]["Enums"]["document_category"] | null
-          client_id?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          expiry_date?: string | null
-          extracted_payload?: Json | null
-          file_name?: string | null
-          file_size_bytes?: number | null
-          file_url?: string | null
-          id?: string
-          ingestion_status?: string
-          issue_date?: string | null
-          location_id?: string | null
-          mime_type?: string | null
-          organization_id?: string
-          personnel_id?: string | null
-          storage_path?: string | null
-          status?: Database["public"]["Enums"]["document_status"] | null
-          title?: string | null
-          updated_at?: string | null
-          version?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "documents_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "documents_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "documents_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "documents_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "documents_personnel_id_fkey"
-            columns: ["personnel_id"]
-            isOneToOne: false
-            referencedRelation: "personnel"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      document_ingestions: {
-        Row: {
+          confidence: string
           created_at: string
           created_by: string | null
           document_id: string
-          error_message: string | null
-          extracted_payload: Json | null
-          extracted_text: string | null
+          entity_payload: Json
+          entity_type: string
+          extraction_review_id: string | null
           id: string
+          linked_record_id: string | null
+          linked_table: string | null
           organization_id: string
-          parser_type: string
-          review_notes: string | null
-          reviewed_at: string | null
-          reviewed_by: string | null
-          status: string
           updated_at: string
         }
         Insert: {
+          confidence?: string
           created_at?: string
           created_by?: string | null
           document_id: string
-          error_message?: string | null
-          extracted_payload?: Json | null
-          extracted_text?: string | null
+          entity_payload?: Json
+          entity_type: string
+          extraction_review_id?: string | null
           id?: string
+          linked_record_id?: string | null
+          linked_table?: string | null
           organization_id: string
-          parser_type?: string
-          review_notes?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
           updated_at?: string
         }
         Update: {
+          confidence?: string
           created_at?: string
           created_by?: string | null
           document_id?: string
-          error_message?: string | null
-          extracted_payload?: Json | null
-          extracted_text?: string | null
+          entity_payload?: Json
+          entity_type?: string
+          extraction_review_id?: string | null
           id?: string
+          linked_record_id?: string | null
+          linked_table?: string | null
           organization_id?: string
-          parser_type?: string
-          review_notes?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "document_ingestions_created_by_fkey"
+            foreignKeyName: "document_entities_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "document_ingestions_document_id_fkey"
+            foreignKeyName: "document_entities_document_id_fkey"
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "document_ingestions_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: "document_entities_extraction_review_id_fkey"
+            columns: ["extraction_review_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "document_extraction_reviews"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "document_ingestions_reviewed_by_fkey"
-            columns: ["reviewed_by"]
+            foreignKeyName: "document_entities_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -885,76 +1260,229 @@ export type Database = {
           },
         ]
       }
-      document_entities: {
+      document_ingestions: {
         Row: {
-          confidence: string
           created_at: string
           created_by: string | null
           document_id: string
-          entity_payload: Json
-          entity_type: string
-          extraction_review_id: string | null
+          error_message: string | null
+          extracted_payload: Json | null
+          extracted_text: string | null
           id: string
-          linked_record_id: string | null
-          linked_table: string | null
           organization_id: string
+          parser_type: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
           updated_at: string
         }
         Insert: {
-          confidence?: string
           created_at?: string
           created_by?: string | null
           document_id: string
-          entity_payload?: Json
-          entity_type: string
-          extraction_review_id?: string | null
+          error_message?: string | null
+          extracted_payload?: Json | null
+          extracted_text?: string | null
           id?: string
-          linked_record_id?: string | null
-          linked_table?: string | null
           organization_id: string
+          parser_type?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
           updated_at?: string
         }
         Update: {
-          confidence?: string
           created_at?: string
           created_by?: string | null
           document_id?: string
-          entity_payload?: Json
-          entity_type?: string
-          extraction_review_id?: string | null
+          error_message?: string | null
+          extracted_payload?: Json | null
+          extracted_text?: string | null
           id?: string
-          linked_record_id?: string | null
-          linked_table?: string | null
           organization_id?: string
+          parser_type?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "document_entities_created_by_fkey"
+            foreignKeyName: "document_ingestions_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "document_entities_document_id_fkey"
+            foreignKeyName: "document_ingestions_document_id_fkey"
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "document_entities_extraction_review_id_fkey"
-            columns: ["extraction_review_id"]
-            isOneToOne: false
-            referencedRelation: "document_extraction_reviews"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "document_entities_organization_id_fkey"
+            foreignKeyName: "document_ingestions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_ingestions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_versions: {
+        Row: {
+          created_at: string | null
+          document_id: string
+          id: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          document_id: string
+          id?: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string | null
+          document_id?: string
+          id?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_versions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_versions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          category: Database["public"]["Enums"]["document_category"] | null
+          client_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          expiry_date: string | null
+          extracted_payload: Json | null
+          file_name: string | null
+          file_size_bytes: number | null
+          file_url: string | null
+          id: string
+          ingestion_status: string
+          issue_date: string | null
+          location_id: string | null
+          mime_type: string | null
+          organization_id: string
+          personnel_id: string | null
+          status: Database["public"]["Enums"]["document_status"] | null
+          storage_path: string | null
+          title: string | null
+          updated_at: string | null
+          version: string | null
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["document_category"] | null
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expiry_date?: string | null
+          extracted_payload?: Json | null
+          file_name?: string | null
+          file_size_bytes?: number | null
+          file_url?: string | null
+          id?: string
+          ingestion_status?: string
+          issue_date?: string | null
+          location_id?: string | null
+          mime_type?: string | null
+          organization_id: string
+          personnel_id?: string | null
+          status?: Database["public"]["Enums"]["document_status"] | null
+          storage_path?: string | null
+          title?: string | null
+          updated_at?: string | null
+          version?: string | null
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["document_category"] | null
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expiry_date?: string | null
+          extracted_payload?: Json | null
+          file_name?: string | null
+          file_size_bytes?: number | null
+          file_url?: string | null
+          id?: string
+          ingestion_status?: string
+          issue_date?: string | null
+          location_id?: string | null
+          mime_type?: string | null
+          organization_id?: string
+          personnel_id?: string | null
+          status?: Database["public"]["Enums"]["document_status"] | null
+          storage_path?: string | null
+          title?: string | null
+          updated_at?: string | null
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
             referencedColumns: ["id"]
           },
         ]
@@ -1066,6 +1594,611 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      management_capacity_staging: {
+        Row: {
+          client_id: string | null
+          client_source_record_id: string | null
+          created_at: string
+          id: string
+          location_id: string | null
+          location_source_record_id: string | null
+          organization_id: string
+          owner_name: string | null
+          payload: Json
+          period_end: string | null
+          period_start: string | null
+          personnel_id: string | null
+          planned_fte: number | null
+          planned_hours: number | null
+          service_line_source_record_id: string | null
+          source_record_id: string
+          source_system: string
+          status: string | null
+          sync_run_id: string | null
+          synced_at: string
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          client_source_record_id?: string | null
+          created_at?: string
+          id?: string
+          location_id?: string | null
+          location_source_record_id?: string | null
+          organization_id: string
+          owner_name?: string | null
+          payload?: Json
+          period_end?: string | null
+          period_start?: string | null
+          personnel_id?: string | null
+          planned_fte?: number | null
+          planned_hours?: number | null
+          service_line_source_record_id?: string | null
+          source_record_id: string
+          source_system?: string
+          status?: string | null
+          sync_run_id?: string | null
+          synced_at?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          client_source_record_id?: string | null
+          created_at?: string
+          id?: string
+          location_id?: string | null
+          location_source_record_id?: string | null
+          organization_id?: string
+          owner_name?: string | null
+          payload?: Json
+          period_end?: string | null
+          period_start?: string | null
+          personnel_id?: string | null
+          planned_fte?: number | null
+          planned_hours?: number | null
+          service_line_source_record_id?: string | null
+          source_record_id?: string
+          source_system?: string
+          status?: string | null
+          sync_run_id?: string | null
+          synced_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "management_capacity_staging_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_capacity_staging_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_capacity_staging_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_capacity_staging_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_capacity_staging_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "management_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      management_clients_staging: {
+        Row: {
+          account_owner: string | null
+          active_locations_count: number | null
+          client_code: string | null
+          client_id: string | null
+          created_at: string
+          id: string
+          name: string
+          organization_id: string
+          payload: Json
+          service_model: string | null
+          source_record_id: string
+          source_system: string
+          status: string | null
+          sync_run_id: string | null
+          synced_at: string
+          updated_at: string
+          vat_number: string | null
+        }
+        Insert: {
+          account_owner?: string | null
+          active_locations_count?: number | null
+          client_code?: string | null
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          organization_id: string
+          payload?: Json
+          service_model?: string | null
+          source_record_id: string
+          source_system?: string
+          status?: string | null
+          sync_run_id?: string | null
+          synced_at?: string
+          updated_at?: string
+          vat_number?: string | null
+        }
+        Update: {
+          account_owner?: string | null
+          active_locations_count?: number | null
+          client_code?: string | null
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          payload?: Json
+          service_model?: string | null
+          source_record_id?: string
+          source_system?: string
+          status?: string | null
+          sync_run_id?: string | null
+          synced_at?: string
+          updated_at?: string
+          vat_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "management_clients_staging_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_clients_staging_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_clients_staging_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "management_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      management_contracts_staging: {
+        Row: {
+          annual_value: number | null
+          client_id: string | null
+          client_source_record_id: string | null
+          contract_code: string | null
+          contract_type: string | null
+          created_at: string
+          end_date: string | null
+          id: string
+          issue_date: string | null
+          notes: string | null
+          organization_id: string
+          owner_name: string | null
+          payload: Json
+          renewal_date: string | null
+          source_record_id: string
+          source_system: string
+          start_date: string | null
+          status: string | null
+          sync_run_id: string | null
+          synced_at: string
+          updated_at: string
+        }
+        Insert: {
+          annual_value?: number | null
+          client_id?: string | null
+          client_source_record_id?: string | null
+          contract_code?: string | null
+          contract_type?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          issue_date?: string | null
+          notes?: string | null
+          organization_id: string
+          owner_name?: string | null
+          payload?: Json
+          renewal_date?: string | null
+          source_record_id: string
+          source_system?: string
+          start_date?: string | null
+          status?: string | null
+          sync_run_id?: string | null
+          synced_at?: string
+          updated_at?: string
+        }
+        Update: {
+          annual_value?: number | null
+          client_id?: string | null
+          client_source_record_id?: string | null
+          contract_code?: string | null
+          contract_type?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          issue_date?: string | null
+          notes?: string | null
+          organization_id?: string
+          owner_name?: string | null
+          payload?: Json
+          renewal_date?: string | null
+          source_record_id?: string
+          source_system?: string
+          start_date?: string | null
+          status?: string | null
+          sync_run_id?: string | null
+          synced_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "management_contracts_staging_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_contracts_staging_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_contracts_staging_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "management_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      management_deadlines_staging: {
+        Row: {
+          client_id: string | null
+          client_source_record_id: string | null
+          created_at: string
+          deadline_type: string | null
+          due_date: string
+          id: string
+          location_id: string | null
+          location_source_record_id: string | null
+          organization_id: string
+          owner_name: string | null
+          payload: Json
+          priority: string | null
+          source_record_id: string
+          source_system: string
+          status: string | null
+          sync_run_id: string | null
+          synced_at: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          client_source_record_id?: string | null
+          created_at?: string
+          deadline_type?: string | null
+          due_date: string
+          id?: string
+          location_id?: string | null
+          location_source_record_id?: string | null
+          organization_id: string
+          owner_name?: string | null
+          payload?: Json
+          priority?: string | null
+          source_record_id: string
+          source_system?: string
+          status?: string | null
+          sync_run_id?: string | null
+          synced_at?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          client_source_record_id?: string | null
+          created_at?: string
+          deadline_type?: string | null
+          due_date?: string
+          id?: string
+          location_id?: string | null
+          location_source_record_id?: string | null
+          organization_id?: string
+          owner_name?: string | null
+          payload?: Json
+          priority?: string | null
+          source_record_id?: string
+          source_system?: string
+          status?: string | null
+          sync_run_id?: string | null
+          synced_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "management_deadlines_staging_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_deadlines_staging_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_deadlines_staging_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_deadlines_staging_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "management_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      management_service_lines_staging: {
+        Row: {
+          annual_value: number | null
+          cadence: string | null
+          client_id: string | null
+          client_source_record_id: string | null
+          created_at: string
+          end_date: string | null
+          id: string
+          location_id: string | null
+          location_source_record_id: string | null
+          organization_id: string
+          owner_name: string | null
+          payload: Json
+          quantity: number | null
+          service_area: string | null
+          service_code: string | null
+          service_name: string
+          source_record_id: string
+          source_system: string
+          start_date: string | null
+          status: string | null
+          sync_run_id: string | null
+          synced_at: string
+          updated_at: string
+        }
+        Insert: {
+          annual_value?: number | null
+          cadence?: string | null
+          client_id?: string | null
+          client_source_record_id?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          location_id?: string | null
+          location_source_record_id?: string | null
+          organization_id: string
+          owner_name?: string | null
+          payload?: Json
+          quantity?: number | null
+          service_area?: string | null
+          service_code?: string | null
+          service_name: string
+          source_record_id: string
+          source_system?: string
+          start_date?: string | null
+          status?: string | null
+          sync_run_id?: string | null
+          synced_at?: string
+          updated_at?: string
+        }
+        Update: {
+          annual_value?: number | null
+          cadence?: string | null
+          client_id?: string | null
+          client_source_record_id?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          location_id?: string | null
+          location_source_record_id?: string | null
+          organization_id?: string
+          owner_name?: string | null
+          payload?: Json
+          quantity?: number | null
+          service_area?: string | null
+          service_code?: string | null
+          service_name?: string
+          source_record_id?: string
+          source_system?: string
+          start_date?: string | null
+          status?: string | null
+          sync_run_id?: string | null
+          synced_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "management_service_lines_staging_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_service_lines_staging_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_service_lines_staging_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_service_lines_staging_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "management_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      management_sync_runs: {
+        Row: {
+          created_at: string
+          error_summary: string | null
+          finished_at: string | null
+          id: string
+          organization_id: string
+          payload: Json
+          records_read: number
+          records_skipped: number
+          records_written: number
+          source_system: string
+          started_at: string
+          status: string
+          sync_mode: string
+          sync_scope: string
+        }
+        Insert: {
+          created_at?: string
+          error_summary?: string | null
+          finished_at?: string | null
+          id?: string
+          organization_id: string
+          payload?: Json
+          records_read?: number
+          records_skipped?: number
+          records_written?: number
+          source_system?: string
+          started_at?: string
+          status?: string
+          sync_mode?: string
+          sync_scope?: string
+        }
+        Update: {
+          created_at?: string
+          error_summary?: string | null
+          finished_at?: string | null
+          id?: string
+          organization_id?: string
+          payload?: Json
+          records_read?: number
+          records_skipped?: number
+          records_written?: number
+          source_system?: string
+          started_at?: string
+          status?: string
+          sync_mode?: string
+          sync_scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "management_sync_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      medical_visits: {
+        Row: {
+          created_at: string
+          doctor_name: string | null
+          expiry_date: string | null
+          fitness_status: string
+          id: string
+          limitations: string | null
+          notes: string | null
+          organization_id: string
+          personnel_id: string
+          protocol: string | null
+          updated_at: string
+          visit_date: string
+        }
+        Insert: {
+          created_at?: string
+          doctor_name?: string | null
+          expiry_date?: string | null
+          fitness_status?: string
+          id?: string
+          limitations?: string | null
+          notes?: string | null
+          organization_id: string
+          personnel_id: string
+          protocol?: string | null
+          updated_at?: string
+          visit_date: string
+        }
+        Update: {
+          created_at?: string
+          doctor_name?: string | null
+          expiry_date?: string | null
+          fitness_status?: string
+          id?: string
+          limitations?: string | null
+          notes?: string | null
+          organization_id?: string
+          personnel_id?: string
+          protocol?: string | null
+          updated_at?: string
+          visit_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_visits_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_visits_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
             referencedColumns: ["id"]
           },
         ]
@@ -1711,3 +2844,4 @@ export const Constants = {
     },
   },
 } as const
+

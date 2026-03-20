@@ -19,6 +19,8 @@ import { getPersonnelList } from "@/features/personnel/queries/get-personnel";
 import { getDocuments } from "@/features/documents/queries/get-documents";
 import { DocumentsTable } from "@/features/documents/components/documents-table";
 import { ManageDocumentSheet } from "@/features/documents/components/manage-document-sheet";
+import { getMedicalVisitsByPersonnel } from "@/features/personnel/queries/get-medical-visits";
+import { MedicalVisitsCard } from "@/features/personnel/components/medical-visits-card";
 
 type PageProps = {
     params: Promise<{ id: string }>;
@@ -37,7 +39,7 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
         notFound();
     }
 
-    const [courses, clientOptions, personnelOptions, documents] = await Promise.all([
+    const [courses, clientOptions, personnelOptions, documents, medicalVisits] = await Promise.all([
         getTrainingCourses(ctx.organizationId),
         getClientOptions(ctx.organizationId),
         getPersonnelList(ctx.organizationId, person.client_id ?? undefined),
@@ -45,6 +47,7 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
             organizationId: ctx.organizationId,
             personnelIds: [person.id],
         }),
+        getMedicalVisitsByPersonnel(ctx.organizationId, person.id),
     ]);
 
     const personnelSeed = [
@@ -232,6 +235,8 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
                     </CardContent>
                 </Card>
             </div>
+
+            <MedicalVisitsCard personnelId={person.id} visits={medicalVisits} />
 
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
                 <Card>

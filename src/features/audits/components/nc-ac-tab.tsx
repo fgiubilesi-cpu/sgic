@@ -31,7 +31,9 @@ import {
 import {
   createCorrectiveAction,
   updateCorrectiveAction,
+  deleteCorrectiveAction,
 } from "@/features/audits/actions/corrective-action-actions";
+import { updateNonConformity } from "@/features/audits/actions/non-conformity-actions";
 
 interface NcAcTabProps {
   audit: AuditWithChecklists;
@@ -454,6 +456,8 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
   const [editingCaId, setEditingCaId] = useState<string | null>(null);
   const [addingCaForNcId, setAddingCaForNcId] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const [deletingCaId, setDeletingCaId] = useState<string | null>(null);
+  const [updatingNcStatusId, setUpdatingNcStatusId] = useState<string | null>(null);
 
   const reportText = generateNcAcReport(audit, nonConformities, correctiveActions);
 
@@ -595,7 +599,8 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setAddingCaForNcId(ncCas.length === 0 ? nc.id : null);
+                            setExpandedNcId(nc.id);
+                            setAddingCaForNcId(nc.id);
                           }}
                           className={cn(
                             "gap-1 text-xs transition-opacity",
@@ -643,9 +648,34 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
                               </div>
                               <div>
                                 <label className="text-xs font-medium text-zinc-600 block mb-1">Stato</label>
-                                <Badge className={cn("text-xs", NC_STATUS_COLORS[status])}>
-                                  {NC_STATUS_LABELS[status]}
-                                </Badge>
+                                {readOnly ? (
+                                  <Badge className={cn("text-xs", NC_STATUS_COLORS[status])}>
+                                    {NC_STATUS_LABELS[status]}
+                                  </Badge>
+                                ) : (
+                                  <select
+                                    defaultValue={nc.status}
+                                    disabled={updatingNcStatusId === nc.id}
+                                    onChange={async (e) => {
+                                      setUpdatingNcStatusId(nc.id);
+                                      const result = await updateNonConformity({
+                                        id: nc.id,
+                                        status: e.target.value as "open" | "pending_verification" | "closed",
+                                      });
+                                      setUpdatingNcStatusId(null);
+                                      if (result.success) {
+                                        toast.success("Stato NC aggiornato.");
+                                      } else {
+                                        toast.error(result.error || "Errore aggiornamento stato.");
+                                      }
+                                    }}
+                                    className="w-full text-xs border border-zinc-300 rounded px-2 py-1 focus:ring-1 focus:ring-zinc-500 disabled:opacity-50"
+                                  >
+                                    <option value="open">Aperta</option>
+                                    <option value="pending_verification">In verifica</option>
+                                    <option value="closed">Chiusa</option>
+                                  </select>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -698,10 +728,18 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={(e) => {
+                                                disabled={deletingCaId === ca.id}
+                                                onClick={async (e) => {
                                                   e.stopPropagation();
-                                                  // TODO: Implement delete AC
-                                                  toast.info("Delete AC: implementazione in corso");
+                                                  if (!confirm("Eliminare questa azione correttiva?")) return;
+                                                  setDeletingCaId(ca.id);
+                                                  const result = await deleteCorrectiveAction(ca.id);
+                                                  setDeletingCaId(null);
+                                                  if (result.success) {
+                                                    toast.success("Azione correttiva eliminata.");
+                                                  } else {
+                                                    toast.error(result.error || "Errore eliminazione AC.");
+                                                  }
                                                 }}
                                                 className="h-6 px-1.5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
                                               >
@@ -752,7 +790,7 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
                                 />
                               </div>
                             ) : (
-                              ncCas.length === 0 && !readOnly && (
+                              !readOnly && (
                                 <Button
                                   type="button"
                                   variant="outline"

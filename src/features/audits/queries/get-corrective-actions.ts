@@ -26,6 +26,7 @@ export async function getCorrectiveActionsByNonConformity(
     .from("corrective_actions")
     .select("*")
     .eq("non_conformity_id", ncId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -73,6 +74,7 @@ export async function getCorrectiveActionsByAudit(
     .from("corrective_actions")
     .select("*")
     .in("non_conformity_id", ncIds)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (error) {

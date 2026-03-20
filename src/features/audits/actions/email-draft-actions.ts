@@ -59,6 +59,16 @@ export async function generateEmailDraft(
     };
   }
 
+  // 2b. Fetch corrective actions for all NCs
+  const ncIds = nonConformities.map((nc: any) => nc.id);
+  const { data: casData } = await supabase
+    .from("corrective_actions")
+    .select("id, non_conformity_id, description, responsible_person_name, target_completion_date, status")
+    .in("non_conformity_id", ncIds)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true });
+  const correctiveActions = (casData ?? []) as any[];
+
   // 3. Fetch checklist summary
   const { data: checklists } = await supabase
     .from("checklists")
@@ -87,13 +97,36 @@ export async function generateEmailDraft(
     year: "numeric",
   }).format(new Date());
 
-  // Build NC list
+  const CA_STATUS_LABELS_IT: Record<string, string> = {
+    pending: "da avviare",
+    in_progress: "in corso",
+    completed: "completata",
+  };
+
+  // Build NC list with AC
   const ncLines = nonConformities
     .map((nc, idx) => {
       const severity = SEVERITY_LABELS_IT[nc.severity] ?? nc.severity;
       const status = STATUS_LABELS_IT[nc.status] ?? nc.status;
       const desc = nc.description ? ` — ${nc.description}` : "";
-      return `   ${idx + 1}. ${nc.title} [${severity}${desc ? "" : ""}] — stato: ${status}${desc}`;
+      let line = `   ${idx + 1}. ${nc.title} [${severity}] — stato: ${status}${desc}`;
+
+      const ncCas = correctiveActions.filter((ca: any) => ca.non_conformity_id === nc.id);
+      if (ncCas.length > 0) {
+        const caLines = ncCas.map((ca: any) => {
+          const caStatus = CA_STATUS_LABELS_IT[ca.status] ?? ca.status;
+          const dueDate = ca.target_completion_date
+            ? `, scadenza: ${new Intl.DateTimeFormat("it-IT").format(new Date(ca.target_completion_date))}`
+            : "";
+          const responsible = ca.responsible_person_name ? `, resp.: ${ca.responsible_person_name}` : "";
+          return `      → AC: ${ca.description} [${caStatus}${responsible}${dueDate}]`;
+        });
+        line += "\n" + caLines.join("\n");
+      } else {
+        line += "\n      → Nessuna azione correttiva registrata.";
+      }
+
+      return line;
     })
     .join("\n");
 

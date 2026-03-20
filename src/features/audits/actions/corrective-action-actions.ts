@@ -136,6 +136,50 @@ export async function updateCorrectiveAction(
   }
 }
 
+export async function deleteCorrectiveAction(
+  id: string
+): Promise<ActionResult<null>> {
+  try {
+    const ctx = await getOrganizationContext();
+    if (!ctx) return { success: false, error: "Unauthorized" };
+
+    const { supabase } = ctx;
+
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("corrective_actions")
+      .update({ deleted_at: now, updated_at: now })
+      .eq("id", id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const { data: ca } = await supabase
+      .from("corrective_actions")
+      .select("non_conformity_id")
+      .eq("id", id)
+      .single();
+
+    if (ca?.non_conformity_id) {
+      const { data: nc } = await supabase
+        .from("non_conformities")
+        .select("audit_id")
+        .eq("id", ca.non_conformity_id)
+        .single();
+
+      if (nc?.audit_id) {
+        revalidatePath(`/audits/${nc.audit_id}`);
+      }
+    }
+
+    return { success: true, data: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return { success: false, error: message };
+  }
+}
+
 export async function completeCorrectiveAction(
   input: CompleteCorrectiveActionInput
 ): Promise<ActionResult<null>> {

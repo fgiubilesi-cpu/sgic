@@ -3,51 +3,39 @@
 
 ---
 
-## CURRENT SPRINT — Qualità + Test Manuali
+## CURRENT SPRINT — Completamento flusso audit end-to-end
 
-### P0 — Test manuali end-to-end (da fare in UI — non automatizzabili)
+### A — Fix critici NC/AC
+
+- [x] **A0** XLS export — già completo (3 fogli: checklist, NC, AC)
+- [x] **A0b** Bozza mail post-audit — già completo (testo deterministico da copiare)
+- [ ] **A1** Fix AC multipla: permettere l'aggiunta di più AC per la stessa NC
+- [ ] **A2** Implementare Delete AC (soft delete con deleted_at)
+- [ ] **A3** Cambio stato NC dall'UI (open → pending_verification → closed) nel pannello espanso
+- [ ] **A4** Includere AC nel testo bozza mail (attualmente mostra solo NC)
+
+### Test manuali end-to-end (dopo A1-A4)
 
 - [ ] **V1** Flusso audit completo: crea audit da template → compila 1 OK + 1 NOK + 1 N/A → verifica score aggiornato + NC auto-creata → tab NC mostra la NC
-- [ ] **V2** Flusso NC→AC: apri NC → aggiungi AC → verifica subtab AC → cambia stato → verifica badge scadenza
-- [ ] **V3** Report NC-AC: clicca "Genera Report" → verifica testo generato → copia negli appunti
-- [ ] **V4** Template: crea → aggiungi domande → reorder ↑↓ → import CSV → import Excel → crea audit da template
-- [ ] **V5** Export Excel: completa audit → "Esporta Excel" → verifica file con 3 fogli
-- [ ] **V6** Portale cliente: accedi con utente ruolo='client' → verifica vede solo propri audit → verifica banner "Modalità sola lettura" → verifica bottoni disabilitati
+- [ ] **V2** Flusso NC→AC: apri NC → aggiungi AC → aggiungi seconda AC → cambia stato NC → verifica badge scadenza
+- [ ] **V3** Bozza mail: clicca "Bozza mail" → verifica testo con NC e AC → copia negli appunti
+- [ ] **V4** XLS: completa audit → "Esporta Excel" → verifica file con 3 fogli
+- [ ] **V5** Template: crea → aggiungi domande → reorder ↑↓ → import CSV → crea audit da template
+- [ ] **V6** Portale cliente: accedi con ruolo client → sola lettura → banner corretto
 
-### P1 — PDF Report Audit
+### Commit e Tag
 
-- [ ] **R1** Setup `@react-pdf/renderer` (npm install)
-- [ ] **R2** Template PDF: copertina (logo, cliente, sede, data) + dati audit + tabella checklist con esiti + sezione NC e AC
-- [ ] **R3** Bottone "Scarica PDF" nella pagina dettaglio audit (accanto a "Esporta Excel")
-- [ ] **R4** Il PDF è read-only per ruolo client — bottone visibile ma genera report senza dati sensibili se necessario
-
-### P2 — Notifiche Email NC Scadute
-
-- [ ] **E1** Setup Resend (`npm install resend`)
-- [ ] **E2** Server action `sendOverdueNcNotification`: trova NC con AC scadute (due_date < oggi, status != 'completed') e invia email al responsible_person_email
-- [ ] **E3** Trigger manuale: bottone "Invia notifiche scadute" nella Dashboard (solo per admin/inspector)
-- [ ] **E4** Template email: lista NC + AC scadute con link diretto all'audit
-
-### P3 — Ricerca Globale
-
-- [ ] **S1** Input ricerca nella topbar (o sidebar) — cerca in: titoli audit, domande checklist, clienti, NC
-- [ ] **S2** Query full-text su Supabase: `ilike` su audit.title, client.name, non_conformities.title
-- [ ] **S3** Risultati raggruppati per tipo con link diretto
-
-### P4 — Commit e Tag
-
-- [ ] **G1** `git commit -m "feat: Sprint 8 - PDF report, email notifiche, ricerca globale"` → tag `v0.6-sprint8` → push
+- [ ] **G1** commit + tag `v0.6-sprint8`
 
 ---
 
 ## BACKLOG — Sprint Futuri
 
+- [ ] Ricerca globale: verificare se già funzionante (feature scaffoldata in `src/features/search/`)
 - [ ] CI/CD GitHub Actions (lint + typecheck + test e2e su PR)
-- [ ] Environment staging separato
-- [ ] Fix search_path funzioni DB (WARN sicurezza — non urgente)
 - [ ] Filtri avanzati lista audit (data, stato, score range)
-- [ ] Modalità offline base
 - [ ] Storico audit per cliente: vista timeline
+- [ ] Fix search_path funzioni DB (WARN sicurezza — non urgente)
 
 ---
 

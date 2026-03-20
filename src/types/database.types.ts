@@ -2569,32 +2569,52 @@ export type Database = {
       training_courses: {
         Row: {
           category: string
+          client_id: string | null
           created_at: string | null
           duration_hours: number
           id: string
+          location_id: string | null
           organization_id: string
           title: string
           validity_months: number | null
         }
         Insert: {
           category?: string
+          client_id?: string | null
           created_at?: string | null
           duration_hours?: number
           id?: string
+          location_id?: string | null
           organization_id: string
           title?: string
           validity_months?: number | null
         }
         Update: {
           category?: string
+          client_id?: string | null
           created_at?: string | null
           duration_hours?: number
           id?: string
+          location_id?: string | null
           organization_id?: string
           title?: string
           validity_months?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "training_courses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_courses_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "training_courses_organization_id_fkey"
             columns: ["organization_id"]

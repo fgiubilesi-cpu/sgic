@@ -65,7 +65,7 @@ function getNavItems(role?: string | null): NavItem[] {
     { label: "Clienti", href: "/clients", icon: Building2 },
     { label: "Personale", href: "/personnel", icon: Users },
     { label: "Documenti", href: "/documents", icon: FileText },
-    { label: "Formazione", href: null, icon: GraduationCap, disabled: true },
+    { label: "Formazione", href: "/training", icon: GraduationCap },
     { label: "Campionamenti", href: null, icon: FlaskConical, disabled: true },
     { label: "Organizzazione", href: "/organization", icon: Building2 },
     { label: "Account", href: "/settings", icon: Settings },

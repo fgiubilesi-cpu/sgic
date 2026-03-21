@@ -31,6 +31,7 @@ import {
   BriefcaseBusiness,
   Settings,
   Users,
+  Clock,
 } from "lucide-react";
 import { ClientFilter } from "@/features/clients/components/client-filter";
 import { getClientsList } from "@/features/clients/queries/get-clients-list";
@@ -67,6 +68,7 @@ function getNavItems(role?: string | null): NavItem[] {
     { label: "Documenti", href: "/documents", icon: FileText },
     { label: "Formazione", href: "/training", icon: GraduationCap },
     { label: "Campionamenti", href: "/samplings", icon: FlaskConical },
+    { label: "Scadenze", href: "/deadlines", icon: Clock },
     { label: "Organizzazione", href: "/organization", icon: Building2 },
     { label: "Account", href: "/settings", icon: Settings },
   ];

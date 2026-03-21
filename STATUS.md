@@ -20,6 +20,7 @@ author: claude-strategy
 | Documenti | 🟢 stabile | Pagina /documents attiva | 2026-03-21 |
 | Personale + Visite | 🟢 stabile | Pagina lista + visite mediche | 2026-03-21 |
 | Formazione | 🟢 stabile | Dettaglio corso /training/[id] + widget scadenze dashboard | 2026-03-21 |
+| Scadenze unificata | 🟢 stabile | Pagina /deadlines con KPI strip + filtri tipo/urgenza | 2026-03-21 |
 | Campionamenti | 🟢 stabile | Export XLS attivo | 2026-03-21 |
 | Portale cliente | ✅ done | — | Sprint 7 |
 | Test manuali e2e | 🟢 stabile | V1-V6 codice verificato (browser test da eseguire dal vivo) | 2026-03-21 |
@@ -37,8 +38,8 @@ author: claude-strategy
 
 ## Info rapide
 
-- **Tag stabile:** v0.8-sprint14
-- **Sprint corrente:** 14
+- **Tag stabile:** v0.9-sprint15
+- **Sprint corrente:** 15
 - **Stack:** Next.js 16 + TypeScript + Supabase + Tailwind + shadcn/ui
 - **Porta:** 3000
 - **Percorso:** `~/sgic`

@@ -103,11 +103,14 @@
 - [x] **F5** Scadenze attestati: widget dashboard 90gg + KPI strip in /training (Sprint 13)
 - [x] **S4** Export risultati lab XLS per cliente (Sprint 13)
 
-## Sprint 15: Dashboard scadenze unificata
+## Completato — Sprint 15: Dashboard scadenze unificata
 
-- [ ] **DEADLINES-1** Pagina /deadlines con vista unificata (visite mediche + attestati + audit + AC scadute)
-- [ ] **DEADLINES-2** Filtri per cliente, tipo, urgenza + ordinamento
-- [ ] **DEADLINES-3** KPI strip scadenze (scadute / entro 30gg / entro 90gg / in regola)
+- [x] **DEADLINES-1** Pagina /deadlines con vista unificata (visite mediche + attestati + audit + documenti + AC)
+- [x] **DEADLINES-2** Filtri tipo + urgenza client-side + semaforo per riga + ordinamento urgenza
+- [x] **DEADLINES-3** KPI strip scadute/entro 30gg/entro 90gg/in regola — cliccabili → filtrano tabella
+- [x] Link "Scadenze" aggiunto in sidebar (layout.tsx)
+- [x] `npx tsc --noEmit` → 0 errori
+- [x] Tag `v0.9-sprint15`
 
 ## Sprint 14+: Knowledge Base
 

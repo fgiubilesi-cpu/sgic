@@ -16,6 +16,7 @@ import { TemplateTab } from "@/features/audits/components/template-tab";
 import { AuditCompletionSection } from "@/features/audits/components/audit-completion-section";
 import { ExportExcelButton } from "@/features/audits/components/export-excel-button";
 import { EmailDraftModal } from "@/features/audits/components/email-draft-modal";
+import { SendAuditReportButton } from "@/features/email/components/send-audit-report-button";
 
 export const dynamic = "force-dynamic";
 
@@ -136,6 +137,7 @@ export default async function AuditDetailPage({
               />
             )}
             {!isReadOnly && <ExportExcelButton auditId={audit.id} auditTitle={audit.title} />}
+            {!isReadOnly && <SendAuditReportButton auditId={audit.id} />}
           </div>
         </div>
       </div>

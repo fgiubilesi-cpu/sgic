@@ -112,6 +112,18 @@
 - [x] `npx tsc --noEmit` → 0 errori
 - [x] Tag `v0.9-sprint15`
 
+## Completato — Sprint 16: Notifiche email (Resend)
+
+- [x] **EMAIL-1** Setup `resend` package + `RESEND_API_KEY` in .env.local (placeholder) + template HTML G&A
+- [x] **EMAIL-2** Server action `sendDeadlinesSummaryAction` + bottone "Invia riepilogo scadenze" in /deadlines
+- [x] **EMAIL-3** Server action `sendAuditReportAction` + bottone "Invia report al cliente" in /audits/[id]
+- [x] **EMAIL-4** Server action `sendOverdueACNotificationsAction` + bottone "Notifica AC scadute" in /deadlines
+- [x] `npx tsc --noEmit` → 0 errori
+- [x] Tag `v1.0-sprint16`
+
+> ⚠️ Richiede: aggiungere chiave reale in `.env.local` → `RESEND_API_KEY=re_...`
+> ⚠️ Richiede: aggiornare `RESEND_FROM_EMAIL` con dominio verificato su Resend
+
 ## Sprint 14+: Knowledge Base
 
 - [ ] Ricerca full-text nei documenti (basata su extracted_text)

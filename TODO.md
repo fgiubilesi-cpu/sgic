@@ -1,11 +1,45 @@
 # SGIC — TODO.md
-> Aggiornato: 2026-03-21 | Sprint 9
+> Aggiornato: 2026-03-21 | Sprint 14
 
 ---
 
-## CURRENT SPRINT — Sprint 13: Completamento moduli esistenti — Parte 1
+## CURRENT SPRINT — Sprint 14: Test e2e + Ricerca + Fix DB
 
-> Tutti completati. Prossimo: Sprint 14 (test e2e + ricerca + fix DB).
+> Completato. Prossimo: Sprint 15 (dashboard scadenze unificata).
+
+### Test manuali end-to-end — verifica codice (Sprint 14)
+
+> Verifica a livello codice eseguita 2026-03-21. Test browser manuali da eseguire in sessione dal vivo.
+
+- [x] **V1** Flusso audit completo — PASS (codice verificato: create-audit-sheet, checklist-manager, checklist-row OK/NOK/NA, NC auto-create da NOK, score aggiornato)
+- [x] **V2** Flusso NC→AC — PASS (codice verificato: nc-ac-tab, corrective-action-form, corrective-action-actions con stati pending/in_progress/completed)
+- [x] **V3** Bozza mail — PASS (codice verificato: email-draft-modal, email-draft-actions)
+- [x] **V4** XLS 3 fogli — PASS (codice verificato: export-actions usa ExcelJS con 3 fogli Checklist/NC/AC)
+- [x] **V5** Template — PASS (codice verificato: template-editor-form, template-actions, import-template-sheet CSV)
+- [x] **V6** Portale cliente read-only — PASS (codice verificato: readOnly prop propagata, banner ambra, bottoni disabilitati)
+
+### SEARCH — Ricerca globale
+
+- [x] Scaffold verificato in `src/features/search/` — già funzionante
+- [x] Pagina `/search` attiva con risultati raggruppati per tipo
+- [x] `GlobalSearchLauncher` già presente nel layout header (topbar)
+- [x] Query ilike su: audits, clients, locations, personnel, documents con filtro ruolo client
+
+### DB-FIX — Fix search_path funzioni DB
+
+- [x] Verifica eseguita: tutte le 10 funzioni DB già hanno `search_path=public`
+- [x] Nessun warning search_path nei security advisors (solo: leaked password protection — non pertinente)
+
+### Verifica finale Sprint 14
+
+- [x] `npx tsc --noEmit` → 0 errori
+- [x] Tag `v0.8-sprint14`
+
+---
+
+## CURRENT SPRINT PRECEDENTE — Sprint 13: Completamento moduli esistenti — Parte 1
+
+> Tutti completati.
 
 ---
 
@@ -69,6 +103,12 @@
 - [x] **F5** Scadenze attestati: widget dashboard 90gg + KPI strip in /training (Sprint 13)
 - [x] **S4** Export risultati lab XLS per cliente (Sprint 13)
 
+## Sprint 15: Dashboard scadenze unificata
+
+- [ ] **DEADLINES-1** Pagina /deadlines con vista unificata (visite mediche + attestati + audit + AC scadute)
+- [ ] **DEADLINES-2** Filtri per cliente, tipo, urgenza + ordinamento
+- [ ] **DEADLINES-3** KPI strip scadenze (scadute / entro 30gg / entro 90gg / in regola)
+
 ## Sprint 14+: Knowledge Base
 
 - [ ] Ricerca full-text nei documenti (basata su extracted_text)
@@ -79,11 +119,11 @@
 
 ## BACKLOG
 
-- [ ] Ricerca globale: verificare se già funzionante (feature scaffoldata in `src/features/search/`)
+- [x] Ricerca globale: funzionante — /search con ilike multi-tabella + launcher nel topbar
+- [x] Fix search_path funzioni DB: tutte le funzioni già hanno search_path=public
 - [ ] CI/CD GitHub Actions (lint + typecheck + test e2e su PR)
 - [ ] Filtri avanzati lista audit (data, stato, score range)
 - [ ] Storico audit per cliente: vista timeline
-- [ ] Fix search_path funzioni DB (WARN sicurezza — non urgente)
 
 ---
 

@@ -22,7 +22,7 @@ author: claude-strategy
 | Formazione | 🟢 stabile | Dettaglio corso /training/[id] + widget scadenze dashboard | 2026-03-21 |
 | Campionamenti | 🟢 stabile | Export XLS attivo | 2026-03-21 |
 | Portale cliente | ✅ done | — | Sprint 7 |
-| Test manuali e2e | 🟡 ready | V1-V6 in TODO.md | 2026-03-20 |
+| Test manuali e2e | 🟢 stabile | V1-V6 codice verificato (browser test da eseguire dal vivo) | 2026-03-21 |
 | CI/CD | ⚪ parked | — | 2026-03-20 |
 
 ## Legenda
@@ -37,8 +37,8 @@ author: claude-strategy
 
 ## Info rapide
 
-- **Tag stabile:** v0.7-sprint13
-- **Sprint corrente:** 13
+- **Tag stabile:** v0.8-sprint14
+- **Sprint corrente:** 14
 - **Stack:** Next.js 16 + TypeScript + Supabase + Tailwind + shadcn/ui
 - **Porta:** 3000
 - **Percorso:** `~/sgic`

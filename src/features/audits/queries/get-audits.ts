@@ -80,7 +80,8 @@ export async function getAudits(): Promise<AuditWithNCCount[]> {
     .from("non_conformities")
     .select("audit_id")
     .in("audit_id", auditIds)
-    .eq("organization_id", organizationId);
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
 
   const ncCountByAuditId = (ncCounts ?? []).reduce(
     (acc: Record<string, number>, nc: any) => {

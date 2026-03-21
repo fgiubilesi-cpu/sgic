@@ -1,9 +1,23 @@
 # SGIC — TODO.md
-> Aggiornato: 2026-03-21 | Sprint 14
+> Aggiornato: 2026-03-21 | Sprint 18
 
 ---
 
-## CURRENT SPRINT — Sprint 14: Test e2e + Ricerca + Fix DB
+## CURRENT SPRINT — Sprint 18: Filtri avanzati + Knowledge Base
+
+> Completato. Tag: v1.2-sprint18
+
+- [x] **FIX-NC** Bug NC count: aggiunto `deleted_at IS NULL` in `get-audits.ts`
+- [x] **FILTER-DATE** Date range picker (dateMin/dateMax) nella toolbar audit
+- [x] **KB-1** Full-text search nei documenti (ricerca globale estesa a `document_ingestions.extracted_text`)
+- [x] **KB-2** Cross-reference NC → documenti: tabella `nc_documents` + panel in NC detail
+- [x] **KB-3** Suggerimento procedure durante compilazione checklist (SuggestedDocumentsRow)
+- [x] `npx tsc --noEmit` → 0 errori
+- [x] Tag `v1.2-sprint18`
+
+---
+
+## CURRENT SPRINT PRECEDENTE — Sprint 14: Test e2e + Ricerca + Fix DB
 
 > Completato. Prossimo: Sprint 15 (dashboard scadenze unificata).
 

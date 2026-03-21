@@ -34,6 +34,7 @@ import {
   deleteCorrectiveAction,
 } from "@/features/audits/actions/corrective-action-actions";
 import { updateNonConformity } from "@/features/audits/actions/non-conformity-actions";
+import { NCDocumentsPanel } from "@/features/audits/components/nc-documents-panel";
 
 interface NcAcTabProps {
   audit: AuditWithChecklists;
@@ -618,6 +619,7 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
                   {isExpanded && (
                     <tr className="border-b border-zinc-100 bg-zinc-50">
                       <td colSpan={6} className="px-4 py-3">
+                        <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-6">
                           {/* NC EDIT FORM */}
                           <div className="rounded-lg border border-zinc-200 bg-white p-3 space-y-2">
@@ -804,6 +806,13 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
                               )
                             )}
                           </div>
+                        </div>
+
+                        {/* DOCUMENTI COLLEGATI */}
+                        <NCDocumentsPanel
+                          nonConformityId={nc.id}
+                          readOnly={readOnly}
+                        />
                         </div>
                       </td>
                     </tr>

@@ -30,6 +30,8 @@ export type AuditsListState = {
   sort: AuditsListSort;
   groupBy: AuditsListGroupBy;
   viewMode: AuditsListViewMode;
+  dateMin: string;
+  dateMax: string;
 };
 
 export type AuditsListOptions = {
@@ -81,6 +83,8 @@ const DEFAULT_AUDITS_LIST_STATE: AuditsListState = {
   sort: "scheduled_desc",
   groupBy: "none",
   viewMode: "table",
+  dateMin: "",
+  dateMax: "",
 };
 
 type AuditsListDefaults = Partial<
@@ -116,6 +120,11 @@ function isValidValue<T extends string>(value: string | undefined, validValues: 
   return Boolean(value) && validValues.includes(value as T);
 }
 
+function isValidIsoDate(value: string | undefined): boolean {
+  if (!value) return false;
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(value).getTime());
+}
+
 export function parseDate(value: string | null): Date | null {
   if (!value) return null;
   const date = new Date(value);
@@ -140,6 +149,8 @@ export function parseAuditsListState(
   const sort = getSingleValue(searchParams.sort);
   const groupBy = getSingleValue(searchParams.groupBy);
   const viewMode = getSingleValue(searchParams.view);
+  const dateMin = isValidIsoDate(getSingleValue(searchParams.dateMin)) ? getSingleValue(searchParams.dateMin)! : "";
+  const dateMax = isValidIsoDate(getSingleValue(searchParams.dateMax)) ? getSingleValue(searchParams.dateMax)! : "";
 
   return {
     search,
@@ -154,6 +165,8 @@ export function parseAuditsListState(
     sort: isValidValue(sort, VALID_SORTS) ? sort : resolvedDefaults.sort,
     groupBy: isValidValue(groupBy, VALID_GROUPS) ? groupBy : resolvedDefaults.groupBy,
     viewMode: isValidValue(viewMode, VALID_VIEWS) ? viewMode : resolvedDefaults.viewMode,
+    dateMin,
+    dateMax,
   };
 }
 
@@ -236,6 +249,12 @@ export function filterAndSortAudits(
         audit.score < 85) ||
       (state.scoreBand === "gte85" && audit.score !== null && audit.score >= 85);
 
+    const dateMinDate = state.dateMin ? new Date(state.dateMin) : null;
+    const dateMaxDate = state.dateMax ? new Date(`${state.dateMax}T23:59:59`) : null;
+    const matchesDateRange =
+      (!dateMinDate || (auditDate !== null && auditDate >= dateMinDate)) &&
+      (!dateMaxDate || (auditDate !== null && auditDate <= dateMaxDate));
+
     return (
       matchesSearch &&
       matchesStatus &&
@@ -243,7 +262,8 @@ export function filterAndSortAudits(
       matchesLocation &&
       matchesOpenNc &&
       matchesPeriod &&
-      matchesScore
+      matchesScore &&
+      matchesDateRange
     );
   });
 
@@ -589,6 +609,8 @@ export function getActiveFilterLabels(
   if (state.scoreBand !== "all") {
     activeFilters.push({ key: "scoreBand", label: getScoreBandLabel(state.scoreBand) });
   }
+  if (state.dateMin) activeFilters.push({ key: "dateMin", label: `Da: ${state.dateMin}` });
+  if (state.dateMax) activeFilters.push({ key: "dateMax", label: `A: ${state.dateMax}` });
 
   return activeFilters;
 }

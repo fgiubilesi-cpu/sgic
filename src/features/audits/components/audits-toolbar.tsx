@@ -144,7 +144,7 @@ export function AuditsToolbar({
   }, [searchValue, state.search]);
 
   function updateParams(
-    updates: Partial<Record<"search" | "status" | "client" | "location" | "period" | "hasOpenNc" | "scoreBand" | "sort" | "groupBy" | "view", string>>
+    updates: Partial<Record<"search" | "status" | "client" | "location" | "period" | "hasOpenNc" | "scoreBand" | "sort" | "groupBy" | "view" | "dateMin" | "dateMax", string>>
   ) {
     const nextParams = new URLSearchParams(currentSearchParams.toString());
 
@@ -166,6 +166,14 @@ export function AuditsToolbar({
   function clearFilter(filterKey: string) {
     if (filterKey === "hasOpenNc") {
       updateParams({ hasOpenNc: "false" });
+      return;
+    }
+    if (filterKey === "dateMin") {
+      updateParams({ dateMin: "" });
+      return;
+    }
+    if (filterKey === "dateMax") {
+      updateParams({ dateMax: "" });
       return;
     }
 
@@ -361,6 +369,22 @@ export function AuditsToolbar({
               ))}
             </SelectContent>
           </Select>
+
+          <Input
+            type="date"
+            value={state.dateMin}
+            onChange={(e) => updateParams({ dateMin: e.target.value })}
+            placeholder="Da data"
+            title="Data minima"
+          />
+
+          <Input
+            type="date"
+            value={state.dateMax}
+            onChange={(e) => updateParams({ dateMax: e.target.value })}
+            placeholder="A data"
+            title="Data massima"
+          />
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">

@@ -2209,6 +2209,48 @@ export type Database = {
           },
         ]
       }
+      nc_documents: {
+        Row: {
+          created_at: string
+          document_id: string
+          id: string
+          non_conformity_id: string
+          note: string | null
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          id?: string
+          non_conformity_id: string
+          note?: string | null
+          organization_id: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          id?: string
+          non_conformity_id?: string
+          note?: string | null
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nc_documents_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nc_documents_non_conformity_id_fkey"
+            columns: ["non_conformity_id"]
+            isOneToOne: false
+            referencedRelation: "non_conformities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       non_conformities: {
         Row: {
           audit_id: string | null

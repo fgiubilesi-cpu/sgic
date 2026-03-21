@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import React from "react";
 import { toast } from "sonner";
 import { Check, X, Minus, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { updateChecklistItem } from "@/features/audits/actions";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { MediaCapture } from "./media-capture";
+import { SuggestedDocumentsRow } from "./suggested-documents";
 import type { AuditOutcome } from "@/features/audits/schemas/audit-schema";
 import type { ChecklistItemMedia } from "@/features/audits/lib/checklist-media";
 
@@ -19,6 +21,7 @@ interface ChecklistRowProps {
   initialNotes: string | null;
   initialMedia: ChecklistItemMedia[];
   auditId: string;
+  clientId?: string | null;
   isSelected: boolean;
   hasNc?: boolean;
   onSelect: () => void;
@@ -45,6 +48,7 @@ export function ChecklistRow({
   initialNotes,
   initialMedia,
   auditId,
+  clientId,
   isSelected,
   hasNc = false,
   onSelect,
@@ -175,6 +179,7 @@ export function ChecklistRow({
     "border-l-transparent";
 
   return (
+    <React.Fragment>
     <tr
       className={cn(
         "group h-11 border-b border-zinc-200 hover:bg-zinc-100 transition-colors cursor-pointer border-l-4",
@@ -325,5 +330,9 @@ export function ChecklistRow({
         </div>
       </td>
     </tr>
+    {isSelected && !readOnly && (
+      <SuggestedDocumentsRow question={question} clientId={clientId} colSpan={7} />
+    )}
+    </React.Fragment>
   );
 }

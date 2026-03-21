@@ -3,7 +3,13 @@
 
 ---
 
-## CURRENT SPRINT — Sprint 9: Client Filter + Documenti
+## CURRENT SPRINT — Sprint 13: Completamento moduli esistenti — Parte 1
+
+> Tutti completati. Prossimo: Sprint 14 (test e2e + ricerca + fix DB).
+
+---
+
+## Completato — Sprint 9: Client Filter + Documenti
 
 ### Completato in Sprint 9
 
@@ -39,24 +45,31 @@
 - [x] **P2** Tab visite mediche nella scheda personale (/personnel/[id])
 - [x] **P3** Pagina /personnel con filtro per cliente e KPI strip
 - [x] **P4** Cross-link formazione nella scheda personale (già presente)
-- [ ] **P5** Widget scadenze visite in dashboard (sprint futuro)
+- [x] **P5** Widget scadenze visite in dashboard (Sprint 13)
 
 ## Completato — Sprint 11: Formazione
 
 - [x] **F1** Migrazione: aggiunto `client_id` e `location_id` a `training_courses`
 - [x] **F2** Pagina /training con catalogo corsi e registrazioni recenti
 - [x] **F4** Voce "Formazione" attivata in sidebar
-- [ ] **F3** Pagina /training/[id] con dettaglio corso (sprint futuro)
-- [ ] **F5** Scadenze attestati: alert basati su validity_months + completion_date (sprint futuro)
+- [x] **F3** Pagina /training/[id] con dettaglio corso (Sprint 13)
+- [x] **F5** Scadenze attestati: widget dashboard 90gg + KPI strip in /training (Sprint 13)
 
 ## Completato — Sprint 12: Campionamenti e Analisi
 
 - [x] **S1** Migrazione: aggiunto `client_id`, `location_id`, `title`, `matrix`, `sampling_date`, `status` a `samplings`
 - [x] **S2** Pagina /samplings con lista filtrabili per cliente
 - [x] **S3** Voce "Campionamenti" attivata in sidebar
-- [ ] **S4** Export risultati lab XLS per cliente (sprint futuro)
+- [x] **S4** Export risultati lab XLS per cliente (Sprint 13)
 
-## Sprint 13+: Knowledge Base
+## Completato — Sprint 13: Completamento moduli esistenti — Parte 1
+
+- [x] **P5** Widget scadenze visite in dashboard (Sprint 13)
+- [x] **F3** Pagina /training/[id] con dettaglio corso (Sprint 13)
+- [x] **F5** Scadenze attestati: widget dashboard 90gg + KPI strip in /training (Sprint 13)
+- [x] **S4** Export risultati lab XLS per cliente (Sprint 13)
+
+## Sprint 14+: Knowledge Base
 
 - [ ] Ricerca full-text nei documenti (basata su extracted_text)
 - [ ] Cross-reference audit/NC → documenti di riferimento

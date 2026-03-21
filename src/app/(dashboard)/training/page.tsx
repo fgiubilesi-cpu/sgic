@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -128,7 +129,14 @@ export default async function TrainingPage({
               <TableBody>
                 {courses.map((course) => (
                   <TableRow key={course.id}>
-                    <TableCell className="font-medium">{course.title}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link
+                        href={`/training/${course.id}`}
+                        className="hover:underline text-zinc-900"
+                      >
+                        {course.title}
+                      </Link>
+                    </TableCell>
                     <TableCell>{course.category ?? "-"}</TableCell>
                     <TableCell>{course.duration_hours}</TableCell>
                     <TableCell>{course.validity_months ?? "Illimitata"}</TableCell>

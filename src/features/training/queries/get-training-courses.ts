@@ -1,6 +1,77 @@
 import { createClient } from '@/lib/supabase/server';
 import type { Tables } from '@/types/database.types';
 
+export interface CourseRegistration {
+  id: string;
+  personnelId: string;
+  personnelName: string;
+  clientName: string;
+  completionDate: string;
+  expiryDate: string | null;
+  daysUntil: number | null;
+  urgency: 'overdue' | 'warning' | 'ok' | 'none';
+}
+
+export async function getCourseRegistrations(
+  organizationId: string,
+  courseId: string,
+): Promise<CourseRegistration[]> {
+  const supabase = await createClient();
+
+  const { data: records, error } = await supabase
+    .from('training_records')
+    .select('id, personnel_id, completion_date, expiry_date')
+    .eq('organization_id', organizationId)
+    .eq('course_id', courseId)
+    .order('completion_date', { ascending: false });
+
+  if (error || !records || records.length === 0) return [];
+
+  const personnelIds = Array.from(new Set(records.map((r) => r.personnel_id)));
+  const { data: personnel } = await supabase
+    .from('personnel')
+    .select('id, first_name, last_name, client_id, client:client_id(name)')
+    .in('id', personnelIds);
+
+  const personMap = new Map<string, { name: string; clientName: string }>(
+    (personnel ?? []).map((p: any) => [
+      p.id as string,
+      {
+        name: `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim(),
+        clientName: (p.client as any)?.name ?? '',
+      },
+    ]),
+  );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return records.map((r) => {
+    const person = personMap.get(r.personnel_id);
+    let daysUntil: number | null = null;
+    let urgency: CourseRegistration['urgency'] = 'none';
+
+    if (r.expiry_date) {
+      const exp = new Date(r.expiry_date);
+      daysUntil = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysUntil < 0) urgency = 'overdue';
+      else if (daysUntil <= 30) urgency = 'warning';
+      else urgency = 'ok';
+    }
+
+    return {
+      id: r.id,
+      personnelId: r.personnel_id,
+      personnelName: person?.name ?? '—',
+      clientName: person?.clientName ?? '',
+      completionDate: r.completion_date,
+      expiryDate: r.expiry_date,
+      daysUntil,
+      urgency,
+    };
+  });
+}
+
 type TrainingCourse = Tables<'training_courses'>;
 
 export async function getTrainingCourses(

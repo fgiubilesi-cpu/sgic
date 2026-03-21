@@ -84,6 +84,27 @@ export interface DashboardActionCenter {
   todos: DashboardTodoItem[];
 }
 
+export interface MedicalVisitDeadline {
+  id: string;
+  personnelId: string;
+  personnelName: string;
+  clientName: string;
+  expiryDate: string;
+  daysUntil: number;
+  urgency: "overdue" | "warning" | "ok";
+}
+
+export interface TrainingDeadline {
+  id: string;
+  personnelId: string;
+  personnelName: string;
+  clientName: string;
+  courseTitle: string;
+  expiryDate: string;
+  daysUntil: number;
+  urgency: "overdue" | "warning" | "ok";
+}
+
 export interface ClientOption {
   id: string;
   name: string;
@@ -464,6 +485,157 @@ export async function getMonthlyKPIs(): Promise<MonthlyKPIs> {
     openNCsTotal: openNCsTotal ?? 0,
     complianceAvg,
   };
+}
+
+// ─── F5: Training Certificate Deadlines ────────────────────────────────────
+export async function getTrainingDeadlines(
+  filters: DashboardFilters
+): Promise<TrainingDeadline[]> {
+  const ctx = await getOrganizationContext();
+  if (!ctx) return [];
+  const { supabase, organizationId } = ctx;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const ninetyDaysOut = addDays(today, 90);
+  const ninetyDaysOutIso = ninetyDaysOut.toISOString().split("T")[0];
+
+  let personnelQuery = supabase
+    .from("personnel")
+    .select("id, first_name, last_name, client_id, client:client_id(name)")
+    .eq("organization_id", organizationId)
+    .eq("is_active", true);
+
+  if (filters.clientId) {
+    personnelQuery = personnelQuery.eq("client_id", filters.clientId);
+  }
+
+  const { data: personnel } = await personnelQuery;
+  if (!personnel || personnel.length === 0) return [];
+
+  const personnelIds = personnel.map((p: any) => p.id as string);
+  const personnelMap = new Map<string, any>(
+    personnel.map((p: any) => [p.id as string, p])
+  );
+
+  const { data: records } = await supabase
+    .from("training_records")
+    .select("id, personnel_id, course_id, expiry_date")
+    .in("personnel_id", personnelIds)
+    .not("expiry_date", "is", null)
+    .lte("expiry_date", ninetyDaysOutIso)
+    .order("expiry_date", { ascending: true });
+
+  if (!records || records.length === 0) return [];
+
+  const courseIds = Array.from(new Set(records.map((r: any) => r.course_id as string)));
+  const { data: courses } = await supabase
+    .from("training_courses")
+    .select("id, title")
+    .in("id", courseIds);
+
+  const courseMap = new Map<string, string>(
+    (courses ?? []).map((c: any) => [c.id as string, c.title as string])
+  );
+
+  return records.map((r: any) => {
+    const person = personnelMap.get(r.personnel_id);
+    const expiryDate = new Date(r.expiry_date);
+    const daysUntil = Math.ceil(
+      (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    let urgency: TrainingDeadline["urgency"];
+    if (daysUntil < 0) urgency = "overdue";
+    else if (daysUntil <= 30) urgency = "warning";
+    else urgency = "ok";
+
+    return {
+      id: r.id,
+      personnelId: r.personnel_id,
+      personnelName: person
+        ? `${person.first_name ?? ""} ${person.last_name ?? ""}`.trim()
+        : "Collaboratore",
+      clientName: (person?.client as any)?.name ?? "",
+      courseTitle: courseMap.get(r.course_id) ?? "Corso sconosciuto",
+      expiryDate: new Intl.DateTimeFormat("it-IT", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(expiryDate),
+      daysUntil,
+      urgency,
+    } satisfies TrainingDeadline;
+  });
+}
+
+// ─── P5: Medical Visit Deadlines ───────────────────────────────────────────
+export async function getMedicalVisitDeadlines(
+  filters: DashboardFilters
+): Promise<MedicalVisitDeadline[]> {
+  const ctx = await getOrganizationContext();
+  if (!ctx) return [];
+  const { supabase, organizationId } = ctx;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const ninetyDaysOut = addDays(today, 90);
+  const ninetyDaysOutIso = ninetyDaysOut.toISOString().split("T")[0];
+
+  let personnelQuery = supabase
+    .from("personnel")
+    .select("id, first_name, last_name, client_id, client:client_id(name)")
+    .eq("organization_id", organizationId)
+    .eq("is_active", true);
+
+  if (filters.clientId) {
+    personnelQuery = personnelQuery.eq("client_id", filters.clientId);
+  }
+
+  const { data: personnel } = await personnelQuery;
+  if (!personnel || personnel.length === 0) return [];
+
+  const personnelIds = personnel.map((p: any) => p.id as string);
+  const personnelMap = new Map<string, any>(
+    personnel.map((p: any) => [p.id as string, p])
+  );
+
+  const { data: visits } = await supabase
+    .from("medical_visits")
+    .select("id, personnel_id, expiry_date")
+    .in("personnel_id", personnelIds)
+    .not("expiry_date", "is", null)
+    .lte("expiry_date", ninetyDaysOutIso)
+    .order("expiry_date", { ascending: true });
+
+  return (visits ?? []).map((visit: any) => {
+    const person = personnelMap.get(visit.personnel_id);
+    const expiryDate = new Date(visit.expiry_date);
+    const daysUntil = Math.ceil(
+      (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    let urgency: MedicalVisitDeadline["urgency"];
+    if (daysUntil < 0) urgency = "overdue";
+    else if (daysUntil <= 30) urgency = "warning";
+    else urgency = "ok";
+
+    return {
+      id: visit.id,
+      personnelId: visit.personnel_id,
+      personnelName: person
+        ? `${person.first_name ?? ""} ${person.last_name ?? ""}`.trim()
+        : "Collaboratore",
+      clientName: (person?.client as any)?.name ?? "",
+      expiryDate: new Intl.DateTimeFormat("it-IT", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(expiryDate),
+      daysUntil,
+      urgency,
+    } satisfies MedicalVisitDeadline;
+  });
 }
 
 export async function getDashboardActionCenter(

@@ -124,6 +124,20 @@
 > ⚠️ Richiede: aggiungere chiave reale in `.env.local` → `RESEND_API_KEY=re_...`
 > ⚠️ Richiede: aggiornare `RESEND_FROM_EMAIL` con dominio verificato su Resend
 
+## Completato — Sprint 17: Integrazione FileMaker (lettura)
+
+- [x] **FM-1** Client FM Data API (`src/lib/filemaker/fm-client.ts`) + script import clienti/sedi
+- [x] **FM-2** Script import persone e visite mediche da FM
+- [x] **FM-3** Pagina `/admin/fm-sync` (solo admin): bottone sync, log risultati, gestione errori
+- [x] **FM-4** Widget "Attività G&A" nella scheda cliente `/clients/[id]` — live da FM con fallback
+- [x] Migrazione DB: colonna `fm_record_id text` su `clients`, `locations`, `personnel` + indici
+- [x] `database.types.ts` rigenerato
+- [x] `npx tsc --noEmit` → 0 errori
+- [x] Tag `v1.1-sprint17`
+
+> ⚠️ Richiede: FM_HOST, FM_DATABASE, FM_USERNAME, FM_PASSWORD in `.env.local`
+> ⚠️ Aggiustare nomi layout/campi in `src/lib/filemaker/fm-client.ts` → `FM_LAYOUTS` e `FM_FIELDS`
+
 ## Sprint 14+: Knowledge Base
 
 - [ ] Ricerca full-text nei documenti (basata su extracted_text)

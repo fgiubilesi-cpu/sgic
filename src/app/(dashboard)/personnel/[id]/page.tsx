@@ -64,6 +64,7 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
             email: person.email,
             client_id: person.client_id,
             location_id: person.location_id,
+            fm_record_id: null,
         },
     ];
 

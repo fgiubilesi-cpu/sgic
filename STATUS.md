@@ -22,6 +22,7 @@ author: claude-strategy
 | Formazione | 🟢 stabile | Dettaglio corso /training/[id] + widget scadenze dashboard | 2026-03-21 |
 | Scadenze unificata | 🟢 stabile | Pagina /deadlines con KPI strip + filtri tipo/urgenza | 2026-03-21 |
 | Email notifiche | 🟡 ready | Infrastruttura Resend pronta — manca RESEND_API_KEY reale | 2026-03-21 |
+| FileMaker sync | 🟡 ready | Scaffold completo — manca configurazione FM_HOST/credentials | 2026-03-21 |
 | Campionamenti | 🟢 stabile | Export XLS attivo | 2026-03-21 |
 | Portale cliente | ✅ done | — | Sprint 7 |
 | Test manuali e2e | 🟢 stabile | V1-V6 codice verificato (browser test da eseguire dal vivo) | 2026-03-21 |
@@ -39,8 +40,8 @@ author: claude-strategy
 
 ## Info rapide
 
-- **Tag stabile:** v1.0-sprint16
-- **Sprint corrente:** 16
+- **Tag stabile:** v1.1-sprint17
+- **Sprint corrente:** 17
 - **Stack:** Next.js 16 + TypeScript + Supabase + Tailwind + shadcn/ui
 - **Porta:** 3000
 - **Percorso:** `~/sgic`

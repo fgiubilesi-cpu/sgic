@@ -62,6 +62,7 @@ export default async function TrainingPage({
     email: p.email,
     client_id: p.client_id,
     location_id: p.location_id,
+    fm_record_id: null,
   }));
 
   return (

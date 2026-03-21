@@ -984,6 +984,7 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string | null
+          fm_record_id: string | null
           id: string
           is_active: boolean | null
           name: string
@@ -996,6 +997,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email?: string | null
+          fm_record_id?: string | null
           id?: string
           is_active?: boolean | null
           name: string
@@ -1008,6 +1010,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           email?: string | null
+          fm_record_id?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
@@ -1547,6 +1550,7 @@ export type Database = {
           city: string | null
           client_id: string
           created_at: string | null
+          fm_record_id: string | null
           id: string
           is_active: boolean | null
           name: string
@@ -1560,6 +1564,7 @@ export type Database = {
           city?: string | null
           client_id: string
           created_at?: string | null
+          fm_record_id?: string | null
           id?: string
           is_active?: boolean | null
           name: string
@@ -1573,6 +1578,7 @@ export type Database = {
           city?: string | null
           client_id?: string
           created_at?: string | null
+          fm_record_id?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
@@ -2318,6 +2324,7 @@ export type Database = {
           created_at: string | null
           email: string | null
           first_name: string
+          fm_record_id: string | null
           hire_date: string | null
           id: string
           is_active: boolean
@@ -2332,6 +2339,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           first_name?: string
+          fm_record_id?: string | null
           hire_date?: string | null
           id?: string
           is_active?: boolean
@@ -2346,6 +2354,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           first_name?: string
+          fm_record_id?: string | null
           hire_date?: string | null
           id?: string
           is_active?: boolean
@@ -2899,4 +2908,3 @@ export const Constants = {
     },
   },
 } as const
-

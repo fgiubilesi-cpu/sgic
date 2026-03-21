@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -123,7 +124,7 @@ export function DocumentsTable({
           <TableRow key={document.id}>
             <TableCell>
               <div className="flex flex-col">
-                <span className="font-medium text-zinc-900">{document.title || 'Documento senza titolo'}</span>
+                <Link href={`/documents/${document.id}`} className="font-medium text-zinc-900 hover:text-blue-600 hover:underline">{document.title || 'Documento senza titolo'}</Link>
                 <span className="text-xs text-zinc-500">
                   {document.category || 'Categoria non definita'}
                   {document.version ? ` · ${document.version}` : ''}

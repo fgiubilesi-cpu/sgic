@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
+import {
+  searchKnowledgeBase,
+  type KnowledgeSearchResult,
+} from "@/features/knowledge/lib/knowledge-search";
 
 type ActionResult<T = void> = { success: true; data?: T } | { success: false; error: string };
 
@@ -78,18 +82,11 @@ export async function searchDocumentsForNC(query: string) {
   const ctx = await getOrganizationContext();
   if (!ctx) return [];
 
-  const { supabase, organizationId } = ctx;
-  const ilikeTerm = `%${query.trim().replace(/[%_]/g, " ")}%`;
-
-  const { data } = await supabase
-    .from("documents")
-    .select("id, title, category, status, expiry_date, client_id")
-    .eq("organization_id", organizationId)
-    .or(`title.ilike.${ilikeTerm},description.ilike.${ilikeTerm}`)
-    .order("updated_at", { ascending: false, nullsFirst: false })
-    .limit(10);
-
-  return data ?? [];
+  return searchKnowledgeBase(query, {
+    clientId: ctx.role === "client" ? ctx.clientId ?? null : null,
+    limit: 10,
+    scope: "all",
+  });
 }
 
-export type DocumentSearchResult = Awaited<ReturnType<typeof searchDocumentsForNC>>[number];
+export type DocumentSearchResult = KnowledgeSearchResult;

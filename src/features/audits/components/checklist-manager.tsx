@@ -155,6 +155,8 @@ export function ChecklistManager({
                   initialNotes={item.notes ?? null}
                   initialMedia={item.media ?? []}
                   auditId={audit.id}
+                  clientId={audit.client_id}
+                  locationId={audit.location_id}
                   isSelected={selectedItemId === item.id}
                   hasNc={ncItemIds.has(item.id) || item.outcome === "non_compliant"}
                   onSelect={() => setSelectedItemId(item.id)}
@@ -223,6 +225,8 @@ export function ChecklistManager({
                         initialNotes={item.notes ?? null}
                         initialMedia={item.media ?? []}
                         auditId={audit.id}
+                        clientId={audit.client_id}
+                        locationId={audit.location_id}
                         isSelected={selectedItemId === item.id}
                         hasNc={ncItemIds.has(item.id) || item.outcome === "non_compliant"}
                         onSelect={() => setSelectedItemId(item.id)}

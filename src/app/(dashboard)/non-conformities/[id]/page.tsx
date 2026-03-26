@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, ShieldCheck, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { NCDocumentsPanel } from "@/features/audits/components/nc-documents-panel";
 
 type PageProps = {
     params: Promise<{
@@ -67,6 +68,8 @@ export default async function NonConformityDetailPage({ params }: PageProps) {
             </div>
 
             <NCDetailInfo nc={nc} />
+
+            <NCDocumentsPanel nonConformityId={nc.id} />
 
             <div className="space-y-4">
                 <div className="flex items-center gap-2">

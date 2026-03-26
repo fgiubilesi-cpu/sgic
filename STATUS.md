@@ -1,6 +1,6 @@
 ---
 type: status
-date: 2026-03-21
+date: 2026-03-26
 status: active
 tags: [dashboard, stato, sgic]
 author: claude-strategy
@@ -9,13 +9,14 @@ author: claude-strategy
 # STATUS.md — Dashboard stato SGIC
 
 > Aggiornato da: ogni agente che completa uno sprint o milestone
-> Ultimo aggiornamento: 2026-03-21
+> Ultimo aggiornamento: 2026-03-26
 
 ## Stato progetto
 
 | Area | Stato | Prossimo passo | Ultimo update |
 |---|---|---|---|
-| Core app | 🟢 stabile | Sprint 19 | 2026-03-21 |
+| Core app | 🟢 stabile | Sprint 20 | 2026-03-26 |
+| Knowledge base | 🟢 stabile | Hardening su ranking e mapping manuale domanda → documento | 2026-03-26 |
 | Client Filter | 🟢 stabile | Componente attivo in header | 2026-03-21 |
 | Documenti | 🟢 stabile | Pagina /documents attiva | 2026-03-21 |
 | Personale + Visite | 🟢 stabile | Pagina lista + visite mediche | 2026-03-21 |
@@ -40,8 +41,8 @@ author: claude-strategy
 
 ## Info rapide
 
-- **Tag stabile:** v1.2-sprint18
-- **Sprint corrente:** 18
+- **Tag stabile:** v1.2-sprint18 (ultimo tag) + Sprint 19 completata in working tree
+- **Sprint corrente:** 19
 - **Stack:** Next.js 16 + TypeScript + Supabase + Tailwind + shadcn/ui
 - **Porta:** 3000
 - **Percorso:** `~/sgic`

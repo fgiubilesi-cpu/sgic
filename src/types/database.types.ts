@@ -983,7 +983,9 @@ export type Database = {
       clients: {
         Row: {
           created_at: string | null
+          deleted_at: string | null
           email: string | null
+          fm_record_id: string | null
           id: string
           is_active: boolean | null
           name: string
@@ -995,7 +997,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          deleted_at?: string | null
           email?: string | null
+          fm_record_id?: string | null
           id?: string
           is_active?: boolean | null
           name: string
@@ -1007,7 +1011,9 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          deleted_at?: string | null
           email?: string | null
+          fm_record_id?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
@@ -1547,6 +1553,7 @@ export type Database = {
           city: string | null
           client_id: string
           created_at: string | null
+          fm_record_id: string | null
           id: string
           is_active: boolean | null
           name: string
@@ -1560,6 +1567,7 @@ export type Database = {
           city?: string | null
           client_id: string
           created_at?: string | null
+          fm_record_id?: string | null
           id?: string
           is_active?: boolean | null
           name: string
@@ -1573,6 +1581,7 @@ export type Database = {
           city?: string | null
           client_id?: string
           created_at?: string | null
+          fm_record_id?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
@@ -2203,6 +2212,48 @@ export type Database = {
           },
         ]
       }
+      nc_documents: {
+        Row: {
+          created_at: string
+          document_id: string
+          id: string
+          non_conformity_id: string
+          note: string | null
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          id?: string
+          non_conformity_id: string
+          note?: string | null
+          organization_id: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          id?: string
+          non_conformity_id?: string
+          note?: string | null
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nc_documents_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nc_documents_non_conformity_id_fkey"
+            columns: ["non_conformity_id"]
+            isOneToOne: false
+            referencedRelation: "non_conformities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       non_conformities: {
         Row: {
           audit_id: string | null
@@ -2318,6 +2369,7 @@ export type Database = {
           created_at: string | null
           email: string | null
           first_name: string
+          fm_record_id: string | null
           hire_date: string | null
           id: string
           is_active: boolean
@@ -2332,6 +2384,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           first_name?: string
+          fm_record_id?: string | null
           hire_date?: string | null
           id?: string
           is_active?: boolean
@@ -2346,6 +2399,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           first_name?: string
+          fm_record_id?: string | null
           hire_date?: string | null
           id?: string
           is_active?: boolean
@@ -2899,4 +2953,3 @@ export const Constants = {
     },
   },
 } as const
-

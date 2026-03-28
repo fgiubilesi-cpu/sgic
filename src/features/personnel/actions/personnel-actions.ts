@@ -1,6 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { assertInternalOperator } from '@/lib/access-control';
+import { recordAppEvent } from '@/lib/app-event-log';
 import { createClient as createSupabaseClient } from '@/lib/supabase/server';
 import { getOrganizationContext } from '@/lib/supabase/get-org-context';
 import type { PersonnelFormInput } from '../schemas/personnel-schema';
@@ -12,6 +14,7 @@ import {
   getPersonnelOperationalStatus,
   getTrainingWindowSummary,
 } from '@/features/personnel/lib/personnel-status';
+import { buildPersonnelMutationPayload } from '@/features/personnel/lib/personnel-action-payloads';
 
 type TrainingRecordRow = Tables<'training_records'> & {
   training_courses?: Pick<
@@ -67,6 +70,7 @@ async function ensurePersonnelRelations(
     .select('id')
     .eq('id', clientId)
     .eq('organization_id', organizationId)
+    .is('deleted_at', null)
     .single();
 
   if (clientError || !client) {
@@ -95,7 +99,7 @@ async function ensurePersonnelRelations(
 export async function createPersonnel(input: PersonnelFormInput) {
   try {
     const orgContext = await getOrganizationContext();
-    if (!orgContext) throw new Error('Unauthorized');
+    assertInternalOperator(orgContext, 'personale');
 
     const supabase = await createSupabaseClient();
     const validated = personnelSchema.parse(input);
@@ -109,22 +113,30 @@ export async function createPersonnel(input: PersonnelFormInput) {
 
     const { data, error } = await supabase
       .from('personnel')
-      .insert({
-        organization_id: orgContext.organizationId,
-        first_name: validated.first_name,
-        last_name: validated.last_name,
-        role: validated.role,
-        email: validated.email.trim(),
-        client_id: validated.client_id,
-        location_id: locationId,
-        tax_code: validated.tax_code.trim() || null,
-        hire_date: validated.hire_date.trim() || null,
-        is_active: validated.is_active,
-      })
+      .insert(
+        buildPersonnelMutationPayload({
+          locationId,
+          organizationId: orgContext.organizationId,
+          validated,
+        })
+      )
       .select()
       .single();
 
     if (error) throw error;
+    await recordAppEvent(orgContext, {
+      action: 'INSERT',
+      details: `${data.first_name} ${data.last_name}`.trim(),
+      payload: {
+        client_id: data.client_id ?? null,
+        entity: 'personnel',
+        is_active: data.is_active ?? null,
+        role: data.role ?? null,
+      },
+      recordId: data.id,
+      tableName: 'personnel_events',
+      title: 'Collaboratore creato',
+    });
 
     revalidatePath('/personnel');
     revalidatePath(`/clients/${validated.client_id}`);
@@ -139,7 +151,7 @@ export async function createPersonnel(input: PersonnelFormInput) {
 export async function updatePersonnel(personnelId: string, input: PersonnelFormInput) {
   try {
     const orgContext = await getOrganizationContext();
-    if (!orgContext) throw new Error('Unauthorized');
+    assertInternalOperator(orgContext, 'personale');
 
     const supabase = await createSupabaseClient();
     const validated = personnelSchema.parse(input);
@@ -160,23 +172,32 @@ export async function updatePersonnel(personnelId: string, input: PersonnelFormI
 
     const { data, error } = await supabase
       .from('personnel')
-      .update({
-        first_name: validated.first_name,
-        last_name: validated.last_name,
-        role: validated.role,
-        email: validated.email.trim(),
-        client_id: validated.client_id,
-        location_id: locationId,
-        tax_code: validated.tax_code.trim() || null,
-        hire_date: validated.hire_date.trim() || null,
-        is_active: validated.is_active,
-      })
+      .update(
+        buildPersonnelMutationPayload({
+          locationId,
+          organizationId: orgContext.organizationId,
+          validated,
+        })
+      )
       .eq('id', personnelId)
       .eq('organization_id', orgContext.organizationId)
       .select()
       .single();
 
     if (error) throw error;
+    await recordAppEvent(orgContext, {
+      action: 'UPDATE',
+      details: `${data.first_name} ${data.last_name}`.trim(),
+      payload: {
+        client_id: data.client_id ?? null,
+        entity: 'personnel',
+        is_active: data.is_active ?? null,
+        role: data.role ?? null,
+      },
+      recordId: data.id,
+      tableName: 'personnel_events',
+      title: 'Collaboratore aggiornato',
+    });
 
     revalidatePath('/personnel');
     revalidatePath(`/personnel/${personnelId}`);
@@ -216,6 +237,7 @@ export async function getPersonnelDetail(id: string): Promise<PersonnelDetail | 
           .select('name')
           .eq('id', data.client_id)
           .eq('organization_id', organizationId)
+          .is('deleted_at', null)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     data.location_id
@@ -281,7 +303,7 @@ export async function getPersonnelDetail(id: string): Promise<PersonnelDetail | 
 export async function setPersonnelActiveState(personnelId: string, isActive: boolean) {
   try {
     const orgContext = await getOrganizationContext();
-    if (!orgContext) throw new Error('Unauthorized');
+    assertInternalOperator(orgContext, 'personale');
 
     const supabase = await createSupabaseClient();
 
@@ -294,6 +316,18 @@ export async function setPersonnelActiveState(personnelId: string, isActive: boo
       .single();
 
     if (error) throw error;
+    await recordAppEvent(orgContext, {
+      action: 'UPDATE',
+      details: isActive ? 'Collaboratore riattivato' : 'Collaboratore disattivato',
+      payload: {
+        client_id: data?.client_id ?? null,
+        entity: 'personnel',
+        is_active: isActive,
+      },
+      recordId: personnelId,
+      tableName: 'personnel_events',
+      title: 'Stato collaboratore aggiornato',
+    });
 
     revalidatePath('/clients');
     revalidatePath(`/personnel/${personnelId}`);

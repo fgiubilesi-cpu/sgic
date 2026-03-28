@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import React from "react";
 import { toast } from "sonner";
-import { Check, X, Minus, AlertTriangle } from "lucide-react";
+import { Check, X, Minus, AlertTriangle, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { updateChecklistItem } from "@/features/audits/actions";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { MediaCapture } from "./media-capture";
+import { SuggestedDocumentsRow } from "./suggested-documents";
 import type { AuditOutcome } from "@/features/audits/schemas/audit-schema";
 import type { ChecklistItemMedia } from "@/features/audits/lib/checklist-media";
 
@@ -19,6 +21,8 @@ interface ChecklistRowProps {
   initialNotes: string | null;
   initialMedia: ChecklistItemMedia[];
   auditId: string;
+  clientId?: string | null;
+  locationId?: string | null;
   isSelected: boolean;
   hasNc?: boolean;
   onSelect: () => void;
@@ -45,7 +49,8 @@ export function ChecklistRow({
   initialNotes,
   initialMedia,
   auditId,
-  isSelected,
+  clientId,
+  locationId,
   hasNc = false,
   onSelect,
   path,
@@ -59,6 +64,7 @@ export function ChecklistRow({
   const [localNotes, setLocalNotes] = useState(initialNotes ?? "");
   const [localOutcome, setLocalOutcome] = useState(initialOutcome);
   const [localMedia, setLocalMedia] = useState(initialMedia);
+  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
 
   useEffect(() => {
     setLocalNotes(initialNotes ?? "");
@@ -144,11 +150,19 @@ export function ChecklistRow({
       setLocalOutcome(previousOutcome);
       toast.error(result.error ?? "Failed to save outcome.");
     } else if (result.ncCreated) {
+      if (newOutcome === "non_compliant") {
+        setKnowledgeOpen(true);
+      }
       toast.info("Non conformità registrata automaticamente.");
     } else if (result.ncCancelled) {
       toast.info("Non conformità annullata.");
     } else if ("offline" in result && result.offline) {
+      if (newOutcome === "non_compliant") {
+        setKnowledgeOpen(true);
+      }
       toast.info("Esito salvato offline.");
+    } else if (newOutcome === "non_compliant") {
+      setKnowledgeOpen(true);
     }
   };
 
@@ -175,6 +189,7 @@ export function ChecklistRow({
     "border-l-transparent";
 
   return (
+    <React.Fragment>
     <tr
       className={cn(
         "group h-11 border-b border-zinc-200 hover:bg-zinc-100 transition-colors cursor-pointer border-l-4",
@@ -190,6 +205,24 @@ export function ChecklistRow({
       <td className="px-3 py-0">
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-zinc-900 lg:whitespace-normal lg:break-words line-clamp-2 lg:line-clamp-none max-w-xs lg:max-w-none">{question}</span>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setKnowledgeOpen((current) => !current);
+              }}
+              className={cn(
+                "inline-flex h-5 w-5 items-center justify-center rounded-full border transition-colors shrink-0",
+                knowledgeOpen || localOutcome === "non_compliant"
+                  ? "border-blue-300 bg-blue-50 text-blue-700"
+                  : "border-zinc-200 bg-white text-zinc-400 hover:border-zinc-300 hover:text-zinc-600"
+              )}
+              title="Mostra procedura o riferimento suggerito"
+            >
+              <Info className="h-3 w-3" />
+            </button>
+          )}
           {hasNc && (
             <span
               className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold bg-red-100 text-red-700 shrink-0"
@@ -287,7 +320,11 @@ export function ChecklistRow({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                isListening ? stopListening() : startListening();
+                if (isListening) {
+                  stopListening();
+                } else {
+                  startListening();
+                }
               }}
               className={cn(
                 "inline-flex items-center justify-center w-6 h-6 rounded transition-colors shrink-0",
@@ -325,5 +362,15 @@ export function ChecklistRow({
         </div>
       </td>
     </tr>
+    {!readOnly && (knowledgeOpen || localOutcome === "non_compliant") && (
+      <SuggestedDocumentsRow
+        question={question}
+        clientId={clientId}
+        locationId={locationId}
+        colSpan={7}
+        variant={localOutcome === "non_compliant" ? "violation" : "info"}
+      />
+    )}
+    </React.Fragment>
   );
 }

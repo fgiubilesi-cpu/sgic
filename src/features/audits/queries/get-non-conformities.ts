@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { NCStatus, NCsSeverity } from "@/features/quality/schemas/nc-ac.schema";
+import { toCanonicalNonConformity } from "@/features/quality/lib/nc-ac-contract";
 
 export interface NonConformity {
   id: string;
@@ -17,6 +18,29 @@ export interface NonConformity {
     outcome: string;
   };
 }
+
+type NonConformityRow = {
+  audit_id: string;
+  checklist_item_id: string;
+  checklist_items:
+    | {
+        outcome: string;
+        question: string;
+      }
+    | Array<{
+        outcome: string;
+        question: string;
+      }>
+    | null;
+  closed_at: string | null;
+  created_at: string;
+  description: string | null;
+  id: string;
+  severity: NCsSeverity;
+  status: NCStatus;
+  title: string;
+  updated_at: string;
+};
 
 export async function getNonConformitiesByAudit(
   auditId: string
@@ -44,6 +68,7 @@ export async function getNonConformitiesByAudit(
     `
     )
     .eq("audit_id", auditId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -51,24 +76,27 @@ export async function getNonConformitiesByAudit(
     return [];
   }
 
-  return (data || []).map((nc: any) => ({
-    id: nc.id,
-    auditId: nc.audit_id,
-    checklistItemId: nc.checklist_item_id,
-    title: nc.title,
-    description: nc.description,
-    severity: nc.severity,
-    status: nc.status,
-    createdAt: nc.created_at,
-    updatedAt: nc.updated_at,
-    closedAt: nc.closed_at,
-    checklistItem: nc.checklist_items
-      ? {
-          question: nc.checklist_items.question,
-          outcome: nc.checklist_items.outcome,
-        }
-      : undefined,
-  }));
+  return ((data ?? []) as NonConformityRow[]).map((nc) => {
+    const canonical = toCanonicalNonConformity(nc);
+    return {
+      id: canonical.id,
+      auditId: canonical.auditId ?? "",
+      checklistItemId: canonical.checklistItemId ?? "",
+      title: canonical.title ?? "",
+      description: canonical.description,
+      severity: canonical.severity,
+      status: canonical.status,
+      createdAt: canonical.createdAt ?? "",
+      updatedAt: canonical.updatedAt ?? "",
+      closedAt: canonical.closedAt,
+      checklistItem: canonical.checklistQuestion
+        ? {
+            question: canonical.checklistQuestion,
+            outcome: canonical.checklistOutcome ?? "",
+          }
+        : undefined,
+    };
+  });
 }
 
 export async function getNonConformity(
@@ -97,6 +125,7 @@ export async function getNonConformity(
     `
     )
     .eq("id", ncId)
+    .is("deleted_at", null)
     .single();
 
   if (error) {
@@ -111,21 +140,26 @@ export async function getNonConformity(
     ? data.checklist_items[0]
     : data.checklist_items;
 
+  const canonical = toCanonicalNonConformity({
+    ...data,
+    checklist_items: rawItem,
+  });
+
   return {
-    id: data.id,
-    auditId: data.audit_id,
-    checklistItemId: data.checklist_item_id,
-    title: data.title,
-    description: data.description,
-    severity: data.severity,
-    status: data.status,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-    closedAt: data.closed_at,
-    checklistItem: rawItem
+    id: canonical.id,
+    auditId: canonical.auditId ?? "",
+    checklistItemId: canonical.checklistItemId ?? "",
+    title: canonical.title ?? "",
+    description: canonical.description,
+    severity: canonical.severity,
+    status: canonical.status,
+    createdAt: canonical.createdAt ?? "",
+    updatedAt: canonical.updatedAt ?? "",
+    closedAt: canonical.closedAt,
+    checklistItem: canonical.checklistQuestion
       ? {
-          question: rawItem.question,
-          outcome: rawItem.outcome,
+          question: canonical.checklistQuestion,
+          outcome: canonical.checklistOutcome ?? "",
         }
       : undefined,
   };

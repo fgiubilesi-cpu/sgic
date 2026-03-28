@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -88,9 +88,10 @@ export function AuditsWorkweekPanel({ audits }: AuditsWorkweekPanelProps) {
   const [plannerFilter, setPlannerFilter] = useState<PlannerFilter>("all");
   const [referenceDate, setReferenceDate] = useState(() => new Date());
 
-  useEffect(() => {
-    setPlannerFilter(viewMode === "month" ? "busy" : "all");
-  }, [viewMode]);
+  const handleViewModeChange = (mode: PlannerViewMode) => {
+    setViewMode(mode);
+    setPlannerFilter(mode === "month" ? "busy" : "all");
+  };
 
   const allDays =
     viewMode === "week"
@@ -151,7 +152,7 @@ export function AuditsWorkweekPanel({ audits }: AuditsWorkweekPanelProps) {
                       ? "bg-white text-zinc-900 shadow-sm"
                       : "text-zinc-500 hover:text-zinc-900"
                   )}
-                  onClick={() => setViewMode(mode)}
+                  onClick={() => handleViewModeChange(mode)}
                 >
                   {mode === "week" ? "Settimana" : "Mese"}
                 </Button>

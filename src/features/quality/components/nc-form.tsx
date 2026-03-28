@@ -25,16 +25,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { createNC } from "../actions/quality-actions";
 import { useOfflineMutation } from "@/lib/offline/use-offline-mutation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
-import { Sparkles, Loader2 } from "lucide-react";
-import { generateAIAnalysis } from "../actions/analyze-nc";
+import { Loader2 } from "lucide-react";
 
 export function NCForm({ onSuccess }: { onSuccess?: () => void }) {
     const [isPending, setIsPending] = useState(false);
-    const [isAiPending, startAiTransition] = useTransition();
     const router = useRouter();
 
     const form = useForm<z.input<typeof nonConformitySchema>, unknown, z.infer<typeof nonConformitySchema>>({
@@ -45,40 +43,16 @@ export function NCForm({ onSuccess }: { onSuccess?: () => void }) {
             identified_date: new Date().toISOString().split("T")[0],
             severity: "minor",
             status: "open",
-            root_cause_analysis: "",
-            action_plan: "",
         },
     });
 
     const { mutateAsync: createOfflineNC } = useOfflineMutation({
         actionType: 'CREATE_NC',
         generateOfflineId: () => crypto.randomUUID(),
-        mutationFn: async (mutationData: any) => {
+        mutationFn: async (mutationData: z.infer<typeof nonConformitySchema>) => {
             return createNC(mutationData);
         }
     });
-
-    const handleAIAssist = () => {
-        const title = form.getValues("title");
-        const description = form.getValues("description");
-        const severity = form.getValues("severity") || "minor";
-
-        if (!title || !description) {
-            toast.error("Inserisci Titolo e Descrizione per usare l'assistente AI.");
-            return;
-        }
-
-        startAiTransition(async () => {
-            const result = await generateAIAnalysis({ title, description, severity });
-            if (result.success) {
-                form.setValue("root_cause_analysis", result.data.root_cause_analysis, { shouldDirty: true, shouldValidate: true });
-                form.setValue("action_plan", result.data.suggested_action_plan, { shouldDirty: true, shouldValidate: true });
-                toast.success("Analisi AI completata!");
-            } else {
-                toast.error(result.error);
-            }
-        });
-    };
 
     async function onSubmit(data: z.infer<typeof nonConformitySchema>) {
         setIsPending(true);
@@ -167,66 +141,13 @@ export function NCForm({ onSuccess }: { onSuccess?: () => void }) {
                     />
                 </div>
 
-                <div className="pt-4 border-t mt-4">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h3 className="text-sm font-medium">Analisi Causa e Piano d'Azione</h3>
-                            <p className="text-xs text-muted-foreground">Compila i campi o fatti aiutare dall'AI basandosi su titolo e descrizione.</p>
-                        </div>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleAIAssist}
-                            disabled={isAiPending || isPending}
-                            className="bg-primary/5 hover:bg-primary/10 text-primary border-primary/20"
-                        >
-                            {isAiPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                            AI Assist: Suggerisci Cause
-                        </Button>
-                    </div>
+                <div className="rounded-lg border border-dashed bg-zinc-50 px-4 py-3 text-sm text-muted-foreground">
+                    Registriamo solo i dati essenziali per aprire la NC. Analisi causa radice e piano operativo
+                    si definiscono nella scheda di dettaglio insieme alle azioni correttive.
                 </div>
 
-                <FormField
-                    control={form.control}
-                    name="root_cause_analysis"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Analisi Cause Radice (Root Cause)</FormLabel>
-                            <FormControl>
-                                <Textarea
-                                    placeholder="Scrivi l'analisi delle cause..."
-                                    className="min-h-[80px]"
-                                    {...field}
-                                    value={field.value || ""}
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                <FormField
-                    control={form.control}
-                    name="action_plan"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Piano d'Azione Suggerito</FormLabel>
-                            <FormControl>
-                                <Textarea
-                                    placeholder="Descrivi il piano d'azione..."
-                                    className="min-h-[80px]"
-                                    {...field}
-                                    value={field.value || ""}
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                <Button type="submit" className="w-full mt-6" disabled={isPending || isAiPending}>
-                    {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Crea Non Conformità"}
+                <Button type="submit" className="w-full mt-6" disabled={isPending}>
+                    {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Apri Non Conformità"}
                 </Button>
             </form>
         </Form>

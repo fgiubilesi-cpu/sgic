@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, User, GraduationCap, Calendar, CreditCard, Briefcase, Building2, Mail, MapPin, TriangleAlert, ShieldCheck, Clock3 } from "lucide-react";
+import type { ComponentProps } from "react";
+import { ArrowLeft, GraduationCap, Calendar, CreditCard, Briefcase, Building2, Mail, MapPin, TriangleAlert, Clock3 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -21,10 +22,13 @@ import { DocumentsTable } from "@/features/documents/components/documents-table"
 import { ManageDocumentSheet } from "@/features/documents/components/manage-document-sheet";
 import { getMedicalVisitsByPersonnel } from "@/features/personnel/queries/get-medical-visits";
 import { MedicalVisitsCard } from "@/features/personnel/components/medical-visits-card";
+import { buildPersonnelSeed } from "@/features/personnel/lib/personnel-detail-view";
 
 type PageProps = {
     params: Promise<{ id: string }>;
 };
+
+type TrainingTableRecords = ComponentProps<typeof TrainingRecordTable>["records"];
 
 export default async function PersonnelDetailPage({ params }: PageProps) {
     const { id } = await params;
@@ -50,22 +54,7 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
         getMedicalVisitsByPersonnel(ctx.organizationId, person.id),
     ]);
 
-    const personnelSeed = [
-        {
-            id: person.id,
-            organization_id: person.organization_id,
-            first_name: person.first_name,
-            last_name: person.last_name,
-            role: person.role,
-            tax_code: person.tax_code,
-            hire_date: person.hire_date,
-            is_active: person.is_active,
-            created_at: null,
-            email: person.email,
-            client_id: person.client_id,
-            location_id: person.location_id,
-        },
-    ];
+    const personnelSeed = buildPersonnelSeed(person);
 
     return (
         <div className="space-y-6">
@@ -101,20 +90,7 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
                 <PersonnelStateToggleButton isActive={person.is_active} personnelId={person.id} />
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <Card className="border-zinc-200 bg-white/90 shadow-sm">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                            Stato operativo
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex items-center gap-3">
-                        <ShieldCheck className="h-5 w-5 text-emerald-600" />
-                        <div>
-                            <PersonnelOperationalBadge status={person.operational_status} />
-                        </div>
-                    </CardContent>
-                </Card>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 <Card className="border-zinc-200 bg-white/90 shadow-sm">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-xs font-medium uppercase tracking-wide text-zinc-500">
@@ -200,13 +176,6 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
                                 </span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <User className="h-4 w-4 text-zinc-400" />
-                            <div className="flex flex-col">
-                                <span className="text-xs text-zinc-500 uppercase font-semibold">ID Sistema</span>
-                                <span className="text-xs text-zinc-400 truncate w-48">{person.id}</span>
-                            </div>
-                        </div>
                     </CardContent>
                 </Card>
 
@@ -231,7 +200,7 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <TrainingRecordTable records={person.training_records as any} showPerson={false} />
+                        <TrainingRecordTable records={person.training_records as TrainingTableRecords} showPerson={false} />
                     </CardContent>
                 </Card>
             </div>
@@ -281,9 +250,9 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0">
                         <div>
-                        <CardTitle className="text-lg">Sintesi Scadenze</CardTitle>
+                        <CardTitle className="text-lg">Prontezza Operativa</CardTitle>
                         <CardDescription>
-                            Lettura rapida per capire se il collaboratore e pronto, da monitorare o da sospendere.
+                            Solo i segnali che cambiano lo stato operativo del collaboratore.
                         </CardDescription>
                         </div>
                         <ManageDocumentSheet
@@ -296,14 +265,6 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
                         />
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
-                        <div className="rounded-lg border border-zinc-200 p-3">
-                            <p className="font-medium text-zinc-900">Formazione completata</p>
-                            <p className="mt-1 text-zinc-600">
-                                {person.training_records.length > 0
-                                    ? `${person.training_records.length} corsi registrati nello storico.`
-                                    : "Nessun corso registrato: conviene completare il profilo formativo."}
-                            </p>
-                        </div>
                         <div className="rounded-lg border border-zinc-200 p-3">
                             <p className="font-medium text-zinc-900">Criticita immediate</p>
                             <p className="mt-1 text-zinc-600">
@@ -318,6 +279,14 @@ export default async function PersonnelDetailPage({ params }: PageProps) {
                                 {person.training_expiring_count > 0
                                     ? `${person.training_expiring_count} corsi scadono entro 30 giorni.`
                                     : "Nessuna scadenza imminente nei prossimi 30 giorni."}
+                            </p>
+                        </div>
+                        <div className="rounded-lg border border-zinc-200 p-3">
+                            <p className="font-medium text-zinc-900">Copertura registrata</p>
+                            <p className="mt-1 text-zinc-600">
+                                {person.training_records.length > 0
+                                    ? `${person.training_records.length} corsi nello storico formativo.`
+                                    : "Nessun corso registrato: conviene completare il profilo formativo."}
                             </p>
                         </div>
                     </CardContent>

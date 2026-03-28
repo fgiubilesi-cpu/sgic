@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabase/server";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 
 export interface ClientListItem {
@@ -16,6 +15,7 @@ export async function getClientsList(): Promise<ClientListItem[]> {
     .from("clients")
     .select("id, name")
     .eq("organization_id", organizationId)
+    .is("deleted_at", null)
     .order("name");
 
   if (error || !data) return [];

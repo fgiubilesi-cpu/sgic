@@ -214,21 +214,6 @@ function firstLabeledDate(input: string, labels: string[]) {
   return parseDateCandidate(value) ?? firstDateInText(value ?? '');
 }
 
-function extractSectionAfterLabels(input: string, labels: string[]) {
-  for (const label of labels) {
-    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(
-      `${escaped}\\s*[:\\-]?\\s*([\\s\\S]{0,400}?)(?:\\n\\s*\\n|\\n[A-Z][^\\n]{0,60}:|$)`,
-      'i'
-    );
-    const match = input.match(regex);
-    const value = match?.[1]?.replace(/\s+/g, ' ').trim();
-    if (value) return value;
-  }
-
-  return null;
-}
-
 function excerptAroundKeyword(input: string, keywords: string[]) {
   const lower = input.toLowerCase();
   for (const keyword of keywords) {
@@ -492,14 +477,6 @@ function deriveContractType(text: string) {
   if (text.includes('triennale')) return 'triennale';
   if (text.includes('fornitura')) return 'fornitura';
   return 'standard';
-}
-
-function deriveFrequency(text: string) {
-  if (text.includes('mensile')) return 'mensile';
-  if (text.includes('trimestrale')) return 'trimestrale';
-  if (text.includes('semestrale')) return 'semestrale';
-  if (text.includes('annuale')) return 'annuale';
-  return null;
 }
 
 function normalizeEuroNumber(input: string | null | undefined) {

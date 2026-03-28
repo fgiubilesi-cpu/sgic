@@ -1,4 +1,5 @@
 import { useMutation, UseMutationOptions } from '@tanstack/react-query';
+import type { MutationFunctionContext } from '@tanstack/react-query';
 import { useSync } from './sync-provider';
 import { toast } from 'sonner';
 
@@ -8,14 +9,26 @@ export interface OfflineMutationOptions<TData, TError, TVariables, TContext>
     generateOfflineId?: (variables: TVariables) => string;
 }
 
-export function useOfflineMutation<TData = any, TError = any, TVariables = any, TContext = any>(
+type MutationResultWithError = {
+    error?: string;
+};
+
+function hasResultError(value: unknown): value is MutationResultWithError {
+    return typeof value === 'object' && value !== null && 'error' in value && typeof value.error === 'string';
+}
+
+function isNetworkError(error: unknown): error is Error {
+    return error instanceof Error;
+}
+
+export function useOfflineMutation<TData = unknown, TError = Error, TVariables = void, TContext = unknown>(
     options: OfflineMutationOptions<TData, TError, TVariables, TContext>
 ) {
     const { enqueueMutation, isOnline } = useSync();
 
     return useMutation<TData, TError, TVariables, TContext>({
         ...options,
-        mutationFn: async (variables: TVariables) => {
+        mutationFn: async (variables: TVariables, context: MutationFunctionContext) => {
             // Force offline queuing if the browser is completely offline
             if (!isOnline) {
                 await enqueueMutation(options.actionType, variables);
@@ -31,26 +44,28 @@ export function useOfflineMutation<TData = any, TError = any, TVariables = any, 
             }
 
             // If online, execute the real mutation
-            if (!options.mutationFn) {
+            const mutationFn = options.mutationFn;
+            if (!mutationFn) {
                 throw new Error('mutationFn is required');
             }
 
             try {
-                // @ts-ignore
-                const result = await options.mutationFn(variables);
+                const result = await mutationFn(variables, context);
 
                 // If the server action returned an integrated error object
-                if ((result as any)?.error) {
-                    throw new Error((result as any).error);
+                if (hasResultError(result)) {
+                    throw new Error(result.error);
                 }
 
                 return result;
-            } catch (err: any) {
+            } catch (err: unknown) {
                 // If the request fails specifically due to sudden network loss
                 if (
                     !navigator.onLine ||
-                    err?.message?.toLowerCase().includes('fetch') ||
-                    err?.message?.toLowerCase().includes('network')
+                    (isNetworkError(err) && (
+                        err.message.toLowerCase().includes('fetch') ||
+                        err.message.toLowerCase().includes('network')
+                    ))
                 ) {
                     await enqueueMutation(options.actionType, variables);
                     toast.info('Rete instabile. Azione salvata in coda.');

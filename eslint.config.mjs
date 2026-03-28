@@ -9,9 +9,18 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".next-stale-route-fix/**",
+    ".next-stale-route-fix-2/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "public/fallback-*.js",
+    "public/swe-worker-*.js",
+    "public/workbox-*.js",
+    "public/sw.js",
+    ".claude/worktrees/**",
+    ".codex-trash/**",
+    "supabase/.temp/**",
   ]),
 ]);
 

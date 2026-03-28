@@ -1,11 +1,11 @@
-import imageCompression from 'browser-image-compression';
+import imageCompression, { type Options } from 'browser-image-compression';
 
 export async function compressEvidenceImage(file: File): Promise<File> {
-    const options = {
+    const options: Options = {
         maxSizeMB: 0.8,
         maxWidthOrHeight: 1280,
         useWebWorker: true,
-        fileType: 'image/webp' as any // Enforce webp for better sizing
+        fileType: 'image/webp'
     };
 
     try {

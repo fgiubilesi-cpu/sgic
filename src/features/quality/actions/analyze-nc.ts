@@ -65,6 +65,7 @@ export async function generateAIAnalysisForNC(ncId: string): Promise<AIAnalysisR
         .from("non_conformities")
         .select("title, description, severity")
         .eq("id", ncId)
+        .is("deleted_at", null)
         .single();
 
     if (ncError || !nc) {

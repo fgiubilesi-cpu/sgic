@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,7 +67,7 @@ function onSubmit(values: OrganizationRulesValues) {
     });
   }
 
-  const current = form.watch();
+  const current = useWatch({ control: form.control });
   const getNumericValue = (value: unknown) => (typeof value === "number" ? value : "");
   const getNumericDisplay = (value: unknown) => {
     if (typeof value === "number") return value;

@@ -129,7 +129,8 @@ async function buildClientResolutionContext(
       supabase
         .from("clients")
         .select("id, name, vat_number")
-        .eq("organization_id", organizationId),
+        .eq("organization_id", organizationId)
+        .is("deleted_at", null),
       supabase
         .from("management_clients_staging")
         .select("source_record_id, client_id, name, vat_number")

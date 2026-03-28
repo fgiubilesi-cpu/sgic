@@ -1,8 +1,15 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { assertInternalOperator } from '@/lib/access-control';
+import { recordAppEvent } from '@/lib/app-event-log';
 import { createClient as createSupabaseClient } from '@/lib/supabase/server';
 import { getOrganizationContext } from '@/lib/supabase/get-org-context';
+import {
+  buildClientDeadlineMutationPayload,
+  buildClientTaskMutationPayload,
+  buildClientTaskStatusPatch,
+} from '@/features/clients/lib/client-workspace-action-payloads';
 import {
   clientContactSchema,
   clientContractSchema,
@@ -37,6 +44,7 @@ async function ensureClientAccess(
     .select('id')
     .eq('id', clientId)
     .eq('organization_id', organizationId)
+    .is('deleted_at', null)
     .single();
 
   if (error || !client) {
@@ -130,7 +138,7 @@ function normalizeActionError(error: unknown, fallback: string) {
 export async function upsertClientContract(clientId: string, input: ClientContractInput) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
 
     const validated = clientContractSchema.parse(input);
     const supabase = await createSupabaseClient();
@@ -189,7 +197,7 @@ export async function upsertClientContract(clientId: string, input: ClientContra
 export async function createClientTask(clientId: string, input: ClientTaskInput) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
 
     const validated = clientTaskSchema.parse(input);
     const supabase = await createSupabaseClient();
@@ -215,29 +223,37 @@ export async function createClientTask(clientId: string, input: ClientTaskInput)
       locationId
     );
 
-    const shouldComplete = validated.status === 'done';
+    const now = new Date().toISOString();
     const { data, error } = await supabase
       .from('client_tasks')
-      .insert({
-        organization_id: ctx.organizationId,
-        client_id: clientId,
-        title: validated.title,
-        description: normalizeOptionalString(validated.description),
-        status: validated.status,
-        priority: validated.priority,
-        due_date: normalizeOptionalDate(validated.due_date),
-        owner_name: normalizeOptionalString(validated.owner_name),
-        location_id: locationId,
-        audit_id: auditId,
-        service_line_id: serviceLineId,
-        is_recurring: validated.is_recurring,
-        recurrence_label: normalizeOptionalString(validated.recurrence_label),
-        completed_at: shouldComplete ? new Date().toISOString() : null,
-      })
+      .insert(
+        buildClientTaskMutationPayload({
+          auditId,
+          clientId,
+          locationId,
+          now,
+          organizationId: ctx.organizationId,
+          serviceLineId,
+          validated,
+        })
+      )
       .select()
       .single();
 
     if (error) throw error;
+    await recordAppEvent(ctx, {
+      action: 'INSERT',
+      details: data.title,
+      payload: {
+        client_id: clientId,
+        entity: 'client_task',
+        priority: data.priority ?? null,
+        status: data.status ?? null,
+      },
+      recordId: data.id,
+      tableName: 'client_workspace_events',
+      title: 'Task cliente creata',
+    });
     revalidateClientWorkspace(clientId);
     return { success: true, data };
   } catch (error) {
@@ -251,7 +267,7 @@ export async function createClientTask(clientId: string, input: ClientTaskInput)
 export async function updateClientTask(taskId: string, clientId: string, input: ClientTaskInput) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
 
     const validated = clientTaskSchema.parse(input);
     const supabase = await createSupabaseClient();
@@ -277,23 +293,20 @@ export async function updateClientTask(taskId: string, clientId: string, input: 
       locationId
     );
 
-    const shouldComplete = validated.status === 'done';
+    const now = new Date().toISOString();
     const { data, error } = await supabase
       .from('client_tasks')
-      .update({
-        title: validated.title,
-        description: normalizeOptionalString(validated.description),
-        status: validated.status,
-        priority: validated.priority,
-        due_date: normalizeOptionalDate(validated.due_date),
-        owner_name: normalizeOptionalString(validated.owner_name),
-        location_id: locationId,
-        audit_id: auditId,
-        service_line_id: serviceLineId,
-        is_recurring: validated.is_recurring,
-        recurrence_label: normalizeOptionalString(validated.recurrence_label),
-        completed_at: shouldComplete ? new Date().toISOString() : null,
-      })
+      .update(
+        buildClientTaskMutationPayload({
+          auditId,
+          clientId,
+          locationId,
+          now,
+          organizationId: ctx.organizationId,
+          serviceLineId,
+          validated,
+        })
+      )
       .eq('id', taskId)
       .eq('organization_id', ctx.organizationId)
       .eq('client_id', clientId)
@@ -301,6 +314,19 @@ export async function updateClientTask(taskId: string, clientId: string, input: 
       .single();
 
     if (error) throw error;
+    await recordAppEvent(ctx, {
+      action: 'UPDATE',
+      details: data.title,
+      payload: {
+        client_id: clientId,
+        entity: 'client_task',
+        priority: data.priority ?? null,
+        status: data.status ?? null,
+      },
+      recordId: data.id,
+      tableName: 'client_workspace_events',
+      title: 'Task cliente aggiornata',
+    });
     revalidateClientWorkspace(clientId);
     return { success: true, data };
   } catch (error) {
@@ -314,15 +340,13 @@ export async function updateClientTask(taskId: string, clientId: string, input: 
 export async function setClientTaskStatus(taskId: string, clientId: string, status: ClientTaskStatus) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
     const supabase = await createSupabaseClient();
+    const now = new Date().toISOString();
 
     const { data, error } = await supabase
       .from('client_tasks')
-      .update({
-        status,
-        completed_at: status === 'done' ? new Date().toISOString() : null,
-      })
+      .update(buildClientTaskStatusPatch(status, now))
       .eq('id', taskId)
       .eq('client_id', clientId)
       .eq('organization_id', ctx.organizationId)
@@ -330,6 +354,19 @@ export async function setClientTaskStatus(taskId: string, clientId: string, stat
       .single();
 
     if (error) throw error;
+    await recordAppEvent(ctx, {
+      action: 'UPDATE',
+      details: `${data.title ?? 'Task'} -> ${status}`,
+      payload: {
+        client_id: clientId,
+        completed_at: data.completed_at ?? null,
+        entity: 'client_task',
+        status,
+      },
+      recordId: taskId,
+      tableName: 'client_workspace_events',
+      title: 'Stato task cliente aggiornato',
+    });
     revalidateClientWorkspace(clientId);
     return { success: true, data };
   } catch (error) {
@@ -394,7 +431,7 @@ export async function setClientTaskServiceLine(
 export async function createClientContact(clientId: string, input: ClientContactInput) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
 
     const validated = clientContactSchema.parse(input);
     const supabase = await createSupabaseClient();
@@ -443,7 +480,7 @@ export async function updateClientContact(
 ) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
 
     const validated = clientContactSchema.parse(input);
     const supabase = await createSupabaseClient();
@@ -489,7 +526,7 @@ export async function updateClientContact(
 export async function deleteClientContact(contactId: string, clientId: string) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
     const supabase = await createSupabaseClient();
 
     const { error } = await supabase
@@ -517,7 +554,7 @@ export async function setClientDeadlineServiceLine(
 ) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
     const supabase = await createSupabaseClient();
     await ensureClientAccess(supabase, ctx.organizationId, clientId);
 
@@ -564,7 +601,7 @@ export async function setClientDeadlineServiceLine(
 export async function createClientDeadline(clientId: string, input: ClientDeadlineInput) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
 
     const validated = clientDeadlineSchema.parse(input);
     const supabase = await createSupabaseClient();
@@ -586,23 +623,33 @@ export async function createClientDeadline(clientId: string, input: ClientDeadli
 
     const { data, error } = await supabase
       .from('client_deadlines')
-      .insert({
-        organization_id: ctx.organizationId,
-        client_id: clientId,
-        source_type: 'manual',
-        title: validated.title,
-        description: normalizeOptionalString(validated.description),
-        due_date: validated.due_date,
-        priority: validated.priority,
-        status: validated.status,
-        location_id: locationId,
-        service_line_id: serviceLineId,
-        created_by: ctx.userId,
-      })
+      .insert(
+        buildClientDeadlineMutationPayload({
+          clientId,
+          createdBy: ctx.userId,
+          locationId,
+          organizationId: ctx.organizationId,
+          serviceLineId,
+          validated,
+        })
+      )
       .select()
       .single();
 
     if (error) throw error;
+    await recordAppEvent(ctx, {
+      action: 'INSERT',
+      details: data.title,
+      payload: {
+        client_id: clientId,
+        due_date: data.due_date,
+        entity: 'client_deadline',
+        status: data.status ?? null,
+      },
+      recordId: data.id,
+      tableName: 'client_workspace_events',
+      title: 'Scadenza cliente creata',
+    });
     revalidateClientWorkspace(clientId);
     return { success: true, data };
   } catch (error) {
@@ -620,7 +667,7 @@ export async function updateClientDeadline(
 ) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
 
     const validated = clientDeadlineSchema.parse(input);
     const supabase = await createSupabaseClient();
@@ -642,15 +689,15 @@ export async function updateClientDeadline(
 
     const { data, error } = await supabase
       .from('client_deadlines')
-      .update({
-        title: validated.title,
-        description: normalizeOptionalString(validated.description),
-        due_date: validated.due_date,
-        priority: validated.priority,
-        status: validated.status,
-        location_id: locationId,
-        service_line_id: serviceLineId,
-      })
+      .update(
+        buildClientDeadlineMutationPayload({
+          clientId,
+          locationId,
+          organizationId: ctx.organizationId,
+          serviceLineId,
+          validated,
+        })
+      )
       .eq('id', deadlineId)
       .eq('client_id', clientId)
       .eq('organization_id', ctx.organizationId)
@@ -659,6 +706,19 @@ export async function updateClientDeadline(
       .single();
 
     if (error) throw error;
+    await recordAppEvent(ctx, {
+      action: 'UPDATE',
+      details: data.title,
+      payload: {
+        client_id: clientId,
+        due_date: data.due_date,
+        entity: 'client_deadline',
+        status: data.status ?? null,
+      },
+      recordId: data.id,
+      tableName: 'client_workspace_events',
+      title: 'Scadenza cliente aggiornata',
+    });
     revalidateClientWorkspace(clientId);
     return { success: true, data };
   } catch (error) {
@@ -672,7 +732,7 @@ export async function updateClientDeadline(
 export async function deleteClientDeadline(deadlineId: string, clientId: string) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
     const supabase = await createSupabaseClient();
 
     const { error } = await supabase
@@ -684,6 +744,17 @@ export async function deleteClientDeadline(deadlineId: string, clientId: string)
       .eq('source_type', 'manual');
 
     if (error) throw error;
+    await recordAppEvent(ctx, {
+      action: 'DELETE',
+      details: 'Scadenza manuale rimossa',
+      payload: {
+        client_id: clientId,
+        entity: 'client_deadline',
+      },
+      recordId: deadlineId,
+      tableName: 'client_workspace_events',
+      title: 'Scadenza cliente eliminata',
+    });
     revalidateClientWorkspace(clientId);
     return { success: true };
   } catch (error) {
@@ -697,7 +768,7 @@ export async function deleteClientDeadline(deadlineId: string, clientId: string)
 export async function createClientNote(clientId: string, input: ClientNoteInput) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
 
     const validated = clientNoteSchema.parse(input);
     const supabase = await createSupabaseClient();
@@ -739,7 +810,7 @@ export async function createClientNote(clientId: string, input: ClientNoteInput)
 export async function updateClientNote(noteId: string, clientId: string, input: ClientNoteInput) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
 
     const validated = clientNoteSchema.parse(input);
     const supabase = await createSupabaseClient();
@@ -781,7 +852,7 @@ export async function updateClientNote(noteId: string, clientId: string, input: 
 export async function setClientNotePinned(noteId: string, clientId: string, pinned: boolean) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
     const supabase = await createSupabaseClient();
 
     const { data, error } = await supabase
@@ -807,7 +878,7 @@ export async function setClientNotePinned(noteId: string, clientId: string, pinn
 export async function deleteClientNote(noteId: string, clientId: string) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'workspace cliente');
     const supabase = await createSupabaseClient();
 
     const { error } = await supabase

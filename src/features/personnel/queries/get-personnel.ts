@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { runClientsQueryWithSoftDeleteFallback } from "@/lib/supabase/clients-soft-delete";
 import type { Tables } from '@/types/database.types';
 import type { OperationalStatus } from '@/features/personnel/lib/personnel-status';
 import {
@@ -56,8 +57,23 @@ export async function getPersonnelList(
   ] =
     await Promise.all([
       clientIds.length
-        ? supabase.from('clients').select('id, name').in('id', clientIds)
-        : Promise.resolve({ data: [], error: null }),
+        ? runClientsQueryWithSoftDeleteFallback((useSoftDeleteGuard) => {
+            let query = supabase
+              .from('clients')
+              .select('id, name')
+              .in('id', clientIds);
+
+            if (useSoftDeleteGuard) {
+              query = query.is('deleted_at', null);
+            }
+
+            return query;
+          })
+        : Promise.resolve({
+            data: [],
+            error: null,
+            usedClientsSoftDeleteGuard: true,
+          }),
       locationIds.length
         ? supabase.from('locations').select('id, name').in('id', locationIds)
         : Promise.resolve({ data: [], error: null }),

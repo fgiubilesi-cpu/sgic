@@ -6,6 +6,8 @@ import { ClientDetailWorkspace } from '@/features/clients/components/client-deta
 import { getAuditTimeline } from '@/features/audits/queries/get-audit-timeline';
 import { getDocuments } from '@/features/documents/queries/get-documents';
 import { getClientWorkspaceData } from '@/features/clients/queries/get-client-workspace';
+import { getFMActivitiesByClient } from '@/features/filemaker/queries/get-fm-activities';
+import { FMActivitiesWidget } from '@/features/filemaker/components/fm-activities-widget';
 
 export const metadata = {
   title: 'Dettaglio Cliente - SGIC',
@@ -32,7 +34,7 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
     redirect('/clients');
   }
 
-  const [personnel, audits, timelineEvents, workspace] = await Promise.all([
+  const [personnel, audits, timelineEvents, workspace, fmActivities] = await Promise.all([
     getPersonnelList(orgContext.organizationId, client.id),
     orgContext.supabase
       .from('audits')
@@ -42,6 +44,7 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
       .order('scheduled_date', { ascending: false }),
     getAuditTimeline(client.id),
     getClientWorkspaceData(orgContext.organizationId, client.id),
+    getFMActivitiesByClient((client as unknown as Record<string, unknown>).fm_record_id as string | null ?? null),
   ]);
 
   const documents = await getDocuments({
@@ -59,6 +62,7 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
           .select('audit_id, status')
           .eq('organization_id', orgContext.organizationId)
           .in('audit_id', auditIds)
+          .is('deleted_at', null)
           .neq('status', 'closed')
       : { data: [] };
 
@@ -80,6 +84,7 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
   ];
 
   return (
+    <div className="space-y-8">
     <ClientDetailWorkspace
       audits={(audits.data ?? []).map((audit) => ({
         id: audit.id,
@@ -106,5 +111,7 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
       contacts={workspace.contacts}
       contract={workspace.contract}
     />
+    <FMActivitiesWidget result={fmActivities} />
+    </div>
   );
 }

@@ -30,7 +30,6 @@ export async function getExpiringMedicalVisits(
 ): Promise<MedicalVisitListItem[]> {
   const supabase = await createClient();
 
-  const today = new Date().toISOString().split("T")[0];
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + daysAhead);
   const futureDateStr = futureDate.toISOString().split("T")[0];

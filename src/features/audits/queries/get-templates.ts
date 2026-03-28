@@ -1,6 +1,26 @@
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import type { TemplateWithDetails } from "@/features/audits/types/templates";
 
+type AuditTemplateRow = {
+  id: string;
+  title: string | null;
+};
+
+type TemplateQuestionRow = {
+  deleted_at: string | null;
+};
+
+type TemplateClientRow = {
+  name: string | null;
+};
+
+type TemplateDetailsRow = AuditTemplateRow & {
+  client: TemplateClientRow | TemplateClientRow[] | null;
+  client_id: string | null;
+  description: string | null;
+  template_questions: TemplateQuestionRow[] | null;
+};
+
 export type AuditTemplate = {
   id: string;
   title: string;
@@ -29,7 +49,10 @@ export async function getAuditTemplates(): Promise<AuditTemplate[]> {
     return [];
   }
 
-  return (data ?? []).map((t: any) => ({ id: String(t.id), title: t.title ?? "" }));
+  return (data ?? []).map((template: AuditTemplateRow) => ({
+    id: String(template.id),
+    title: template.title ?? "",
+  }));
 }
 
 /**
@@ -54,7 +77,10 @@ export async function getTemplatesForClient(clientId: string): Promise<AuditTemp
     return [];
   }
 
-  return (data ?? []).map((t: any) => ({ id: String(t.id), title: t.title ?? "" }));
+  return (data ?? []).map((template: AuditTemplateRow) => ({
+    id: String(template.id),
+    title: template.title ?? "",
+  }));
 }
 
 /**
@@ -85,16 +111,18 @@ export async function getAllTemplates(): Promise<TemplateWithDetails[]> {
     return [];
   }
 
-  return (data ?? []).map((t: any) => {
-    const clientRecord = Array.isArray(t.client) ? t.client[0] : t.client;
+  return (data ?? []).map((template: TemplateDetailsRow) => {
+    const clientRecord = Array.isArray(template.client)
+      ? template.client[0]
+      : template.client;
 
     return {
-      id: String(t.id),
-      title: t.title ?? "",
-      description: t.description ?? null,
-      clientId: t.client_id ?? null,
+      id: String(template.id),
+      title: template.title ?? "",
+      description: template.description ?? null,
+      clientId: template.client_id ?? null,
       clientName: clientRecord?.name ?? null,
-      questionCount: (t.template_questions ?? []).filter((q: any) => !q.deleted_at).length,
+      questionCount: (template.template_questions ?? []).filter((question) => !question.deleted_at).length,
     };
   });
 }

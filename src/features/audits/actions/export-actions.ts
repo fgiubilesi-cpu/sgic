@@ -4,6 +4,38 @@ import ExcelJS from "exceljs";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import { getAudit } from "@/features/audits/queries/get-audit";
 
+type AuditRelationRow = {
+  name: string | null;
+};
+
+type AuditExportRow = {
+  client: AuditRelationRow | AuditRelationRow[] | null;
+  location: AuditRelationRow | AuditRelationRow[] | null;
+  scheduled_date: string | null;
+  title: string | null;
+};
+
+type ChecklistItemQuestionRow = {
+  question: string | null;
+};
+
+type NonConformityExportRow = {
+  checklist_items: ChecklistItemQuestionRow | ChecklistItemQuestionRow[] | null;
+  description: string | null;
+  id: string;
+  severity: string | null;
+  status: string | null;
+  title: string | null;
+};
+
+type CorrectiveActionExportRow = {
+  description: string | null;
+  non_conformity_id: string;
+  responsible_person_name: string | null;
+  status: string | null;
+  target_completion_date: string | null;
+};
+
 /**
  * Genera un file Excel completo per un audit.
  * Fogli: 1) Checklist  2) Non Conformità  3) Azioni Correttive
@@ -54,20 +86,22 @@ export async function generateAuditExcel(
     .from("non_conformities")
     .select("id, title, description, severity, status, checklist_items:checklist_item_id(question)")
     .eq("audit_id", auditId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: true });
 
-  const nonConformities = (ncs ?? []) as any[];
+  const nonConformities: NonConformityExportRow[] = ncs ?? [];
 
   // 4. Fetch corrective actions for all NCs in this audit
   const ncIds = nonConformities.map((nc) => nc.id);
-  let correctiveActions: any[] = [];
+  let correctiveActions: CorrectiveActionExportRow[] = [];
   if (ncIds.length > 0) {
     const { data: cas } = await supabase
       .from("corrective_actions")
       .select("id, non_conformity_id, description, responsible_person_name, target_completion_date, status")
       .in("non_conformity_id", ncIds)
+      .is("deleted_at", null)
       .order("created_at", { ascending: true });
-    correctiveActions = (cas ?? []) as any[];
+    correctiveActions = cas ?? [];
   }
 
   // --- Build Excel ---
@@ -75,12 +109,8 @@ export async function generateAuditExcel(
   workbook.creator = "SGIC";
   workbook.created = new Date();
 
-  const auditTitle = (audit as any).title ?? "Audit";
-  const clientName = (audit as any).client?.name ?? "";
-  const locationName = (audit as any).location?.name ?? "";
-  const scheduledDate = (audit as any).scheduled_date
-    ? new Intl.DateTimeFormat("it-IT").format(new Date((audit as any).scheduled_date))
-    : "";
+  const auditRecord = audit as AuditExportRow;
+  const auditTitle = auditRecord.title ?? "Audit";
 
   const HEADER_FILL: ExcelJS.Fill = {
     type: "pattern",
@@ -114,7 +144,6 @@ export async function generateAuditExcel(
   const CA_STATUS_LABELS: Record<string, string> = {
     open: "Aperta",
     completed: "Completata",
-    verified: "Verificata",
   };
 
   // ---- Foglio 1: Checklist ----
@@ -183,14 +212,15 @@ export async function generateAuditExcel(
   hRow2.height = 22;
 
   nonConformities.forEach((nc) => {
-    const itemQuestion = Array.isArray(nc.checklist_items)
-      ? nc.checklist_items[0]?.question ?? ""
-      : nc.checklist_items?.question ?? "";
+    const checklistItem = Array.isArray(nc.checklist_items)
+      ? nc.checklist_items[0]
+      : nc.checklist_items;
+    const itemQuestion = checklistItem?.question ?? "";
 
     const row = sheet2.addRow({
       ncTitle: nc.title ?? "",
-      severity: SEVERITY_LABELS[nc.severity] ?? nc.severity,
-      status: NC_STATUS_LABELS[nc.status] ?? nc.status,
+      severity: SEVERITY_LABELS[nc.severity ?? ""] ?? nc.severity ?? "",
+      status: NC_STATUS_LABELS[nc.status ?? ""] ?? nc.status ?? "",
       item: itemQuestion,
       description: nc.description ?? "",
     });
@@ -229,7 +259,7 @@ export async function generateAuditExcel(
       description: ca.description ?? "",
       assignedTo: ca.responsible_person_name ?? "",
       dueDate,
-      status: CA_STATUS_LABELS[ca.status] ?? ca.status,
+      status: CA_STATUS_LABELS[ca.status ?? ""] ?? ca.status ?? "",
     });
     row.height = 18;
 

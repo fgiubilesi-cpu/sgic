@@ -1,4 +1,5 @@
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
+import { runClientsQueryWithSoftDeleteFallback } from "@/lib/supabase/clients-soft-delete";
 import {
   getDefaultOrganizationConsoleConfig,
   parseOrganizationConsoleConfig,
@@ -51,11 +52,19 @@ export async function getOrganizationConsoleOverview(): Promise<OrganizationCons
       .from("profiles")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId),
-    supabase
-      .from("clients")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("is_active", true),
+    runClientsQueryWithSoftDeleteFallback((useSoftDeleteGuard) => {
+      let query = supabase
+        .from("clients")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .eq("is_active", true);
+
+      if (useSoftDeleteGuard) {
+        query = query.is("deleted_at", null);
+      }
+
+      return query;
+    }),
     supabase
       .from("audits")
       .select("id", { count: "exact", head: true })
@@ -65,6 +74,7 @@ export async function getOrganizationConsoleOverview(): Promise<OrganizationCons
       .from("non_conformities")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
+      .is("deleted_at", null)
       .eq("status", "open"),
     supabase
       .from("checklist_templates")

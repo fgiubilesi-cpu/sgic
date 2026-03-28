@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const ctx = await getOrganizationContext();
 
-  redirect(user ? "/dashboard" : "/login");
+  if (!ctx) {
+    redirect("/login");
+  }
+
+  redirect(ctx.role === "client" ? "/client-dashboard" : "/my-day");
 }

@@ -30,6 +30,14 @@ export function DashboardNotificationCenter({
           {notifications.length} attive
         </span>
       </div>
+      <div className="mt-3">
+        <Link
+          href="/notifications"
+          className="text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-900"
+        >
+          Apri centro notifiche
+        </Link>
+      </div>
 
       <div className="mt-4 space-y-3">
         {notifications.length === 0 ? (

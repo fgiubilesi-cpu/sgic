@@ -1,9 +1,88 @@
 # SGIC — TODO.md
-> Aggiornato: 2026-03-21 | Sprint 9
+> Aggiornato: 2026-03-28 | Sprint 20
 
 ---
 
-## CURRENT SPRINT — Sprint 9: Client Filter + Documenti
+## CURRENT SPRINT — Sprint 20: Stabilizzazione crash clienti + sessione
+
+> In corso. Focus: fermare i crash da schema non allineato e impedire logout/freeze su errori dati.
+
+- [x] **FIX-CLIENTS-1** Migration SQL per `clients.deleted_at` + contratto tipi aggiornato
+- [x] **FIX-CLIENTS-2** Fallback applicativo sui read path critici (`my-day`, `management`, `documents`, `organization`) finché il DB non applica la migration
+- [x] **AUTH-1** Middleware Supabase attivato a livello app per refresh sessione coerente
+- [x] **AUTH-2** `getOrganizationContext()` distingue errore auth da errore dati, evitando redirect impropri a `/login`
+- [x] **ROUTES-1** Alias legacy `/normative` → `/regulatory` e `/organizzazione` → `/organization`
+- [x] **UX-1** Sidebar ripensata per cluster operativi (`Workspace`, `Operativita`, `Contesto`, `Sistema`) con `Audit` e `Campionamenti` nello stesso blocco
+
+---
+
+## CURRENT SPRINT — Sprint 19: Knowledge Base contestuale
+
+> Completato. Motore KB condiviso attivo tra ricerca, NC e checklist.
+
+- [x] **KB-1** Full-text search nei documenti con snippet e ranking (`document_ingestions.extracted_text` + `/api/knowledge/search`)
+- [x] **KB-2** Cross-reference NC → riferimenti normativi suggeriti con apertura documento e collegamento one-click
+- [x] **KB-3** Suggerimento procedure durante compilazione checklist con pulsante info e apertura automatica su `NOK`
+- [x] `npx tsc --noEmit` → 0 errori
+- [x] `npm run verify:release` → build green
+
+---
+
+## CURRENT SPRINT PRECEDENTE — Sprint 18: Filtri avanzati + Knowledge Base
+
+> Completato. Tag: v1.2-sprint18
+
+- [x] **FIX-NC** Bug NC count: aggiunto `deleted_at IS NULL` in `get-audits.ts`
+- [x] **FILTER-DATE** Date range picker (dateMin/dateMax) nella toolbar audit
+- [x] **KB-1** Base full-text search nei documenti (`document_ingestions.extracted_text`)
+- [x] **KB-2** Base cross-reference NC → documenti: tabella `nc_documents` + panel in NC detail
+- [x] **KB-3** Base suggerimento procedure durante compilazione checklist (`SuggestedDocumentsRow`)
+- [x] `npx tsc --noEmit` → 0 errori
+- [x] Tag `v1.2-sprint18`
+
+---
+
+## CURRENT SPRINT PRECEDENTE — Sprint 14: Test e2e + Ricerca + Fix DB
+
+> Completato. Prossimo: Sprint 15 (dashboard scadenze unificata).
+
+### Test manuali end-to-end — verifica codice (Sprint 14)
+
+> Verifica a livello codice eseguita 2026-03-21. Test browser manuali da eseguire in sessione dal vivo.
+
+- [x] **V1** Flusso audit completo — PASS (codice verificato: create-audit-sheet, checklist-manager, checklist-row OK/NOK/NA, NC auto-create da NOK, score aggiornato)
+- [x] **V2** Flusso NC→AC — PASS (codice verificato: nc-ac-tab, corrective-action-form, corrective-action-actions con stati pending/in_progress/completed)
+- [x] **V3** Bozza mail — PASS (codice verificato: email-draft-modal, email-draft-actions)
+- [x] **V4** XLS 3 fogli — PASS (codice verificato: export-actions usa ExcelJS con 3 fogli Checklist/NC/AC)
+- [x] **V5** Template — PASS (codice verificato: template-editor-form, template-actions, import-template-sheet CSV)
+- [x] **V6** Portale cliente read-only — PASS (codice verificato: readOnly prop propagata, banner ambra, bottoni disabilitati)
+
+### SEARCH — Ricerca globale
+
+- [x] Scaffold verificato in `src/features/search/` — già funzionante
+- [x] Pagina `/search` attiva con risultati raggruppati per tipo
+- [x] `GlobalSearchLauncher` già presente nel layout header (topbar)
+- [x] Query ilike su: audits, clients, locations, personnel, documents con filtro ruolo client
+
+### DB-FIX — Fix search_path funzioni DB
+
+- [x] Verifica eseguita: tutte le 10 funzioni DB già hanno `search_path=public`
+- [x] Nessun warning search_path nei security advisors (solo: leaked password protection — non pertinente)
+
+### Verifica finale Sprint 14
+
+- [x] `npx tsc --noEmit` → 0 errori
+- [x] Tag `v0.8-sprint14`
+
+---
+
+## CURRENT SPRINT PRECEDENTE — Sprint 13: Completamento moduli esistenti — Parte 1
+
+> Tutti completati.
+
+---
+
+## Completato — Sprint 9: Client Filter + Documenti
 
 ### Completato in Sprint 9
 
@@ -39,38 +118,80 @@
 - [x] **P2** Tab visite mediche nella scheda personale (/personnel/[id])
 - [x] **P3** Pagina /personnel con filtro per cliente e KPI strip
 - [x] **P4** Cross-link formazione nella scheda personale (già presente)
-- [ ] **P5** Widget scadenze visite in dashboard (sprint futuro)
+- [x] **P5** Widget scadenze visite in dashboard (Sprint 13)
 
 ## Completato — Sprint 11: Formazione
 
 - [x] **F1** Migrazione: aggiunto `client_id` e `location_id` a `training_courses`
 - [x] **F2** Pagina /training con catalogo corsi e registrazioni recenti
 - [x] **F4** Voce "Formazione" attivata in sidebar
-- [ ] **F3** Pagina /training/[id] con dettaglio corso (sprint futuro)
-- [ ] **F5** Scadenze attestati: alert basati su validity_months + completion_date (sprint futuro)
+- [x] **F3** Pagina /training/[id] con dettaglio corso (Sprint 13)
+- [x] **F5** Scadenze attestati: widget dashboard 90gg + KPI strip in /training (Sprint 13)
 
 ## Completato — Sprint 12: Campionamenti e Analisi
 
 - [x] **S1** Migrazione: aggiunto `client_id`, `location_id`, `title`, `matrix`, `sampling_date`, `status` a `samplings`
 - [x] **S2** Pagina /samplings con lista filtrabili per cliente
 - [x] **S3** Voce "Campionamenti" attivata in sidebar
-- [ ] **S4** Export risultati lab XLS per cliente (sprint futuro)
+- [x] **S4** Export risultati lab XLS per cliente (Sprint 13)
 
-## Sprint 13+: Knowledge Base
+## Completato — Sprint 13: Completamento moduli esistenti — Parte 1
 
-- [ ] Ricerca full-text nei documenti (basata su extracted_text)
-- [ ] Cross-reference audit/NC → documenti di riferimento
-- [ ] Suggerimento procedure durante compilazione checklist
+- [x] **P5** Widget scadenze visite in dashboard (Sprint 13)
+- [x] **F3** Pagina /training/[id] con dettaglio corso (Sprint 13)
+- [x] **F5** Scadenze attestati: widget dashboard 90gg + KPI strip in /training (Sprint 13)
+- [x] **S4** Export risultati lab XLS per cliente (Sprint 13)
+
+## Completato — Sprint 15: Dashboard scadenze unificata
+
+- [x] **DEADLINES-1** Pagina /deadlines con vista unificata (visite mediche + attestati + audit + documenti + AC)
+- [x] **DEADLINES-2** Filtri tipo + urgenza client-side + semaforo per riga + ordinamento urgenza
+- [x] **DEADLINES-3** KPI strip scadute/entro 30gg/entro 90gg/in regola — cliccabili → filtrano tabella
+- [x] Link "Scadenze" aggiunto in sidebar (layout.tsx)
+- [x] `npx tsc --noEmit` → 0 errori
+- [x] Tag `v0.9-sprint15`
+
+## Completato — Sprint 16: Notifiche email (Resend)
+
+- [x] **EMAIL-1** Setup `resend` package + `RESEND_API_KEY` in .env.local (placeholder) + template HTML G&A
+- [x] **EMAIL-2** Server action `sendDeadlinesSummaryAction` + bottone "Invia riepilogo scadenze" in /deadlines
+- [x] **EMAIL-3** Server action `sendAuditReportAction` + bottone "Invia report al cliente" in /audits/[id]
+- [x] **EMAIL-4** Server action `sendOverdueACNotificationsAction` + bottone "Notifica AC scadute" in /deadlines
+- [x] `npx tsc --noEmit` → 0 errori
+- [x] Tag `v1.0-sprint16`
+
+> ⚠️ Richiede: aggiungere chiave reale in `.env.local` → `RESEND_API_KEY=re_...`
+> ⚠️ Richiede: aggiornare `RESEND_FROM_EMAIL` con dominio verificato su Resend
+
+## Completato — Sprint 17: Integrazione FileMaker (lettura)
+
+- [x] **FM-1** Client FM Data API (`src/lib/filemaker/fm-client.ts`) + script import clienti/sedi
+- [x] **FM-2** Script import persone e visite mediche da FM
+- [x] **FM-3** Pagina `/admin/fm-sync` (solo admin): bottone sync, log risultati, gestione errori
+- [x] **FM-4** Widget "Attività G&A" nella scheda cliente `/clients/[id]` — live da FM con fallback
+- [x] Migrazione DB: colonna `fm_record_id text` su `clients`, `locations`, `personnel` + indici
+- [x] `database.types.ts` rigenerato
+- [x] `npx tsc --noEmit` → 0 errori
+- [x] Tag `v1.1-sprint17`
+
+> ⚠️ Richiede: FM_HOST, FM_DATABASE, FM_USERNAME, FM_PASSWORD in `.env.local`
+> ⚠️ Aggiustare nomi layout/campi in `src/lib/filemaker/fm-client.ts` → `FM_LAYOUTS` e `FM_FIELDS`
+
+## Sprint 14+: Knowledge Base
+
+- [x] Ricerca full-text nei documenti (basata su extracted_text)
+- [x] Cross-reference audit/NC → documenti di riferimento
+- [x] Suggerimento procedure durante compilazione checklist
 
 ---
 
 ## BACKLOG
 
-- [ ] Ricerca globale: verificare se già funzionante (feature scaffoldata in `src/features/search/`)
+- [x] Ricerca globale: funzionante — /search con ilike multi-tabella + launcher nel topbar
+- [x] Fix search_path funzioni DB: tutte le funzioni già hanno search_path=public
 - [ ] CI/CD GitHub Actions (lint + typecheck + test e2e su PR)
 - [ ] Filtri avanzati lista audit (data, stato, score range)
 - [ ] Storico audit per cliente: vista timeline
-- [ ] Fix search_path funzioni DB (WARN sicurezza — non urgente)
 
 ---
 

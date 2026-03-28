@@ -7,6 +7,7 @@ SGIC e una piattaforma interna per la gestione di audit, clienti, collaboratori,
 - Next.js 16 App Router
 - React 19
 - Supabase per auth e database
+- Vitest per test di logica
 - Playwright per E2E
 - Tailwind CSS 4
 
@@ -35,6 +36,14 @@ Build di verifica:
 npm run verify:release
 ```
 
+Verifiche di quality consigliate:
+
+```bash
+npm run lint
+npx tsc --noEmit
+npm run test:unit
+```
+
 ## Variabili ambiente
 
 Il progetto usa `.env.local`.
@@ -42,7 +51,7 @@ Il progetto usa `.env.local`.
 Minimo richiesto:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
 Per il bridge FileMaker -> staging management:
 

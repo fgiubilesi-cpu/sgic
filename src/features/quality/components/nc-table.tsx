@@ -21,60 +21,64 @@ import { SeverityBadge, NCStatusBadge } from "./quality-badges";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Calendar, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import {
+    getNonConformityActionSummary,
+    getNonConformityProcessPressure,
+    getObservedDate,
+} from "../lib/quality-process";
 
-export function NCTable({ ncs }: { ncs: any[] }) {
-    const [filterClient, setFilterClient] = useState<string>("");
+type NCTableRecord = NonConformity & {
+    audit?: {
+        client?: { name?: string | null } | null;
+        location?: { name?: string | null } | null;
+    } | null;
+    corrective_actions?: Array<{
+        due_date?: string | null;
+        status: string;
+        target_completion_date: string | null;
+    }> | null;
+    created_at?: string | null;
+    id: string;
+    identified_date?: string | null;
+};
+
+export function NCTable({ ncs }: { ncs: NCTableRecord[] }) {
     const [filterLocation, setFilterLocation] = useState<string>("");
     const [filterSeverity, setFilterSeverity] = useState<string>("");
-    const [filterStatus, setFilterStatus] = useState<string>("");
-
-    // Extract unique clients and locations
-    const clients = useMemo(() => {
-        const seen = new Set<string>();
-        return ncs
-            .filter(nc => nc.audit?.client?.name)
-            .map(nc => nc.audit.client.name)
-            .filter(name => {
-                if (seen.has(name)) return false;
-                seen.add(name);
-                return true;
-            })
-            .sort();
-    }, [ncs]);
+    const [filterPressure, setFilterPressure] = useState<string>("");
 
     const locations = useMemo(() => {
         const seen = new Set<string>();
-        return ncs
-            .filter(nc => nc.audit?.location?.name)
-            .map(nc => nc.audit.location.name)
-            .filter(name => {
-                if (seen.has(name)) return false;
-                seen.add(name);
-                return true;
-            })
-            .sort();
+        return ncs.reduce<string[]>((items, nc) => {
+            const locationName = nc.audit?.location?.name;
+            if (!locationName || seen.has(locationName)) return items;
+            seen.add(locationName);
+            items.push(locationName);
+            return items;
+        }, []).sort();
     }, [ncs]);
 
     // Filter NCs based on selected filters
     const filteredNCs = useMemo(() => {
         return (ncs || []).filter(nc => {
-            if (filterClient && nc.audit?.client?.name !== filterClient) return false;
             if (filterLocation && nc.audit?.location?.name !== filterLocation) return false;
             if (filterSeverity && nc.severity !== filterSeverity) return false;
-            if (filterStatus && nc.status !== filterStatus) return false;
+            if (filterPressure && getNonConformityProcessPressure(nc) !== filterPressure) return false;
             return true;
         });
-    }, [ncs, filterClient, filterLocation, filterSeverity, filterStatus]);
+    }, [ncs, filterLocation, filterSeverity, filterPressure]);
 
-    // Check if NC has overdue corrective actions
-    const isNCOverdue = (nc: any): boolean => {
-        if (!nc.corrective_actions || nc.corrective_actions.length === 0) return false;
-        const now = new Date();
-        return nc.corrective_actions.some((ca: any) => {
-            if (ca.status === "completed") return false;
-            const targetDate = new Date(ca.target_completion_date);
-            return targetDate < now;
-        });
+    const toDateLabel = (value: string | null | undefined) => {
+        if (!value) return "—";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("it-IT");
+    };
+
+    const pressureLabel = (pressure: ReturnType<typeof getNonConformityProcessPressure>) => {
+        if (pressure === "overdue") return "AC in ritardo";
+        if (pressure === "unplanned") return "Da pianificare";
+        if (pressure === "ready_for_verification") return "Pronta per verifica";
+        return "In esecuzione";
     };
 
     if (!ncs || ncs.length === 0) {
@@ -94,21 +98,7 @@ export function NCTable({ ncs }: { ncs: any[] }) {
     return (
         <div className="space-y-4">
             {/* Filters */}
-            <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
-                <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Cliente</label>
-                    <Select value={filterClient} onValueChange={setFilterClient}>
-                        <SelectTrigger className="h-9 bg-white">
-                            <SelectValue placeholder="Tutti" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="">Tutti</SelectItem>
-                            {clients.map((client) => (
-                                <SelectItem key={client} value={client}>{client}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
+            <div className="grid gap-3 grid-cols-1 md:grid-cols-3">
                 <div>
                     <label className="text-xs font-medium text-muted-foreground mb-1 block">Sede</label>
                     <Select value={filterLocation} onValueChange={setFilterLocation}>
@@ -138,17 +128,17 @@ export function NCTable({ ncs }: { ncs: any[] }) {
                     </Select>
                 </div>
                 <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Stato</label>
-                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Pressione operativa</label>
+                    <Select value={filterPressure} onValueChange={setFilterPressure}>
                         <SelectTrigger className="h-9 bg-white">
-                            <SelectValue placeholder="Tutti" />
+                            <SelectValue placeholder="Tutte" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">Tutti</SelectItem>
-                            <SelectItem value="open">Aperta</SelectItem>
-                            <SelectItem value="in_progress">In Corso</SelectItem>
-                            <SelectItem value="closed">Chiusa</SelectItem>
-                            <SelectItem value="on_hold">Sospesa</SelectItem>
+                            <SelectItem value="">Tutte</SelectItem>
+                            <SelectItem value="overdue">AC in ritardo</SelectItem>
+                            <SelectItem value="unplanned">Da pianificare</SelectItem>
+                            <SelectItem value="in_execution">In esecuzione</SelectItem>
+                            <SelectItem value="ready_for_verification">Pronte per verifica</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -159,41 +149,78 @@ export function NCTable({ ncs }: { ncs: any[] }) {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Titolo</TableHead>
-                            <TableHead>Cliente</TableHead>
-                            <TableHead>Gravità</TableHead>
-                            <TableHead>Stato</TableHead>
-                            <TableHead>Data</TableHead>
+                            <TableHead>NC</TableHead>
+                            <TableHead>Priorità</TableHead>
+                            <TableHead>Azioni correttive</TableHead>
+                            <TableHead>Rilevata</TableHead>
                             <TableHead className="w-[80px]"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {filteredNCs.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                                     Nessun risultato
                                 </TableCell>
                             </TableRow>
                         ) : (
                             filteredNCs.map((nc) => {
-                                const isOverdue = isNCOverdue(nc);
+                                const pressure = getNonConformityProcessPressure(nc);
+                                const actionSummary = getNonConformityActionSummary(nc);
+                                const observedDate = getObservedDate(nc);
+                                const contextLabel = [nc.audit?.client?.name, nc.audit?.location?.name].filter(Boolean).join(" · ");
+
+                                const rowClassName =
+                                    pressure === "overdue"
+                                        ? "bg-red-50 hover:bg-red-100"
+                                        : pressure === "unplanned"
+                                            ? "bg-amber-50 hover:bg-amber-100"
+                                            : "";
+
                                 return (
-                                    <TableRow key={nc.id} className={isOverdue ? "bg-red-50 hover:bg-red-100" : ""}>
+                                    <TableRow key={nc.id} className={rowClassName}>
                                         <TableCell className="font-medium">
-                                            {isOverdue && <AlertTriangle className="h-4 w-4 text-red-600 inline mr-2" />}
-                                            {nc.title}
+                                            <div className="space-y-1">
+                                                <div className="flex items-start gap-2">
+                                                    {pressure === "overdue" ? <AlertTriangle className="mt-0.5 h-4 w-4 text-red-600" /> : null}
+                                                    <div>
+                                                        <p className="font-medium leading-snug">{nc.title}</p>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            {contextLabel || "Cliente non associato"}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </TableCell>
-                                        <TableCell className="text-sm">{nc.audit?.client?.name || "-"}</TableCell>
                                         <TableCell>
-                                            <SeverityBadge severity={nc.severity} />
+                                            <div className="space-y-2">
+                                                <SeverityBadge severity={nc.severity} />
+                                                <p className="text-xs text-muted-foreground">{pressureLabel(pressure)}</p>
+                                                <NCStatusBadge status={nc.status} />
+                                            </div>
                                         </TableCell>
-                                        <TableCell>
-                                            <NCStatusBadge status={nc.status} />
+                                        <TableCell className="text-sm">
+                                            <div className="space-y-1">
+                                                <p className="font-medium">{actionSummary.label}</p>
+                                                {actionSummary.detail ? (
+                                                    <p
+                                                        className={
+                                                            actionSummary.tone === "critical"
+                                                                ? "text-xs text-red-600"
+                                                                : actionSummary.tone === "success"
+                                                                    ? "text-xs text-emerald-600"
+                                                                    : "text-xs text-muted-foreground"
+                                                        }
+                                                    >
+                                                        {actionSummary.detail}
+                                                    </p>
+                                                ) : null}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-sm">
                                             <div className="flex items-center gap-1">
                                                 <Calendar className="h-3 w-3 text-muted-foreground" />
-                                                {new Date(nc.identified_date).toLocaleDateString("it-IT")}
+                                                {toDateLabel(observedDate)}
                                             </div>
                                         </TableCell>
                                         <TableCell>

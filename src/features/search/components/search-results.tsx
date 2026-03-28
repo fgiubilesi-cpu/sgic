@@ -63,7 +63,7 @@ export function SearchResults({
       <div className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center">
         <p className="text-base font-medium text-zinc-900">Ricerca globale</p>
         <p className="mt-2 text-sm text-zinc-500">
-          Inserisci almeno 2 caratteri per cercare audit, clienti, sedi, collaboratori e documenti.
+          Inserisci almeno 2 caratteri per cercare audit, clienti, sedi, collaboratori e anche nel testo estratto dei documenti.
         </p>
       </div>
     );
@@ -74,7 +74,7 @@ export function SearchResults({
       <div className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center">
         <p className="text-base font-medium text-zinc-900">Nessun risultato per “{query}”</p>
         <p className="mt-2 text-sm text-zinc-500">
-          Prova con un titolo audit, un nome cliente o il cognome di un collaboratore.
+          Prova con un titolo audit, un nome cliente o un termine presente dentro una procedura o un manuale.
         </p>
       </div>
     );
@@ -85,7 +85,7 @@ export function SearchResults({
       <div className="rounded-2xl border border-zinc-200 bg-white px-5 py-4 shadow-sm">
         <p className="text-sm font-semibold text-zinc-900">{total} risultati trovati</p>
         <p className="mt-1 text-xs text-zinc-500">
-          La ricerca usa il perimetro organizzativo attivo e privilegia i risultati piu recenti.
+          La ricerca usa il perimetro organizzativo attivo e privilegia i risultati piu recenti e piu pertinenti del corpus documentale.
         </p>
       </div>
 

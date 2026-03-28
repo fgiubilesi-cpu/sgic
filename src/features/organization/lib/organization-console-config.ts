@@ -29,7 +29,10 @@ export type OrganizationBrandingConfig = {
 };
 
 export type OrganizationNotificationsConfig = {
+  audience: "admins" | "admins_inspectors";
+  deliveryChannel: "dashboard" | "dashboard_email";
   digestFrequency: "daily" | "off" | "weekly";
+  minimumSeverity: "default" | "warning" | "danger";
   recipients: string;
   sendAuditOverdue: boolean;
   sendAuditUpcoming: boolean;
@@ -73,7 +76,10 @@ const defaults: OrganizationConsoleConfig = {
     reportTitle: "SGIC Report",
   },
   notifications: {
+    audience: "admins_inspectors",
+    deliveryChannel: "dashboard_email",
     digestFrequency: "weekly",
+    minimumSeverity: "default",
     recipients: "",
     sendAuditOverdue: true,
     sendAuditUpcoming: true,

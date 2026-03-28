@@ -19,13 +19,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import {
     Sheet,
     SheetContent,
     SheetDescription,
@@ -41,16 +34,17 @@ export function CreateSamplingSheet() {
     const [open, setOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
+    const defaultValues: z.input<typeof samplingSchema> = {
+        title: "",
+        matrix: "",
+        sampling_date: new Date().toISOString().split("T")[0],
+        operator_name: "",
+        status: "planned",
+    };
 
     const form = useForm<z.input<typeof samplingSchema>, unknown, z.infer<typeof samplingSchema>>({
         resolver: zodResolver(samplingSchema),
-        defaultValues: {
-            title: "",
-            matrix: "",
-            sampling_date: new Date().toISOString().split("T")[0],
-            operator_name: "",
-            status: "planned",
-        } as any,
+        defaultValues,
     });
 
     async function onSubmit(values: z.infer<typeof samplingSchema>) {
@@ -69,7 +63,7 @@ export function CreateSamplingSheet() {
             } else {
                 toast.error("Errore: " + result.error);
             }
-        } catch (err) {
+        } catch {
             toast.error("Errore salvataggio");
         } finally {
             setIsLoading(false);

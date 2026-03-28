@@ -19,7 +19,7 @@ export default async function SearchPage({
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Ricerca globale</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Un punto unico per trovare audit, clienti, sedi, collaboratori e documenti.
+          Un punto unico per trovare audit, clienti, sedi, collaboratori e documenti anche nel testo estratto.
         </p>
       </div>
 
@@ -30,7 +30,7 @@ export default async function SearchPage({
             type="search"
             name="q"
             defaultValue={query}
-            placeholder="Cerca per titolo audit, cliente, collaboratore, documento..."
+            placeholder="Cerca per titolo audit, cliente, collaboratore o testo documento..."
             className="h-11 rounded-full border-zinc-200 bg-zinc-50 pl-10 pr-4"
           />
         </form>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -124,6 +124,7 @@ export function CreateAuditSheet({
         const { data: clientsData, error: clientsError } = await supabase
           .from("clients")
           .select("id, name")
+          .is("deleted_at", null)
           .order("name");
 
         if (clientsData) setClients(clientsData);
@@ -134,7 +135,6 @@ export function CreateAuditSheet({
     }
 
     fetchData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // When client is selected, fetch its locations
@@ -157,8 +157,7 @@ export function CreateAuditSheet({
     }
 
     fetchLocations();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClientId]);
+  }, [form, selectedClientId]);
 
   async function onSubmit(values: FormValues) {
     setIsLoading(true);

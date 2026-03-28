@@ -28,6 +28,23 @@ export default async function DocumentsPage({
     getClientOptions(ctx.organizationId),
     getPersonnelList(ctx.organizationId),
   ]);
+  const today = new Date();
+  const inThirtyDays = new Date();
+  inThirtyDays.setDate(inThirtyDays.getDate() + 30);
+  const reviewQueueCount = documents.filter(
+    (document) =>
+      document.ingestion_status === "review_required" ||
+      document.ingestion_status === "failed"
+  ).length;
+  const expiringSoonCount = documents.filter((document) => {
+    if (!document.expiry_date) return false;
+    const expiryDate = new Date(document.expiry_date);
+    return expiryDate >= today && expiryDate <= inThirtyDays;
+  }).length;
+  const expiredCount = documents.filter((document) => {
+    if (!document.expiry_date) return false;
+    return new Date(document.expiry_date) < today;
+  }).length;
 
   return (
     <section className="space-y-6">
@@ -37,7 +54,7 @@ export default async function DocumentsPage({
             Documenti
           </h1>
           <p className="max-w-2xl text-sm text-zinc-500">
-            Manuali, procedure, istruzioni operative, certificati e contratti.
+            Archivio operativo orientato a review, scadenze e applicazione al workspace.
             {clientFilter && documents.length > 0
               ? ` Filtrati per cliente: ${documents[0]?.client_name ?? "selezionato"}.`
               : ""}
@@ -51,36 +68,17 @@ export default async function DocumentsPage({
       </div>
 
       {/* KPI strip */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border bg-white px-4 py-3">
-          <div className="text-2xl font-semibold">{documents.length}</div>
-          <div className="text-xs text-zinc-500">Documenti totali</div>
+          <div className="text-2xl font-semibold text-amber-600">{reviewQueueCount}</div>
+          <div className="text-xs text-zinc-500">Da validare</div>
         </div>
         <div className="rounded-lg border bg-white px-4 py-3">
-          <div className="text-2xl font-semibold">
-            {documents.filter((d) => d.status === "published").length}
-          </div>
-          <div className="text-xs text-zinc-500">Pubblicati</div>
-        </div>
-        <div className="rounded-lg border bg-white px-4 py-3">
-          <div className="text-2xl font-semibold text-amber-600">
-            {documents.filter((d) => {
-              if (!d.expiry_date) return false;
-              const exp = new Date(d.expiry_date);
-              const in30 = new Date();
-              in30.setDate(in30.getDate() + 30);
-              return exp <= in30 && exp >= new Date();
-            }).length}
-          </div>
+          <div className="text-2xl font-semibold text-amber-600">{expiringSoonCount}</div>
           <div className="text-xs text-zinc-500">In scadenza (30gg)</div>
         </div>
         <div className="rounded-lg border bg-white px-4 py-3">
-          <div className="text-2xl font-semibold text-rose-600">
-            {documents.filter((d) => {
-              if (!d.expiry_date) return false;
-              return new Date(d.expiry_date) < new Date();
-            }).length}
-          </div>
+          <div className="text-2xl font-semibold text-rose-600">{expiredCount}</div>
           <div className="text-xs text-zinc-500">Scaduti</div>
         </div>
       </div>

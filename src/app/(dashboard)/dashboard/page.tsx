@@ -1,12 +1,14 @@
 import { Suspense } from "react";
 import { SlidersHorizontal, BarChart2, AlertTriangle, Sparkles } from "lucide-react";
-import { getDashboardFilterOptions, getDashboardMetrics, getGlobalNCs, getAuditScoreTrend, getRecentAudits, getUpcomingAudits, getMonthlyKPIs, getDashboardActionCenter } from "@/features/dashboard/queries/get-dashboard-data";
+import { getDashboardFilterOptions, getDashboardMetrics, getGlobalNCs, getAuditScoreTrend, getRecentAudits, getUpcomingAudits, getMonthlyKPIs, getDashboardActionCenter, getMedicalVisitDeadlines, getTrainingDeadlines } from "@/features/dashboard/queries/get-dashboard-data";
 import { DashboardFilters } from "@/features/dashboard/components/dashboard-filters";
 import { DashboardMetricsGrid } from "@/features/dashboard/components/dashboard-metrics";
 import { GlobalNCTable } from "@/features/dashboard/components/global-nc-table";
 import { AuditTrendChart } from "@/features/dashboard/components/audit-trend-chart";
 import { RecentAudits } from "@/features/dashboard/components/recent-audits";
 import { UpcomingAuditsWidget } from "@/features/dashboard/components/upcoming-audits-widget";
+import { MedicalVisitsWidget } from "@/features/dashboard/components/medical-visits-widget";
+import { TrainingDeadlinesWidget } from "@/features/dashboard/components/training-deadlines-widget";
 import { MonthlyKPIs } from "@/features/dashboard/components/monthly-kpis";
 import { DashboardSavedViews } from "@/features/dashboard/components/dashboard-saved-views";
 import { DashboardNotificationCenter } from "@/features/dashboard/components/dashboard-notification-center";
@@ -29,7 +31,7 @@ export default async function DashboardPage({
 
   const filters = { clientId, locationId, dateFrom, dateTo };
 
-  const [filterOptions, metrics, globalNCs, trendData, recentAudits, upcomingAudits, monthlyKPIs, actionCenter] = await Promise.all([
+  const [filterOptions, metrics, globalNCs, trendData, recentAudits, upcomingAudits, monthlyKPIs, actionCenter, medicalVisits, trainingDeadlines] = await Promise.all([
     getDashboardFilterOptions(),
     getDashboardMetrics(filters),
     getGlobalNCs(filters),
@@ -38,6 +40,8 @@ export default async function DashboardPage({
     getUpcomingAudits(),
     getMonthlyKPIs(),
     getDashboardActionCenter(filters),
+    getMedicalVisitDeadlines(filters),
+    getTrainingDeadlines(filters),
   ]);
 
   return (
@@ -192,7 +196,29 @@ export default async function DashboardPage({
         </div>
       </section>
 
-            {/* Global NC Table */}
+            {/* P5: Medical Visits Deadlines */}
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle className="w-4 h-4 text-zinc-400" />
+          <h2 className="text-sm font-semibold text-zinc-700">Visite mediche in scadenza (90 giorni)</h2>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <MedicalVisitsWidget visits={medicalVisits} />
+        </div>
+      </section>
+
+      {/* F5: Training Certificate Deadlines */}
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle className="w-4 h-4 text-zinc-400" />
+          <h2 className="text-sm font-semibold text-zinc-700">Attestati formazione in scadenza (90 giorni)</h2>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <TrainingDeadlinesWidget deadlines={trainingDeadlines} />
+        </div>
+      </section>
+
+      {/* Global NC Table */}
       <section>
         <div className="flex items-center gap-2 mb-3">
           <AlertTriangle className="w-4 h-4 text-zinc-400" />

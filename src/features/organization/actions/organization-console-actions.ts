@@ -16,16 +16,23 @@ import {
   type OrganizationProfileDetailsInput,
   type OrganizationRulesInput,
 } from "@/features/organization/schemas/organization-console-schema";
+import type { Json } from "@/types/database.types";
 
 type ConsoleActionResult = {
   error?: string;
   success?: string;
 };
 
+type OrganizationConsoleRow = {
+  id: string;
+  logo_url: string | null;
+  settings: Json | null;
+};
+
 async function getAdminOrganizationRow() {
   const ctx = await getOrganizationContext();
-  if (!ctx) return { error: "Sessione non valida.", row: null as any };
-  if (ctx.role !== "admin") return { error: "Solo gli admin possono modificare questa console.", row: null as any };
+  if (!ctx) return { error: "Sessione non valida.", row: null as OrganizationConsoleRow | null };
+  if (ctx.role !== "admin") return { error: "Solo gli admin possono modificare questa console.", row: null as OrganizationConsoleRow | null };
 
   const { data: organization, error } = await ctx.supabase
     .from("organizations")
@@ -33,8 +40,8 @@ async function getAdminOrganizationRow() {
     .eq("id", ctx.organizationId)
     .single();
 
-  if (error || !organization) return { error: "Organizzazione non trovata.", row: null as any };
-  return { ctx, error: null as string | null, row: organization };
+  if (error || !organization) return { error: "Organizzazione non trovata.", row: null as OrganizationConsoleRow | null };
+  return { ctx, error: null as string | null, row: organization as OrganizationConsoleRow };
 }
 
 function revalidateOrganizationConsole() {

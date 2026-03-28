@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertInternalOperator } from "@/lib/access-control";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
+import { normalizeNonConformityStatus } from "@/features/quality/lib/nc-ac-contract";
 import {
   createNonConformitySchema,
   updateNonConformitySchema,
@@ -20,7 +22,11 @@ export async function createNonConformity(
     const validated = createNonConformitySchema.parse(input);
 
     const ctx = await getOrganizationContext();
-    if (!ctx) return { success: false, error: "Unauthorized" };
+    try {
+      assertInternalOperator(ctx, "non conformita audit");
+    } catch {
+      return { success: false, error: "Unauthorized" };
+    }
 
     const { supabase, organizationId } = ctx;
 
@@ -57,20 +63,28 @@ export async function updateNonConformity(
     const validated = updateNonConformitySchema.parse(input);
 
     const ctx = await getOrganizationContext();
-    if (!ctx) return { success: false, error: "Unauthorized" };
+    try {
+      assertInternalOperator(ctx, "non conformita audit");
+    } catch {
+      return { success: false, error: "Unauthorized" };
+    }
 
     const { supabase, organizationId } = ctx;
 
     // Verify non-conformity belongs to user's organization
     const { data: nc, error: ncError } = await supabase
       .from("non_conformities")
-      .select("organization_id")
+      .select("organization_id, status, closed_at")
       .eq("id", validated.id)
+      .is("deleted_at", null)
       .single();
 
     if (ncError || !nc || nc.organization_id !== organizationId) {
       return { success: false, error: "Unauthorized" };
     }
+
+    const now = new Date().toISOString();
+    const nextStatus = normalizeNonConformityStatus(validated.status ?? nc.status);
 
     const { error: updateError } = await supabase
       .from("non_conformities")
@@ -78,8 +92,9 @@ export async function updateNonConformity(
         title: validated.title,
         description: validated.description,
         severity: validated.severity,
-        status: validated.status,
-        updated_at: new Date().toISOString(),
+        status: nextStatus,
+        closed_at: nextStatus === "closed" ? nc.closed_at ?? now : null,
+        updated_at: now,
       })
       .eq("id", validated.id)
       .eq("organization_id", organizationId);
@@ -92,6 +107,7 @@ export async function updateNonConformity(
       .from("non_conformities")
       .select("audit_id")
       .eq("id", validated.id)
+      .is("deleted_at", null)
       .single();
 
     if (ncUpdated?.audit_id) {
@@ -112,7 +128,11 @@ export async function closeNonConformity(
     const validated = closeNonConformitySchema.parse(input);
 
     const ctx = await getOrganizationContext();
-    if (!ctx) return { success: false, error: "Unauthorized" };
+    try {
+      assertInternalOperator(ctx, "non conformita audit");
+    } catch {
+      return { success: false, error: "Unauthorized" };
+    }
 
     const { supabase, organizationId } = ctx;
 
@@ -121,6 +141,7 @@ export async function closeNonConformity(
       .from("non_conformities")
       .select("organization_id")
       .eq("id", validated.id)
+      .is("deleted_at", null)
       .single();
 
     if (ncError || !nc || nc.organization_id !== organizationId) {
@@ -146,6 +167,7 @@ export async function closeNonConformity(
       .from("non_conformities")
       .select("audit_id")
       .eq("id", validated.id)
+      .is("deleted_at", null)
       .single();
 
     if (ncUpdated?.audit_id) {

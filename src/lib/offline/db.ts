@@ -5,7 +5,7 @@ export type SyncStatus = 'pending' | 'failed';
 export interface SyncQueueItem {
     id: string; // UUID defined by the client
     actionType: string;
-    payload: any;
+    payload: Record<string, unknown>;
     createdAt: number;
     status: SyncStatus;
     error?: string; // Optional error message if it failed
@@ -13,7 +13,7 @@ export interface SyncQueueItem {
 
 export interface CacheItem {
     key: string;
-    data: any;
+    data: unknown;
     updatedAt: number;
 }
 

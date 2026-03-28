@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { runClientsQueryWithSoftDeleteFallback } from "@/lib/supabase/clients-soft-delete";
 
 export interface ClientLocationOption {
   id: string;
@@ -16,11 +17,19 @@ export async function getClientOptions(
 ): Promise<ClientOption[]> {
   const supabase = await createClient();
 
-  const { data: clients, error: clientsError } = await supabase
-    .from('clients')
-    .select('id, name')
-    .eq('organization_id', organizationId)
-    .order('name');
+  const { data: clients, error: clientsError } =
+    await runClientsQueryWithSoftDeleteFallback((useSoftDeleteGuard) => {
+      let query = supabase
+        .from('clients')
+        .select('id, name')
+        .eq('organization_id', organizationId);
+
+      if (useSoftDeleteGuard) {
+        query = query.is('deleted_at', null);
+      }
+
+      return query.order('name');
+    });
 
   if (clientsError) {
     throw clientsError;

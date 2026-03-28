@@ -22,7 +22,7 @@ interface TrainingRecordTableProps {
   showPerson?: boolean;
 }
 
-export function TrainingRecordTable({ records, showPerson = true }: TrainingRecordTableProps) {
+export function TrainingRecordTable({ records }: TrainingRecordTableProps) {
   if (!records || records.length === 0) {
     return (
       <p className="text-sm text-zinc-500 py-4 text-center">

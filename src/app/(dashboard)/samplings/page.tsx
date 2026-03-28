@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import { getSamplings } from "@/features/samplings/queries/get-samplings";
 import { CreateSamplingSheet } from "@/features/samplings/components/create-sampling-sheet";
+import { ExportSamplingsButton } from "@/features/samplings/components/export-samplings-button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -54,7 +55,10 @@ export default async function SamplingsPage({
             Campionamenti acqua, superfici, alimenti e risultati laboratorio.
           </p>
         </div>
-        <CreateSamplingSheet />
+        <div className="flex gap-2">
+          <ExportSamplingsButton clientId={clientFilter} />
+          <CreateSamplingSheet />
+        </div>
       </div>
 
       {/* KPI strip */}

@@ -15,6 +15,7 @@ import { Plus, ShieldCheck, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NCDocumentsPanel } from "@/features/audits/components/nc-documents-panel";
+import { getObservedDate } from "@/features/quality/lib/quality-process";
 
 type PageProps = {
     params: Promise<{
@@ -31,6 +32,10 @@ export default async function NonConformityDetailPage({ params }: PageProps) {
         notFound();
     }
 
+    const observedDate = getObservedDate(nc);
+    const observedLabel = observedDate ? new Date(observedDate).toLocaleDateString("it-IT") : "data non disponibile";
+    const shortId = nc.id.slice(0, 8);
+
     return (
         <div className="space-y-8 pb-12">
             <div className="flex items-center justify-between">
@@ -41,8 +46,8 @@ export default async function NonConformityDetailPage({ params }: PageProps) {
                         </Link>
                     </Button>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Dettaglio NC</h1>
-                        <p className="text-sm text-muted-foreground">ID: {nc.id}</p>
+                        <h1 className="text-2xl font-bold tracking-tight">{nc.title}</h1>
+                        <p className="text-sm text-muted-foreground">NC {shortId} · rilevata il {observedLabel}</p>
                     </div>
                 </div>
 
@@ -57,7 +62,7 @@ export default async function NonConformityDetailPage({ params }: PageProps) {
                         <SheetHeader>
                             <SheetTitle>Nuova Azione Correttiva (AC)</SheetTitle>
                             <SheetDescription>
-                                Definisci l'azione da intraprendere per risolvere questa Non Conformità.
+                                Definisci l&apos;azione da intraprendere per risolvere questa Non Conformità.
                             </SheetDescription>
                         </SheetHeader>
                         <div className="py-6">

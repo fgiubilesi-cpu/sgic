@@ -54,7 +54,7 @@ export function ClientServiceCoverageCard({
           </div>
         ) : (
           <>
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-zinc-500">Presidiate</p>
                 <p className="mt-2 text-2xl font-semibold text-emerald-700">
@@ -71,12 +71,6 @@ export function ClientServiceCoverageCard({
                 <p className="text-xs uppercase tracking-wide text-zinc-500">Scoperte / in ritardo</p>
                 <p className="mt-2 text-2xl font-semibold text-rose-700">
                   {coverage.summary.missing + coverage.summary.overdue}
-                </p>
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
-                <p className="text-xs uppercase tracking-wide text-zinc-500">Ricorrenti</p>
-                <p className="mt-2 text-2xl font-semibold text-sky-700">
-                  {coverage.summary.recurring}
                 </p>
               </div>
             </div>

@@ -19,7 +19,7 @@ export const nonConformitySchema = z.object({
 export const correctiveActionSchema = z.object({
     id: z.string().uuid().optional(),
     organization_id: z.string().uuid().optional(),
-    nc_id: z.string().uuid(),
+    non_conformity_id: z.string().uuid(),
     description: z.string().min(1, "La descrizione è obbligatoria"),
     due_date: z.string().optional().nullable(),
     status: acStatusEnum.default('pending'),

@@ -16,6 +16,21 @@ export type AuditTrailHistory = {
   totalCount: number;
 };
 
+type AuditTrailRow = {
+  audit_id: string;
+  changed_at: string;
+  changed_by: string;
+  id: string;
+  new_status: string;
+  old_status: string | null;
+  profiles: { email?: string | null } | Array<{ email?: string | null }> | null;
+};
+
+function getProfileEmail(profileRelation: AuditTrailRow["profiles"]): string | undefined {
+  const profile = Array.isArray(profileRelation) ? profileRelation[0] : profileRelation;
+  return profile?.email ?? undefined;
+}
+
 /**
  * Fetch audit trail (status change history) for a specific audit.
  * Enforces organization_id security check.
@@ -59,8 +74,7 @@ export async function getAuditTrail(auditId: string): Promise<AuditTrailHistory 
     return null;
   }
 
-  const trailEntries: AuditTrailEntry[] = (entries || []).map((entry: any) => {
-    const profile = Array.isArray(entry.profiles) ? entry.profiles[0] : entry.profiles;
+  const trailEntries: AuditTrailEntry[] = ((entries ?? []) as AuditTrailRow[]).map((entry) => {
     return {
       id: String(entry.id),
       auditId: String(entry.audit_id),
@@ -68,7 +82,7 @@ export async function getAuditTrail(auditId: string): Promise<AuditTrailHistory 
       newStatus: entry.new_status,
       changedBy: String(entry.changed_by),
       changedAt: entry.changed_at,
-      changedByEmail: profile?.email,
+      changedByEmail: getProfileEmail(entry.profiles),
     };
   });
 
@@ -124,14 +138,14 @@ export async function getLatestAuditStatusChange(
     return null;
   }
 
-  const authorProfile = Array.isArray(entry.profiles) ? entry.profiles[0] : entry.profiles;
+  const auditTrailEntry = entry as AuditTrailRow;
   return {
-    id: String(entry.id),
-    auditId: String(entry.audit_id),
-    oldStatus: entry.old_status,
-    newStatus: entry.new_status,
-    changedBy: String(entry.changed_by),
-    changedAt: entry.changed_at,
-    changedByEmail: (authorProfile as any)?.email,
+    id: String(auditTrailEntry.id),
+    auditId: String(auditTrailEntry.audit_id),
+    oldStatus: auditTrailEntry.old_status,
+    newStatus: auditTrailEntry.new_status,
+    changedBy: String(auditTrailEntry.changed_by),
+    changedAt: auditTrailEntry.changed_at,
+    changedByEmail: getProfileEmail(auditTrailEntry.profiles),
   };
 }

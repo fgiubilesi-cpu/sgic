@@ -17,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { buildClientRiskRadar } from "@/features/clients/lib/client-risk-radar";
 import type {
   ManagementCoverageRow,
   ManagementDashboardData,
@@ -156,6 +157,14 @@ function MetricCard({ metric }: { metric: ManagementMetric }) {
 
 function PortfolioRowCard({ row }: { row: ManagementPortfolioRow }) {
   const sourceBadge = portfolioSourceBadge(row.source);
+  const radar = buildClientRiskRadar({
+    expiringDocumentCount: row.expiringDocuments,
+    missingPresidio: row.activePersonnel === 0,
+    missingServiceCoverage: row.serviceLines === 0,
+    openNcCount: row.openNCs,
+    overdueActionCount: row.overdueActions,
+    overduePressureCount: row.overdueItems,
+  });
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-4">
@@ -194,21 +203,16 @@ function PortfolioRowCard({ row }: { row: ManagementPortfolioRow }) {
 
         <div className="text-right">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-            Risk score
+            Risk radar
           </p>
-          <p
-            className={`mt-1 text-2xl font-semibold ${
-              row.riskScore >= 10
-                ? "text-rose-700"
-                : row.riskScore >= 6
-                  ? "text-amber-700"
-                  : "text-zinc-900"
-            }`}
-          >
-            {row.riskScore}
-          </p>
+          <p className="mt-1 text-2xl font-semibold text-zinc-900">{radar.score}</p>
+          <div className="mt-2 flex justify-end">
+            <Badge variant="outline" className={radar.className}>
+              {radar.label}
+            </Badge>
+          </div>
           <p className="mt-1 text-xs text-zinc-500">
-            NC {row.openNCs} · AC {row.overdueActions} · scadenze {row.overdueItems}
+            {radar.summary}
           </p>
           <p className="mt-1 text-xs text-zinc-400">
             ultimo audit {formatDate(row.lastAuditDate)}

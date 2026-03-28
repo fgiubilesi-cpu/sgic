@@ -1,6 +1,47 @@
 "use server";
 
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
+import {
+  countOpenCorrectiveActions,
+  getNonConformityActionSummary,
+} from "@/features/quality/lib/quality-process";
+import {
+  toCanonicalNonConformity,
+  toProcessCorrectiveActionShape,
+} from "@/features/quality/lib/nc-ac-contract";
+
+type AuditRelationRow = {
+  name: string | null;
+};
+
+type AuditDraftRow = {
+  client: AuditRelationRow | AuditRelationRow[] | null;
+  location: AuditRelationRow | AuditRelationRow[] | null;
+  scheduled_date: string | null;
+  score: number | null;
+  title: string | null;
+};
+
+type NonConformityDraftRow = {
+  description: string | null;
+  id: string;
+  severity: string | null;
+  status: string | null;
+  title: string;
+};
+
+type CorrectiveActionDraftRow = {
+  description: string | null;
+  id: string;
+  non_conformity_id: string;
+  responsible_person_name: string | null;
+  status: string | null;
+  target_completion_date: string | null;
+};
+
+type ChecklistSummaryRow = {
+  checklist_items: Array<{ outcome: string | null }> | null;
+};
 
 const SEVERITY_LABELS_IT: Record<string, string> = {
   minor: "minore",
@@ -46,10 +87,11 @@ export async function generateEmailDraft(
     .from("non_conformities")
     .select("id, title, severity, status, description")
     .eq("audit_id", auditId)
+    .is("deleted_at", null)
     .neq("status", "cancelled")
     .order("created_at", { ascending: true });
 
-  const nonConformities = (ncs ?? []) as any[];
+  const nonConformities: NonConformityDraftRow[] = ncs ?? [];
 
   if (nonConformities.length === 0) {
     return {
@@ -60,14 +102,14 @@ export async function generateEmailDraft(
   }
 
   // 2b. Fetch corrective actions for all NCs
-  const ncIds = nonConformities.map((nc: any) => nc.id);
+  const ncIds = nonConformities.map((nonConformity) => nonConformity.id);
   const { data: casData } = await supabase
     .from("corrective_actions")
     .select("id, non_conformity_id, description, responsible_person_name, target_completion_date, status")
     .in("non_conformity_id", ncIds)
     .is("deleted_at", null)
     .order("created_at", { ascending: true });
-  const correctiveActions = (casData ?? []) as any[];
+  const correctiveActions: CorrectiveActionDraftRow[] = casData ?? [];
 
   // 3. Fetch checklist summary
   const { data: checklists } = await supabase
@@ -75,19 +117,24 @@ export async function generateEmailDraft(
     .select("id, checklist_items(outcome)")
     .eq("audit_id", auditId);
 
-  const allItems = (checklists ?? []).flatMap((c: any) => c.checklist_items ?? []) as any[];
+  const allItems = (checklists ?? []).flatMap(
+    (checklist: ChecklistSummaryRow) => checklist.checklist_items ?? []
+  );
   const total = allItems.length;
-  const compliant = allItems.filter((i: any) => i.outcome === "compliant").length;
-  const nonCompliant = allItems.filter((i: any) => i.outcome === "non_compliant").length;
+  const compliant = allItems.filter((item) => item.outcome === "compliant").length;
+  const nonCompliant = allItems.filter((item) => item.outcome === "non_compliant").length;
 
   // 4. Build email text
-  const auditTitle = (audit as any).title ?? "Audit";
-  const clientName = (audit as any).client?.name ?? "Cliente";
-  const locationName = (audit as any).location?.name ?? "Sede";
-  const score = (audit as any).score != null ? `${Number((audit as any).score).toFixed(1)}%` : "N/D";
-  const dateFormatted = (audit as any).scheduled_date
+  const auditRecord = audit as AuditDraftRow;
+  const client = Array.isArray(auditRecord.client) ? auditRecord.client[0] : auditRecord.client;
+  const location = Array.isArray(auditRecord.location) ? auditRecord.location[0] : auditRecord.location;
+  const auditTitle = auditRecord.title ?? "Audit";
+  const clientName = client?.name ?? "Cliente";
+  const locationName = location?.name ?? "Sede";
+  const score = auditRecord.score != null ? `${Number(auditRecord.score).toFixed(1)}%` : "N/D";
+  const dateFormatted = auditRecord.scheduled_date
     ? new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric" }).format(
-        new Date((audit as any).scheduled_date)
+        new Date(auditRecord.scheduled_date)
       )
     : new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric" }).format(new Date());
 
@@ -97,36 +144,32 @@ export async function generateEmailDraft(
     year: "numeric",
   }).format(new Date());
 
-  const CA_STATUS_LABELS_IT: Record<string, string> = {
-    pending: "da avviare",
-    in_progress: "in corso",
-    completed: "completata",
-  };
-
-  // Build NC list with AC
+  // Build NC list with operational handling summary
   const ncLines = nonConformities
     .map((nc, idx) => {
-      const severity = SEVERITY_LABELS_IT[nc.severity] ?? nc.severity;
-      const status = STATUS_LABELS_IT[nc.status] ?? nc.status;
-      const desc = nc.description ? ` — ${nc.description}` : "";
-      let line = `   ${idx + 1}. ${nc.title} [${severity}] — stato: ${status}${desc}`;
+      const ncCas = correctiveActions.filter((action) => action.non_conformity_id === nc.id);
+      const canonicalNc = toCanonicalNonConformity({
+        ...nc,
+        corrective_actions: ncCas,
+      });
+      const processActions = canonicalNc.correctiveActions.map(toProcessCorrectiveActionShape);
+      const summary = getNonConformityActionSummary({
+        corrective_actions: processActions,
+        severity: canonicalNc.severity,
+      });
+      const openActionCount = countOpenCorrectiveActions(processActions);
+      const activeOwner = canonicalNc.correctiveActions.find((action) => action.status !== "completed")?.responsiblePersonName;
 
-      const ncCas = correctiveActions.filter((ca: any) => ca.non_conformity_id === nc.id);
-      if (ncCas.length > 0) {
-        const caLines = ncCas.map((ca: any) => {
-          const caStatus = CA_STATUS_LABELS_IT[ca.status] ?? ca.status;
-          const dueDate = ca.target_completion_date
-            ? `, scadenza: ${new Intl.DateTimeFormat("it-IT").format(new Date(ca.target_completion_date))}`
-            : "";
-          const responsible = ca.responsible_person_name ? `, resp.: ${ca.responsible_person_name}` : "";
-          return `      → AC: ${ca.description} [${caStatus}${responsible}${dueDate}]`;
-        });
-        line += "\n" + caLines.join("\n");
-      } else {
-        line += "\n      → Nessuna azione correttiva registrata.";
-      }
+      const severityKey = nc.severity ?? "";
+      const statusKey = nc.status ?? "";
+      const severity = SEVERITY_LABELS_IT[severityKey] ?? severityKey;
+      const status = STATUS_LABELS_IT[statusKey] ?? statusKey;
+      const desc = canonicalNc.description ? ` ${canonicalNc.description}` : "";
+      const owner = activeOwner ? ` Referente operativo: ${activeOwner}.` : "";
+      const openActionsLabel =
+        openActionCount > 0 ? ` Azioni aperte: ${openActionCount}.` : "";
 
-      return line;
+      return `   ${idx + 1}. ${canonicalNc.title ?? nc.title} [${severity}] — stato: ${status}. ${summary.label}.${summary.detail ? ` ${summary.detail}` : ""}${openActionsLabel}${owner}${desc}`;
     })
     .join("\n");
 
@@ -142,10 +185,10 @@ RIEPILOGO ISPEZIONE
 • Non conformità rilevate: ${nonCompliant}
 • Score complessivo: ${score}
 
-NON CONFORMITÀ RILEVATE
+NON CONFORMITÀ E STATO PRESA IN CARICO
 ${ncLines}
 
-Come da procedura, Le chiediamo di predisporre per ciascuna non conformità un piano di azioni correttive con relativo responsabile e scadenza, da trasmettere entro 30 giorni dalla data della presente comunicazione.
+Come da procedura, Le chiediamo di completare la presa in carico delle non conformità ancora aperte, indicando per ciascuna responsabile e data obiettivo entro 30 giorni dalla data della presente comunicazione.
 
 Il report completo in formato Excel è allegato a questa comunicazione.
 

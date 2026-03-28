@@ -21,6 +21,32 @@ type OrganizationPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+function OrganizationDataUnavailable({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <Card className="border-amber-200 bg-amber-50/60">
+      <CardHeader className="flex flex-row items-start gap-3 space-y-0">
+        <div className="mt-1 rounded-full bg-amber-100 p-1.5 text-amber-700">
+          <AlertTriangle className="h-4 w-4" />
+        </div>
+        <div>
+          <CardTitle className="text-sm font-semibold text-amber-900">
+            {title}
+          </CardTitle>
+          <CardDescription className="pt-1 text-sm text-amber-800">
+            {description}
+          </CardDescription>
+        </div>
+      </CardHeader>
+    </Card>
+  );
+}
+
 export default async function OrganizationPage({ searchParams }: OrganizationPageProps) {
   const params = await searchParams;
   const activeTab =
@@ -82,7 +108,16 @@ export default async function OrganizationPage({ searchParams }: OrganizationPag
 
       <OrganizationConsoleShell
         activeTab={activeTab}
-        accessContent={accessOverview ? <OrganizationAccessPanel overview={accessOverview} /> : null}
+        accessContent={
+          accessOverview ? (
+            <OrganizationAccessPanel overview={accessOverview} />
+          ) : (
+            <OrganizationDataUnavailable
+              title="Accessi temporaneamente non disponibili"
+              description="La console organizzazione è raggiungibile, ma il riepilogo utenti o clienti non è disponibile in questo ambiente. Verifica che lo schema tenant sia allineato e riprova."
+            />
+          )
+        }
         brandingContent={
           <OrganizationBrandingPanel
             canManage={canManageConsole}
@@ -129,7 +164,14 @@ export default async function OrganizationPage({ searchParams }: OrganizationPag
           />
         }
         systemContent={
-          systemSnapshot ? <OrganizationSystemPanel snapshot={systemSnapshot} /> : null
+          systemSnapshot ? (
+            <OrganizationSystemPanel snapshot={systemSnapshot} />
+          ) : (
+            <OrganizationDataUnavailable
+              title="Snapshot sistema non disponibile"
+              description="Non siamo riusciti a leggere il contesto di release o migrazioni locali. La console resta accessibile, ma questo pannello richiede un nuovo tentativo."
+            />
+          )
         }
       />
     </section>

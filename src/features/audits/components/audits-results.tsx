@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight, MoreHorizontal, Table2 } from "lucide-react";
 import { toast } from "sonner";
@@ -131,15 +131,15 @@ export function AuditsResults({ sections, viewMode, groupBy }: AuditsResultsProp
   const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(DEFAULT_VISIBLE_COLUMNS);
   const [collapsedSections, setCollapsedSections] = useState<string[]>([]);
   const [isBulkPending, startBulkTransition] = useTransition();
-  const allAudits = sections.flatMap((section) => section.audits);
-  const allAuditIds = allAudits.map((audit) => audit.id);
+  const allAudits = useMemo(() => sections.flatMap((section) => section.audits), [sections]);
+  const allAuditIds = useMemo(() => allAudits.map((audit) => audit.id), [allAudits]);
   const allSelected =
     allAuditIds.length > 0 && allAuditIds.every((id) => selectedIds.includes(id));
 
   useEffect(() => {
     setSelectedIds((current) => current.filter((id) => allAuditIds.includes(id)));
     setExpandedIds((current) => current.filter((id) => allAuditIds.includes(id)));
-  }, [allAuditIds.join("|")]);
+  }, [allAuditIds]);
 
   function replaceParams(
     updates: Partial<

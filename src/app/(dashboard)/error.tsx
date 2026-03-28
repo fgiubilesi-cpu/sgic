@@ -28,7 +28,7 @@ export default function DashboardError({
                 <p className="text-sm text-zinc-500 max-w-md">
                     Si è verificato un errore imprevisto durante il caricamento di questa pagina.
                     {error.message && (
-                        <span className="block mt-2 italic text-zinc-400">"{error.message}"</span>
+                        <span className="block mt-2 italic text-zinc-400">&quot;{error.message}&quot;</span>
                     )}
                 </p>
             </div>

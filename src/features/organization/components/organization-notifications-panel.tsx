@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useForm } from "react-hook-form";
+import type { Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { updateOrganizationNotifications } from "@/features/organization/actions/organization-console-actions";
 import {
@@ -26,7 +26,7 @@ import {
 } from "@/features/organization/schemas/organization-console-schema";
 
 type ToggleFieldProps = {
-  control: any;
+  control: Control<OrganizationNotificationsInput, unknown, OrganizationNotificationsValues>;
   description: string;
   disabled: boolean;
   label: string;
@@ -103,6 +103,46 @@ export function OrganizationNotificationsPanel({
               <div className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
+                  name="audience"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Audience</FormLabel>
+                      <Select disabled={!canManage || isPending} onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Audience" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="admins_inspectors">Admin + inspector</SelectItem>
+                          <SelectItem value="admins">Solo admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Chi deve vedere e presidiare il centro notifiche.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="deliveryChannel"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Canale</FormLabel>
+                      <Select disabled={!canManage || isPending} onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Canale" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="dashboard_email">Dashboard + email</SelectItem>
+                          <SelectItem value="dashboard">Solo dashboard</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Livello minimo di distribuzione per i trigger attivi.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="digestFrequency"
                   render={({ field }) => (
                     <FormItem>
@@ -117,6 +157,27 @@ export function OrganizationNotificationsPanel({
                           <SelectItem value="weekly">Weekly</SelectItem>
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="minimumSeverity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Severita minima</FormLabel>
+                      <Select disabled={!canManage || isPending} onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Severita" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="default">Tutto</SelectItem>
+                          <SelectItem value="warning">Warning + danger</SelectItem>
+                          <SelectItem value="danger">Solo danger</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>I trigger sotto soglia finiscono in &quot;silenziate&quot;.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -204,7 +265,7 @@ export function OrganizationNotificationsPanel({
             Le notifiche configurate qui influenzano la console admin e le viste di controllo del tenant.
           </div>
           <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-            I destinatari digest sono tracciati a livello tenant e possono essere evoluti in un secondo step verso invii reali.
+            Il Notification Center usa queste preferenze per distinguere trigger attivi, silenziati e storico invii.
           </div>
         </CardContent>
       </Card>

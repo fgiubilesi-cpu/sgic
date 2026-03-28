@@ -1,4 +1,6 @@
 import { getClientAudits } from "@/features/audits/queries/get-client-audits";
+import { ClientRiskRadarCard } from "@/features/clients/components/client-risk-radar-card";
+import { getClientRiskRadar } from "@/features/clients/queries/get-client-risk-radar";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -35,9 +37,10 @@ function getScoreColor(score: number | null) {
 }
 
 export default async function ClientDashboard() {
-  const [ctx, audits] = await Promise.all([
+  const [ctx, audits, radarData] = await Promise.all([
     getOrganizationContext(),
     getClientAudits(),
+    getClientRiskRadar(),
   ]);
 
   let clientName = "";
@@ -47,12 +50,33 @@ export default async function ClientDashboard() {
       .from("clients")
       .select("name")
       .eq("id", ctx.clientId)
+      .is("deleted_at", null)
       .single();
 
     if (client?.name) {
       clientName = client.name;
     }
   }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const openAudits = audits.filter((audit) => audit.status !== "Closed");
+  const upcomingAudit =
+    audits
+      .filter(
+        (audit) =>
+          audit.scheduled_date !== null &&
+          audit.status !== "Closed" &&
+          new Date(audit.scheduled_date) >= today
+      )
+      .sort(
+        (left, right) =>
+          new Date(left.scheduled_date ?? "").getTime() -
+          new Date(right.scheduled_date ?? "").getTime()
+      )[0] ?? null;
+  const latestScoredAudit =
+    audits.find((audit) => audit.status === "Closed" && audit.score !== null) ?? null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6 md:p-12">
@@ -62,7 +86,7 @@ export default async function ClientDashboard() {
             Audit Dashboard {clientName && `— ${clientName}`}
           </h1>
           <p className="text-slate-600">
-            Visualizza e scarica i risultati degli audit della tua organizzazione
+            Vista sintetica degli audit da seguire e dei risultati più recenti.
           </p>
           <div className="mt-4">
             <Link
@@ -74,43 +98,60 @@ export default async function ClientDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 mb-8">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-slate-600">
-                Totale Audit
+                Prossimo Audit
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{audits.length}</div>
+              <div className="text-2xl font-bold">
+                {upcomingAudit?.scheduled_date
+                  ? new Date(upcomingAudit.scheduled_date).toLocaleDateString("it-IT")
+                  : "Nessuno"}
+              </div>
+              <p className="mt-1 text-sm text-slate-500">
+                {upcomingAudit?.title || "Nessun audit pianificato in agenda"}
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-slate-600">
-                In Corso
+                Audit Aperti
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">
-                {audits.filter((audit) => audit.status === "In Progress").length}
+                {openAudits.length}
               </div>
+              <p className="mt-1 text-sm text-slate-500">
+                In attesa, in corso o ancora da chiudere
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-slate-600">
-                Completati
+                Ultimo Score
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {audits.filter((audit) => audit.status === "Closed").length}
+                {latestScoredAudit?.score !== null && latestScoredAudit?.score !== undefined
+                  ? `${Math.round(latestScoredAudit.score)}%`
+                  : "N/D"}
               </div>
+              <p className="mt-1 text-sm text-slate-500">
+                {latestScoredAudit?.title || "Nessun audit chiuso con score disponibile"}
+              </p>
             </CardContent>
           </Card>
+
+          <ClientRiskRadarCard data={radarData} />
         </div>
 
         <Card>

@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+GEA_KB_ROOT="/Users/filippo/gea-kb"
+
+npm --prefix "$ROOT" run lint
+(cd "$ROOT" && npx tsc --noEmit)
+npm --prefix "$GEA_KB_ROOT" run check:sgic:queries

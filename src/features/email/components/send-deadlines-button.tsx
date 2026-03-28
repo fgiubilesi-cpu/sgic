@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Mail, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { useTransition } from "react";
+import { Mail, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { sendDeadlinesSummaryAction } from "@/features/email/actions/send-deadlines-summary";
 import { toast } from "sonner";

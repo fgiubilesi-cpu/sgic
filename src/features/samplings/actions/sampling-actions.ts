@@ -4,6 +4,30 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { samplingSchema } from "../schemas/samplings.schema";
 import { labResultSchema } from "../schemas/lab-results.schema";
+import type { Sampling } from "../schemas/samplings.schema";
+import type { LabResult } from "../schemas/lab-results.schema";
+
+type ActionResult<T> = {
+    success: boolean;
+    data?: T;
+    error?: string;
+};
+
+type SamplingRecord = Sampling & {
+    id: string;
+};
+
+type LabResultRecord = LabResult & {
+    id: string;
+};
+
+function getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    return "Errore sconosciuto";
+}
 
 /**
  * Helper to get the current user's organization_id
@@ -23,7 +47,7 @@ async function getOrgId() {
     return profile.organization_id;
 }
 
-export async function createSampling(values: any) {
+export async function createSampling(values: Sampling | unknown): Promise<ActionResult<SamplingRecord>> {
     try {
         const validated = samplingSchema.parse(values);
         const orgId = await getOrgId();
@@ -48,13 +72,13 @@ export async function createSampling(values: any) {
 
         revalidatePath("/samplings");
         return { success: true, data };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("createSampling Error:", error);
-        return { success: false, error: error.message };
+        return { success: false, error: getErrorMessage(error) };
     }
 }
 
-export async function updateSampling(id: string, values: any) {
+export async function updateSampling(id: string, values: Sampling | unknown): Promise<ActionResult<SamplingRecord>> {
     try {
         const validated = samplingSchema.parse(values);
         const orgId = await getOrgId();
@@ -82,13 +106,13 @@ export async function updateSampling(id: string, values: any) {
         revalidatePath("/samplings");
         revalidatePath(`/samplings/${id}`);
         return { success: true, data };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("updateSampling Error:", error);
-        return { success: false, error: error.message };
+        return { success: false, error: getErrorMessage(error) };
     }
 }
 
-export async function createLabResult(values: any) {
+export async function createLabResult(values: LabResult | unknown): Promise<ActionResult<LabResultRecord>> {
     try {
         const validated = labResultSchema.parse(values);
         const orgId = await getOrgId();
@@ -112,13 +136,13 @@ export async function createLabResult(values: any) {
 
         revalidatePath(`/samplings/${validated.sampling_id}`);
         return { success: true, data };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("createLabResult Error:", error);
-        return { success: false, error: error.message };
+        return { success: false, error: getErrorMessage(error) };
     }
 }
 
-export async function updateLabResult(id: string, values: any) {
+export async function updateLabResult(id: string, values: LabResult | unknown): Promise<ActionResult<LabResultRecord>> {
     try {
         const validated = labResultSchema.parse(values);
         const orgId = await getOrgId();
@@ -144,8 +168,8 @@ export async function updateLabResult(id: string, values: any) {
 
         revalidatePath(`/samplings/${validated.sampling_id}`);
         return { success: true, data };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("updateLabResult Error:", error);
-        return { success: false, error: error.message };
+        return { success: false, error: getErrorMessage(error) };
     }
 }

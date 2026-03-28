@@ -49,6 +49,7 @@ export function CloneTemplateSheet({ templateId }: CloneTemplateSheetProps) {
         const { data, error } = await supabase
           .from('clients')
           .select('id, name')
+          .is('deleted_at', null)
           .order('name');
 
         if (data) setClients(data);

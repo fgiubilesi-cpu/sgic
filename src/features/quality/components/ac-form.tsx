@@ -32,7 +32,7 @@ export function ACForm({ ncId, onSuccess }: { ncId: string, onSuccess?: () => vo
     const form = useForm<z.input<typeof correctiveActionSchema>, unknown, z.infer<typeof correctiveActionSchema>>({
         resolver: zodResolver(correctiveActionSchema),
         defaultValues: {
-            nc_id: ncId,
+            non_conformity_id: ncId,
             description: "",
             due_date: "",
             status: "pending",
@@ -44,15 +44,20 @@ export function ACForm({ ncId, onSuccess }: { ncId: string, onSuccess?: () => vo
         try {
             const aiResult = await generateAIAnalysisForNC(ncId);
             if (aiResult.success) {
-                const currentDesc = form.getValues("description");
-                const aiText = `**Analisi Cause Radice:**\n${aiResult.data.root_cause_analysis}\n\n**Piano d'Azione Proposto:**\n${aiResult.data.suggested_action_plan}`;
-                form.setValue("description", currentDesc ? `${currentDesc}\n\n${aiText}` : aiText);
-                toast.success("Analisi AI completata");
+                const currentDesc = form.getValues("description").trim();
+                const suggestedAction = aiResult.data.suggested_action_plan.trim();
+
+                form.setValue(
+                    "description",
+                    currentDesc ? `${currentDesc}\n${suggestedAction}` : suggestedAction,
+                    { shouldDirty: true, shouldValidate: true }
+                );
+                toast.success("Bozza operativa generata");
             } else {
                 toast.error(aiResult.error || "Errore durante l'analisi AI");
             }
-        } catch (error: any) {
-            toast.error(error.message || "Errore durante l'analisi AI");
+        } catch (error: unknown) {
+            toast.error(error instanceof Error ? error.message : "Errore durante l'analisi AI");
             console.error(error);
         } finally {
             setIsAskingAI(false);
@@ -91,19 +96,22 @@ export function ACForm({ ncId, onSuccess }: { ncId: string, onSuccess?: () => vo
                                     size="sm"
                                     onClick={handleAskAI}
                                     disabled={isAskingAI}
-                                    className="h-8 shadow-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200"
-                                >
+                            className="h-8 shadow-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200"
+                        >
                                     {isAskingAI ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
-                                    {isAskingAI ? "Analisi..." : "Ask AI (Root Cause)"}
+                                    {isAskingAI ? "Analisi..." : "Suggerisci bozza"}
                                 </Button>
                             </div>
                             <FormControl>
                                 <Textarea
-                                    placeholder="Es: Sostituzione componente difettoso e ricalibrazione..."
-                                    className="min-h-[150px]"
+                                    placeholder="Es: Sostituire il componente, verificare taratura e registrare il controllo finale."
+                                    className="min-h-[120px]"
                                     {...field}
                                 />
                             </FormControl>
+                            <p className="text-xs text-muted-foreground">
+                                Qui salviamo solo l&apos;azione operativa. La causa radice resta nel contesto della NC.
+                            </p>
                             <FormMessage />
                         </FormItem>
                     )}
@@ -113,7 +121,7 @@ export function ACForm({ ncId, onSuccess }: { ncId: string, onSuccess?: () => vo
                     name="due_date"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Scadenza (Opzionale)</FormLabel>
+                            <FormLabel>Data obiettivo</FormLabel>
                             <FormControl>
                                 <Input type="date" {...field} value={field.value || ""} />
                             </FormControl>
@@ -121,7 +129,7 @@ export function ACForm({ ncId, onSuccess }: { ncId: string, onSuccess?: () => vo
                         </FormItem>
                     )}
                 />
-                <Button type="submit" className="w-full" disabled={isPending}>
+                <Button type="submit" className="w-full" disabled={isPending || isAskingAI}>
                     {isPending ? "Salvataggio..." : "Aggiungi Azione Correttiva"}
                 </Button>
             </form>

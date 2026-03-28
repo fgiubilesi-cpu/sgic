@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,7 @@ export function OrganizationBrandingPanel({
     });
   }
 
-  const current = form.watch();
+  const current = useWatch({ control: form.control });
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">

@@ -1,5 +1,6 @@
 import type { ServiceCoverageAuditInput, ServiceCoverageDocumentInput } from '@/features/clients/lib/client-service-coverage';
 import { buildClientServiceCoverage } from '@/features/clients/lib/client-service-coverage';
+import { runClientsQueryWithSoftDeleteFallback } from "@/lib/supabase/clients-soft-delete";
 import type {
   ClientDeadlineRecord,
   ClientServiceLineRecord,
@@ -73,11 +74,19 @@ export async function getClients(
 
   const supabase = await createClient();
 
-  const { data: clients, error: clientsError } = await supabase
-    .from('clients')
-    .select('*')
-    .eq('organization_id', organizationId)
-    .order('name');
+  const { data: clients, error: clientsError } =
+    await runClientsQueryWithSoftDeleteFallback((useSoftDeleteGuard) => {
+      let query = supabase
+        .from('clients')
+        .select('*')
+        .eq('organization_id', organizationId);
+
+      if (useSoftDeleteGuard) {
+        query = query.is('deleted_at', null);
+      }
+
+      return query.order('name');
+    });
 
   if (clientsError) throw clientsError;
   if (!clients || clients.length === 0) return [];
@@ -159,6 +168,7 @@ export async function getClients(
           .select('audit_id, status')
           .eq('organization_id', organizationId)
           .in('audit_id', auditIds)
+          .is('deleted_at', null)
           .neq('status', 'closed')
       : { data: [], error: null };
 

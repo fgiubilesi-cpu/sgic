@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Calendar, CheckCircle2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,13 @@ import {
   CA_STATUS_COLORS,
 } from "@/features/quality/constants";
 import { updateCorrectiveAction } from "@/features/audits/actions/corrective-action-actions";
+import {
+  formatAuditDateLabel,
+  getAuditCorrectiveActionDeadline,
+  getCorrectiveActionOperationalFocus,
+  isAuditCorrectiveActionOverdue,
+} from "@/features/audits/lib/audit-process-view";
+import { cn } from "@/lib/utils";
 
 interface CorrectiveActionDetailProps {
   correctiveAction: CorrectiveAction;
@@ -30,26 +37,39 @@ export function CorrectiveActionDetail({
   const [isUpdating, setIsUpdating] = useState(false);
   const [editData, setEditData] = useState({
     description: correctiveAction.description,
+    dueDate: (
+      correctiveAction.targetCompletionDate ??
+      correctiveAction.dueDate ??
+      ""
+    ).split("T")[0],
     rootCause: correctiveAction.rootCause || "",
     actionPlan: correctiveAction.actionPlan || "",
+    responsiblePersonEmail: correctiveAction.responsiblePersonEmail || "",
+    responsiblePersonName: correctiveAction.responsiblePersonName || "",
   });
+  const focus = getCorrectiveActionOperationalFocus(correctiveAction);
+  const deadline = getAuditCorrectiveActionDeadline(correctiveAction);
+  const isOverdue = isAuditCorrectiveActionOverdue(correctiveAction);
 
-  const createdDate = new Intl.DateTimeFormat("en-GB", {
+  const createdDate = formatAuditDateLabel(correctiveAction.createdAt, {
     year: "numeric",
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(correctiveAction.createdAt));
+  });
 
   const handleUpdate = async () => {
     setIsUpdating(true);
     try {
       const result = await updateCorrectiveAction({
         id: correctiveAction.id,
-        description: editData.description,
-        rootCause: editData.rootCause,
-        actionPlan: editData.actionPlan,
+        actionPlan: editData.actionPlan.trim() || undefined,
+        description: editData.description.trim(),
+        dueDate: editData.dueDate || undefined,
+        responsiblePersonEmail: editData.responsiblePersonEmail.trim() || undefined,
+        responsiblePersonName: editData.responsiblePersonName.trim() || undefined,
+        rootCause: editData.rootCause.trim() || undefined,
       });
 
       if (result.success) {
@@ -84,62 +104,106 @@ export function CorrectiveActionDetail({
 
       {!isEditing ? (
         <div className="space-y-4">
-          {correctiveAction.rootCause && (
-            <Card className="p-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="p-4 md:col-span-2">
               <h3 className="font-semibold text-sm text-zinc-900 mb-2">
-                Root Cause
+                Stato operativo
               </h3>
-              <p className="text-sm text-zinc-700 whitespace-pre-wrap">
-                {correctiveAction.rootCause}
-              </p>
-            </Card>
-          )}
-
-          {correctiveAction.actionPlan && (
-            <Card className="p-4">
-              <h3 className="font-semibold text-sm text-zinc-900 mb-2">
-                Action Plan
-              </h3>
-              <p className="text-sm text-zinc-700 whitespace-pre-wrap font-mono">
-                {correctiveAction.actionPlan}
-              </p>
-            </Card>
-          )}
-
-          <div className="grid md:grid-cols-2 gap-4">
-            {correctiveAction.responsiblePersonName && (
-              <Card className="p-4">
-                <h3 className="font-semibold text-sm text-zinc-900 mb-2">
-                  Responsible Person
-                </h3>
-                <p className="text-sm text-zinc-700">
-                  {correctiveAction.responsiblePersonName}
-                </p>
-                {correctiveAction.responsiblePersonEmail && (
-                  <p className="text-sm text-blue-600 break-all">
-                    {correctiveAction.responsiblePersonEmail}
-                  </p>
+              <p
+                className={cn(
+                  "text-sm font-medium",
+                  focus.tone === "critical" && "text-red-700",
+                  focus.tone === "success" && "text-emerald-700",
+                  focus.tone === "warning" && "text-amber-700",
+                  focus.tone === "neutral" && "text-zinc-800"
                 )}
-              </Card>
-            )}
+              >
+                {focus.label}
+              </p>
+              {focus.detail ? (
+                <p className="mt-1 text-sm text-zinc-600">{focus.detail}</p>
+              ) : null}
+            </Card>
 
-            {correctiveAction.targetCompletionDate && (
-              <Card className="p-4">
-                <h3 className="font-semibold text-sm text-zinc-900 mb-2">
-                  Target Completion
-                </h3>
-                <p className="text-sm text-zinc-700">
-                  {new Date(
-                    correctiveAction.targetCompletionDate
-                  ).toLocaleDateString("en-GB", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
+            <Card className="p-4">
+              <h3 className="font-semibold text-sm text-zinc-900 mb-2">
+                Presa in carico
+              </h3>
+              <div className="space-y-2 text-sm text-zinc-700">
+                <p className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-zinc-500" />
+                  {correctiveAction.responsiblePersonName || "Responsabile da assegnare"}
                 </p>
-              </Card>
-            )}
+                <p
+                  className={cn(
+                    "flex items-center gap-2",
+                    isOverdue ? "text-red-700 font-medium" : ""
+                  )}
+                >
+                  <Calendar className="h-4 w-4 text-zinc-500" />
+                  {deadline ? formatAuditDateLabel(deadline) : "Scadenza da definire"}
+                  {isOverdue ? <AlertTriangle className="h-4 w-4 text-red-600" /> : null}
+                </p>
+                {correctiveAction.completedAt ? (
+                  <p className="flex items-center gap-2 text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Completata il {formatAuditDateLabel(correctiveAction.completedAt)}
+                  </p>
+                ) : null}
+              </div>
+            </Card>
           </div>
+
+          <Card className="p-4">
+            <h3 className="font-semibold text-sm text-zinc-900 mb-2">Azione</h3>
+            <p className="text-sm text-zinc-700 whitespace-pre-wrap">
+              {correctiveAction.description}
+            </p>
+          </Card>
+
+          {(correctiveAction.rootCause ||
+            correctiveAction.actionPlan ||
+            correctiveAction.responsiblePersonEmail) && (
+            <details className="rounded-lg border border-zinc-200 bg-white px-4 py-3">
+              <summary className="cursor-pointer text-sm font-semibold text-zinc-800">
+                Dettagli estesi
+              </summary>
+              <div className="mt-4 space-y-4">
+                {correctiveAction.rootCause ? (
+                  <div>
+                    <h4 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                      Root Cause
+                    </h4>
+                    <p className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap">
+                      {correctiveAction.rootCause}
+                    </p>
+                  </div>
+                ) : null}
+
+                {correctiveAction.actionPlan ? (
+                  <div>
+                    <h4 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                      Action Plan
+                    </h4>
+                    <p className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap">
+                      {correctiveAction.actionPlan}
+                    </p>
+                  </div>
+                ) : null}
+
+                {correctiveAction.responsiblePersonEmail ? (
+                  <div>
+                    <h4 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                      Email responsabile
+                    </h4>
+                    <p className="mt-1 text-sm text-blue-600 break-all">
+                      {correctiveAction.responsiblePersonEmail}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </details>
+          )}
 
           <div className="flex gap-2 justify-end pt-4">
             <Button variant="outline" onClick={() => setIsEditing(true)}>
@@ -166,27 +230,72 @@ export function CorrectiveActionDetail({
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Root Cause</label>
-              <textarea
-                value={editData.rootCause}
-                onChange={(e) =>
-                  setEditData({ ...editData, rootCause: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-zinc-300 rounded-md min-h-[80px]"
-              />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Responsible Person</label>
+                <input
+                  value={editData.responsiblePersonName}
+                  onChange={(e) =>
+                    setEditData({ ...editData, responsiblePersonName: e.target.value })
+                  }
+                  className="w-full rounded-md border border-zinc-300 px-3 py-2"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Target Date</label>
+                <input
+                  type="date"
+                  value={editData.dueDate}
+                  onChange={(e) =>
+                    setEditData({ ...editData, dueDate: e.target.value })
+                  }
+                  className="w-full rounded-md border border-zinc-300 px-3 py-2"
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Action Plan</label>
-              <textarea
-                value={editData.actionPlan}
-                onChange={(e) =>
-                  setEditData({ ...editData, actionPlan: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-zinc-300 rounded-md min-h-[100px] font-mono text-sm"
-              />
-            </div>
+            <details className="rounded-lg border border-amber-200 bg-white px-3 py-2">
+              <summary className="cursor-pointer text-sm font-medium text-zinc-700">
+                Dettagli opzionali
+              </summary>
+
+              <div className="mt-4 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Responsible Email</label>
+                  <input
+                    type="email"
+                    value={editData.responsiblePersonEmail}
+                    onChange={(e) =>
+                      setEditData({ ...editData, responsiblePersonEmail: e.target.value })
+                    }
+                    className="w-full rounded-md border border-zinc-300 px-3 py-2"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Root Cause</label>
+                  <textarea
+                    value={editData.rootCause}
+                    onChange={(e) =>
+                      setEditData({ ...editData, rootCause: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-zinc-300 rounded-md min-h-[80px]"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Action Plan</label>
+                  <textarea
+                    value={editData.actionPlan}
+                    onChange={(e) =>
+                      setEditData({ ...editData, actionPlan: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-zinc-300 rounded-md min-h-[100px] text-sm"
+                  />
+                </div>
+              </div>
+            </details>
 
             <div className="flex gap-2 justify-end pt-2">
               <Button

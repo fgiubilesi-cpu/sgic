@@ -983,6 +983,7 @@ export type Database = {
       clients: {
         Row: {
           created_at: string | null
+          deleted_at: string | null
           email: string | null
           fm_record_id: string | null
           id: string
@@ -996,6 +997,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          deleted_at?: string | null
           email?: string | null
           fm_record_id?: string | null
           id?: string
@@ -1009,6 +1011,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          deleted_at?: string | null
           email?: string | null
           fm_record_id?: string | null
           id?: string

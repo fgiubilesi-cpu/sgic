@@ -42,7 +42,11 @@ export function useSpeechRecognition() {
 
   useEffect(() => {
     const SpeechRecognitionConstructor = detectSpeechRecognition();
-    setIsSupported(Boolean(SpeechRecognitionConstructor));
+
+    const supportFrame = window.requestAnimationFrame(() => {
+      setIsSupported(Boolean(SpeechRecognitionConstructor));
+    });
+
     if (!SpeechRecognitionConstructor) return;
 
     const instance = new SpeechRecognitionConstructor();
@@ -69,6 +73,7 @@ export function useSpeechRecognition() {
     recognitionRef.current = instance;
 
     return () => {
+      window.cancelAnimationFrame(supportFrame);
       recognitionRef.current = null;
     };
   }, []);

@@ -44,7 +44,10 @@ export const organizationBrandingSchema = z.object({
 });
 
 export const organizationNotificationsSchema = z.object({
+  audience: z.enum(["admins", "admins_inspectors"]),
+  deliveryChannel: z.enum(["dashboard", "dashboard_email"]),
   digestFrequency: z.enum(["off", "daily", "weekly"]),
+  minimumSeverity: z.enum(["default", "warning", "danger"]),
   recipients: z.string().trim().max(500, "Troppi destinatari."),
   sendAuditOverdue: z.boolean(),
   sendAuditUpcoming: z.boolean(),

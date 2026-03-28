@@ -42,7 +42,7 @@ export function NCChart({ data }: NCChartProps) {
                         fontSize: "13px",
                         fontWeight: 500
                     }}
-                    formatter={(value: any) => [value, "Non Conformità"] as any}
+                    formatter={(value) => [value ?? 0, "Non Conformità"]}
                 />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={60}>
                     {data.map((entry, index) => (

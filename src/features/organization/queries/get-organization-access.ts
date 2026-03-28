@@ -1,4 +1,5 @@
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
+import { runClientsQueryWithSoftDeleteFallback } from "@/lib/supabase/clients-soft-delete";
 
 export type OrganizationAccessMember = {
   clientId: string | null;
@@ -30,11 +31,18 @@ export async function getOrganizationAccessOverview(): Promise<OrganizationAcces
         .select("id, email, full_name, role, client_id")
         .eq("organization_id", organizationId)
         .order("full_name", { ascending: true }),
-      supabase
-        .from("clients")
-        .select("id, name")
-        .eq("organization_id", organizationId)
-        .order("name"),
+      runClientsQueryWithSoftDeleteFallback((useSoftDeleteGuard) => {
+        let query = supabase
+          .from("clients")
+          .select("id, name")
+          .eq("organization_id", organizationId);
+
+        if (useSoftDeleteGuard) {
+          query = query.is("deleted_at", null);
+        }
+
+        return query.order("name");
+      }),
     ]);
 
   if (profilesError || clientsError) {

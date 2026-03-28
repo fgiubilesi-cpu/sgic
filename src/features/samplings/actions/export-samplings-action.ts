@@ -42,7 +42,11 @@ export async function generateSamplingsExcel(
     { data: labResults },
   ] = await Promise.all([
     clientIds.length
-      ? supabase.from("clients").select("id, name").in("id", clientIds)
+      ? supabase
+          .from("clients")
+          .select("id, name")
+          .in("id", clientIds)
+          .is("deleted_at", null)
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
     locationIds.length
       ? supabase.from("locations").select("id, name").in("id", locationIds)

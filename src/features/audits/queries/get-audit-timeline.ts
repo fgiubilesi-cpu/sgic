@@ -1,5 +1,33 @@
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 
+type AuditTimelineChecklistItemRow = {
+  outcome: string | null;
+};
+
+type AuditTimelineChecklistRow = {
+  checklist_items: AuditTimelineChecklistItemRow[] | null;
+};
+
+type AuditTimelineNonConformityRow = {
+  status: string | null;
+};
+
+type AuditTimelineLocationRow = {
+  name: string | null;
+};
+
+type AuditTimelineRow = {
+  checklists: AuditTimelineChecklistRow[] | null;
+  created_at: string | null;
+  id: string;
+  location: AuditTimelineLocationRow | AuditTimelineLocationRow[] | null;
+  non_conformities: AuditTimelineNonConformityRow[] | null;
+  scheduled_date: string | null;
+  score: number | null;
+  status: string | null;
+  title: string | null;
+};
+
 export interface AuditTimelineEvent {
   id: string;
   audit_id: string;
@@ -67,20 +95,21 @@ export async function getAuditTimeline(
     return [];
   }
 
-  return audits.map((audit: any) => {
+  return (audits as AuditTimelineRow[]).map((audit) => {
     // Calculate checklist completion percentage
     const checklist = audit.checklists?.[0];
     const items = checklist?.checklist_items || [];
     const completedItems = items.filter(
-      (item: any) => item.outcome && item.outcome !== "Scheduled"
+      (item) => item.outcome && item.outcome !== "Scheduled"
     ).length;
     const completionPercentage = items.length > 0 ? (completedItems / items.length) * 100 : 0;
 
     // Count closed corrective actions
     const nonConformities = audit.non_conformities || [];
     const closedACs = nonConformities.filter(
-      (nc: any) => nc.status === "closed"
+      (nonConformity) => nonConformity.status === "closed"
     ).length;
+    const location = Array.isArray(audit.location) ? audit.location[0] : audit.location;
 
     return {
       id: String(audit.id),
@@ -90,7 +119,7 @@ export async function getAuditTimeline(
       scheduled_date: audit.scheduled_date ?? null,
       completed_date: audit.created_at ?? null,
       score: audit.score ?? null,
-      location_name: audit.location?.name ?? null,
+      location_name: location?.name ?? null,
       checklist_completion_percentage: Math.round(completionPercentage),
       nc_count: nonConformities.length,
       ac_closed_count: closedACs,

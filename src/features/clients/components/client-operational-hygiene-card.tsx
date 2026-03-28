@@ -47,7 +47,7 @@ export function ClientOperationalHygieneCard({
           </div>
         ) : (
           <>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-zinc-500">Task senza linea</p>
                 <p className="mt-2 text-2xl font-semibold text-amber-700">
@@ -61,10 +61,6 @@ export function ClientOperationalHygieneCard({
                 <p className="mt-2 text-2xl font-semibold text-amber-700">
                   {unlinkedOpenManualDeadlinesCount}
                 </p>
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
-                <p className="text-xs uppercase tracking-wide text-zinc-500">Totale da completare</p>
-                <p className="mt-2 text-2xl font-semibold text-rose-700">{totalGaps}</p>
               </div>
             </div>
 

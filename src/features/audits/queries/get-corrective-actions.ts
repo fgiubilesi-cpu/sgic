@@ -1,5 +1,26 @@
 import { createClient } from "@/lib/supabase/server";
 import type { CorrectiveActionStatus } from "@/features/quality/schemas/nc-ac.schema";
+import { toCanonicalCorrectiveAction } from "@/features/quality/lib/nc-ac-contract";
+
+type CorrectiveActionRow = {
+  action_plan: string | null;
+  completed_at: string | null;
+  created_at: string;
+  description: string;
+  due_date: string | null;
+  id: string;
+  non_conformity_id: string;
+  responsible_person_email: string | null;
+  responsible_person_name: string | null;
+  root_cause: string | null;
+  status: CorrectiveActionStatus;
+  target_completion_date: string | null;
+  updated_at: string;
+};
+
+type AuditNonConformityRow = {
+  id: string;
+};
 
 export interface CorrectiveAction {
   id: string;
@@ -34,21 +55,24 @@ export async function getCorrectiveActionsByNonConformity(
     return [];
   }
 
-  return (data || []).map((ca: any) => ({
-    id: ca.id,
-    nonConformityId: ca.non_conformity_id,
-    description: ca.description,
-    rootCause: ca.root_cause,
-    actionPlan: ca.action_plan,
-    responsiblePersonName: ca.responsible_person_name,
-    responsiblePersonEmail: ca.responsible_person_email,
-    dueDate: ca.due_date,
-    targetCompletionDate: ca.target_completion_date,
-    status: ca.status,
-    createdAt: ca.created_at,
-    updatedAt: ca.updated_at,
-    completedAt: ca.completed_at,
-  }));
+  return ((data ?? []) as CorrectiveActionRow[]).map((ca) => {
+    const canonical = toCanonicalCorrectiveAction(ca);
+    return {
+      id: canonical.id,
+      nonConformityId: canonical.nonConformityId ?? "",
+      description: canonical.description ?? "",
+      rootCause: canonical.rootCause,
+      actionPlan: canonical.actionPlan,
+      responsiblePersonName: canonical.responsiblePersonName,
+      responsiblePersonEmail: canonical.responsiblePersonEmail,
+      dueDate: canonical.dueDate,
+      targetCompletionDate: canonical.targetCompletionDate,
+      status: canonical.status,
+      createdAt: canonical.createdAt ?? "",
+      updatedAt: canonical.updatedAt ?? "",
+      completedAt: canonical.completedAt,
+    };
+  });
 }
 
 /**
@@ -64,11 +88,12 @@ export async function getCorrectiveActionsByAudit(
   const { data: ncs, error: ncError } = await supabase
     .from("non_conformities")
     .select("id")
-    .eq("audit_id", auditId);
+    .eq("audit_id", auditId)
+    .is("deleted_at", null);
 
   if (ncError || !ncs || ncs.length === 0) return [];
 
-  const ncIds = ncs.map((nc: any) => nc.id as string);
+  const ncIds = (ncs as AuditNonConformityRow[]).map((nonConformity) => nonConformity.id);
 
   const { data, error } = await supabase
     .from("corrective_actions")
@@ -82,21 +107,24 @@ export async function getCorrectiveActionsByAudit(
     return [];
   }
 
-  return (data || []).map((ca: any) => ({
-    id: ca.id,
-    nonConformityId: ca.non_conformity_id,
-    description: ca.description,
-    rootCause: ca.root_cause,
-    actionPlan: ca.action_plan,
-    responsiblePersonName: ca.responsible_person_name,
-    responsiblePersonEmail: ca.responsible_person_email,
-    dueDate: ca.due_date,
-    targetCompletionDate: ca.target_completion_date,
-    status: ca.status,
-    createdAt: ca.created_at,
-    updatedAt: ca.updated_at,
-    completedAt: ca.completed_at,
-  }));
+  return ((data ?? []) as CorrectiveActionRow[]).map((ca) => {
+    const canonical = toCanonicalCorrectiveAction(ca);
+    return {
+      id: canonical.id,
+      nonConformityId: canonical.nonConformityId ?? "",
+      description: canonical.description ?? "",
+      rootCause: canonical.rootCause,
+      actionPlan: canonical.actionPlan,
+      responsiblePersonName: canonical.responsiblePersonName,
+      responsiblePersonEmail: canonical.responsiblePersonEmail,
+      dueDate: canonical.dueDate,
+      targetCompletionDate: canonical.targetCompletionDate,
+      status: canonical.status,
+      createdAt: canonical.createdAt ?? "",
+      updatedAt: canonical.updatedAt ?? "",
+      completedAt: canonical.completedAt,
+    };
+  });
 }
 
 export async function getCorrectiveAction(
@@ -108,6 +136,7 @@ export async function getCorrectiveAction(
     .from("corrective_actions")
     .select("*")
     .eq("id", caId)
+    .is("deleted_at", null)
     .single();
 
   if (error) {
@@ -117,19 +146,21 @@ export async function getCorrectiveAction(
 
   if (!data) return null;
 
+  const canonical = toCanonicalCorrectiveAction(data);
+
   return {
-    id: data.id,
-    nonConformityId: data.non_conformity_id,
-    description: data.description,
-    rootCause: data.root_cause,
-    actionPlan: data.action_plan,
-    responsiblePersonName: data.responsible_person_name,
-    responsiblePersonEmail: data.responsible_person_email,
-    dueDate: data.due_date,
-    targetCompletionDate: data.target_completion_date,
-    status: data.status,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-    completedAt: data.completed_at,
+    id: canonical.id,
+    nonConformityId: canonical.nonConformityId ?? "",
+    description: canonical.description ?? "",
+    rootCause: canonical.rootCause,
+    actionPlan: canonical.actionPlan,
+    responsiblePersonName: canonical.responsiblePersonName,
+    responsiblePersonEmail: canonical.responsiblePersonEmail,
+    dueDate: canonical.dueDate,
+    targetCompletionDate: canonical.targetCompletionDate,
+    status: canonical.status,
+    createdAt: canonical.createdAt ?? "",
+    updatedAt: canonical.updatedAt ?? "",
+    completedAt: canonical.completedAt,
   };
 }

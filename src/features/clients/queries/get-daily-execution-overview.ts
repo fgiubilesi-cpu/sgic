@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { runClientsQueryWithSoftDeleteFallback } from "@/lib/supabase/clients-soft-delete";
 import type { ClientTaskPriority, ClientTaskStatus } from '@/features/clients/queries/get-client-workspace';
 
 type TaskRow = {
@@ -81,6 +82,10 @@ export interface DailyExecutionOverview {
   };
   thisWeekItems: DailyExecutionItem[];
   todayItems: DailyExecutionItem[];
+}
+
+export interface DailyExecutionFilters {
+  clientId?: string;
 }
 
 const MAX_ITEMS_PER_BUCKET = 100;
@@ -208,36 +213,58 @@ function annotateCriticalState(
 }
 
 export async function getDailyExecutionOverview(
-  organizationId: string
+  organizationId: string,
+  filters: DailyExecutionFilters = {}
 ): Promise<DailyExecutionOverview> {
   const supabase = await createClient();
   const today = startOfToday();
   const weekEnd = endOfWeek(today);
 
-  const [clientsResult, locationsResult, tasksResult, deadlinesResult] = await Promise.all([
-    supabase
+  const clientsQuery = runClientsQueryWithSoftDeleteFallback((useSoftDeleteGuard) => {
+    let query = supabase
       .from('clients')
       .select('id, name')
-      .eq('organization_id', organizationId),
-    supabase
+      .eq('organization_id', organizationId);
+
+    if (useSoftDeleteGuard) {
+      query = query.is('deleted_at', null);
+    }
+
+    return query;
+  });
+
+  const locationsQuery = supabase
       .from('locations')
       .select('id, name')
-      .eq('organization_id', organizationId),
-    supabase
+      .eq('organization_id', organizationId);
+
+  let tasksQuery = supabase
       .from('client_tasks')
       .select(
         'id, client_id, title, status, priority, due_date, owner_name, service_line_id, location_id, is_recurring, recurrence_label'
       )
       .eq('organization_id', organizationId)
-      .neq('status', 'done'),
-    supabase
+      .neq('status', 'done');
+
+  let deadlinesQuery = supabase
       .from('client_deadlines')
       .select(
         'id, client_id, title, due_date, priority, status, source_type, service_line_id, location_id'
       )
       .eq('organization_id', organizationId)
       .eq('status', 'open')
-      .neq('source_type', 'task'),
+      .neq('source_type', 'task');
+
+  if (filters.clientId) {
+    tasksQuery = tasksQuery.eq('client_id', filters.clientId);
+    deadlinesQuery = deadlinesQuery.eq('client_id', filters.clientId);
+  }
+
+  const [clientsResult, locationsResult, tasksResult, deadlinesResult] = await Promise.all([
+    clientsQuery,
+    locationsQuery,
+    tasksQuery,
+    deadlinesQuery,
   ]);
 
   if (clientsResult.error) throw clientsResult.error;

@@ -1,5 +1,18 @@
 # SGIC — TODO.md
-> Aggiornato: 2026-03-26 | Sprint 19
+> Aggiornato: 2026-03-28 | Sprint 20
+
+---
+
+## CURRENT SPRINT — Sprint 20: Stabilizzazione crash clienti + sessione
+
+> In corso. Focus: fermare i crash da schema non allineato e impedire logout/freeze su errori dati.
+
+- [x] **FIX-CLIENTS-1** Migration SQL per `clients.deleted_at` + contratto tipi aggiornato
+- [x] **FIX-CLIENTS-2** Fallback applicativo sui read path critici (`my-day`, `management`, `documents`, `organization`) finché il DB non applica la migration
+- [x] **AUTH-1** Middleware Supabase attivato a livello app per refresh sessione coerente
+- [x] **AUTH-2** `getOrganizationContext()` distingue errore auth da errore dati, evitando redirect impropri a `/login`
+- [x] **ROUTES-1** Alias legacy `/normative` → `/regulatory` e `/organizzazione` → `/organization`
+- [x] **UX-1** Sidebar ripensata per cluster operativi (`Workspace`, `Operativita`, `Contesto`, `Sistema`) con `Audit` e `Campionamenti` nello stesso blocco
 
 ---
 

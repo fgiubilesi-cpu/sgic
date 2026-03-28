@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -130,8 +130,35 @@ export function AuditsToolbar({
   const [searchValue, setSearchValue] = useState(state.search);
   const activeFilters = getActiveFilterLabels(state, options);
 
+  const updateParams = useCallback(
+    (
+      updates: Partial<Record<"search" | "status" | "client" | "location" | "period" | "hasOpenNc" | "scoreBand" | "sort" | "groupBy" | "view" | "dateMin" | "dateMax", string>>
+    ) => {
+      const nextParams = new URLSearchParams(currentSearchParams.toString());
+
+      for (const [key, value] of Object.entries(updates)) {
+        if (!value || value === "all" || value === "false" || value === "none" || value === "table") {
+          nextParams.delete(key);
+        } else {
+          nextParams.set(key, value);
+        }
+      }
+
+      const nextUrl = nextParams.toString() ? `${pathname}?${nextParams.toString()}` : pathname;
+
+      startTransition(() => {
+        router.replace(nextUrl);
+      });
+    },
+    [currentSearchParams, pathname, router, startTransition]
+  );
+
   useEffect(() => {
-    setSearchValue(state.search);
+    const timer = window.setTimeout(() => {
+      setSearchValue(state.search);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [state.search]);
 
   useEffect(() => {
@@ -141,27 +168,7 @@ export function AuditsToolbar({
     }, 250);
 
     return () => window.clearTimeout(timeoutId);
-  }, [searchValue, state.search]);
-
-  function updateParams(
-    updates: Partial<Record<"search" | "status" | "client" | "location" | "period" | "hasOpenNc" | "scoreBand" | "sort" | "groupBy" | "view" | "dateMin" | "dateMax", string>>
-  ) {
-    const nextParams = new URLSearchParams(currentSearchParams.toString());
-
-    for (const [key, value] of Object.entries(updates)) {
-      if (!value || value === "all" || value === "false" || value === "none" || value === "table") {
-        nextParams.delete(key);
-      } else {
-        nextParams.set(key, value);
-      }
-    }
-
-    const nextUrl = nextParams.toString() ? `${pathname}?${nextParams.toString()}` : pathname;
-
-    startTransition(() => {
-      router.replace(nextUrl);
-    });
-  }
+  }, [searchValue, state.search, updateParams]);
 
   function clearFilter(filterKey: string) {
     if (filterKey === "hasOpenNc") {

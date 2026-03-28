@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdminOperator } from "@/lib/access-control";
+import { recordAppEvent } from "@/lib/app-event-log";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import { isFMConfigured } from "@/lib/filemaker/fm-client";
 import { importClientsFromFM } from "@/features/filemaker/import/import-clients";
@@ -29,7 +31,9 @@ export async function syncFromFileMakerAction(): Promise<SyncResult> {
     };
   }
 
-  if (ctx.role !== "admin") {
+  try {
+    assertAdminOperator(ctx, "sincronizzazione FileMaker");
+  } catch {
     return {
       success: false,
       summary: "Permesso negato. Solo gli amministratori possono eseguire la sincronizzazione.",
@@ -69,6 +73,20 @@ export async function syncFromFileMakerAction(): Promise<SyncResult> {
   const summary = success
     ? `Sincronizzazione completata: ${totalImported} record importati, ${totalUpdated} aggiornati.`
     : `Completata con ${totalErrors} errore${totalErrors > 1 ? "i" : ""}: ${totalImported} importati, ${totalUpdated} aggiornati.`;
+
+  await recordAppEvent(ctx, {
+    action: "INSERT",
+    details: summary,
+    payload: {
+      entity: "filemaker_sync",
+      imported: totalImported,
+      success,
+      total_errors: totalErrors,
+      updated: totalUpdated,
+    },
+    tableName: "integration_events",
+    title: "Sync FileMaker eseguita",
+  });
 
   return {
     success,

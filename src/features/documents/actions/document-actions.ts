@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import type { Tables } from '@/types/database.types';
+import { assertInternalOperator } from '@/lib/access-control';
+import { recordAppEvent } from '@/lib/app-event-log';
 import { getOrganizationContext } from '@/lib/supabase/get-org-context';
 import type { DocumentFormInput } from '@/features/documents/schemas/document-schema';
 import { documentSchema } from '@/features/documents/schemas/document-schema';
@@ -889,7 +891,7 @@ export async function reprocessDocumentIntake(documentId: string) {
 export async function submitDocumentIntakeReview(documentId: string, input: DocumentIntakeReviewInput) {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) throw new Error('Unauthorized');
+    assertInternalOperator(ctx, 'review documentale');
 
     const validated = documentIntakeReviewSchema.parse(input);
 
@@ -986,6 +988,20 @@ export async function submitDocumentIntakeReview(documentId: string, input: Docu
       if (ingestionInsertError) throw ingestionInsertError;
     }
 
+    await recordAppEvent(ctx, {
+      action: 'INSERT',
+      details: `${document.title ?? document.file_name ?? 'Documento'} · ${validated.action}`,
+      payload: {
+        action: validated.action,
+        category: validated.category,
+        create_followup_task: validated.create_followup_task ?? false,
+        document_id: document.id,
+        next_status: nextDocumentStatus,
+      },
+      recordId: document.id,
+      tableName: 'document_review_events',
+      title: 'Review documento salvata',
+    });
     revalidateDocumentScopes(document);
     return { success: true as const };
   } catch (error) {

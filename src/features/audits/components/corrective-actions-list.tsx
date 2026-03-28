@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Clock } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,9 +12,25 @@ import {
   CA_STATUS_COLORS,
 } from "@/features/quality/constants";
 import {
+  countOpenCorrectiveActions,
+  countOverdueCorrectiveActions,
+} from "@/features/quality/lib/quality-process";
+import {
+  toCanonicalCorrectiveAction,
+  toProcessCorrectiveActionShape,
+} from "@/features/quality/lib/nc-ac-contract";
+import { cn } from "@/lib/utils";
+import {
   completeCorrectiveAction,
   createCorrectiveAction,
 } from "@/features/audits/actions/corrective-action-actions";
+import {
+  formatAuditDateLabel,
+  getAuditCorrectiveActionDeadline,
+  getCorrectiveActionOperationalFocus,
+  isAuditCorrectiveActionOverdue,
+  sortCorrectiveActionsForAudit,
+} from "@/features/audits/lib/audit-process-view";
 import { CorrectiveActionForm } from "./corrective-action-form";
 import { CorrectiveActionDetail } from "./corrective-action-detail";
 
@@ -41,6 +57,12 @@ export function CorrectiveActionsList({
   const [selectedCA, setSelectedCA] = useState<CorrectiveAction | null>(null);
   const [isLoadingCreate, setIsLoadingCreate] = useState(false);
   const [isCompletingId, setIsCompletingId] = useState<string | null>(null);
+  const processActions = correctiveActions.map((action) =>
+    toProcessCorrectiveActionShape(toCanonicalCorrectiveAction(action))
+  );
+  const openActions = countOpenCorrectiveActions(processActions);
+  const overdueActions = countOverdueCorrectiveActions(processActions);
+  const sortedCorrectiveActions = sortCorrectiveActionsForAudit(correctiveActions);
 
   const handleCreateCA = async (data: {
     description: string;
@@ -139,33 +161,88 @@ export function CorrectiveActionsList({
         </div>
       ) : correctiveActions.length === 0 ? (
         <div className="rounded-lg border border-dashed border-zinc-200 bg-white px-6 py-8 text-sm text-zinc-500 text-center">
-          No corrective actions defined yet
+          Serve almeno una azione correttiva per spostare questa NC dalla rilevazione alla presa in carico.
         </div>
       ) : (
         <div className="space-y-2">
-          {correctiveActions.map((ca) => (
+          <div className="flex flex-wrap gap-2">
+            <Badge className="bg-zinc-100 text-zinc-700 border-zinc-200">
+              {correctiveActions.length} totali
+            </Badge>
+            <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+              {openActions} aperte
+            </Badge>
+            {overdueActions > 0 ? (
+              <Badge className="bg-red-100 text-red-800 border-red-200">
+                {overdueActions} in ritardo
+              </Badge>
+            ) : null}
+          </div>
+
+          {sortedCorrectiveActions.map((ca) => {
+            const focus = getCorrectiveActionOperationalFocus(ca);
+            const deadline = getAuditCorrectiveActionDeadline(ca);
+            const overdue = isAuditCorrectiveActionOverdue(ca);
+
+            return (
             <button
               key={ca.id}
               onClick={() => setSelectedCA(ca)}
-              className="w-full text-left rounded-lg border border-zinc-200 bg-white p-4 hover:bg-zinc-50 transition-colors"
+              className={cn(
+                "w-full text-left rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:bg-zinc-50",
+                overdue ? "border-red-200 bg-red-50/40" : ""
+              )}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-zinc-900 break-words">
+                  <h3 className="font-medium text-zinc-900 break-words line-clamp-2">
                     {ca.description}
                   </h3>
-                  {ca.responsiblePersonName && (
-                    <p className="text-sm text-zinc-500 mt-1">
-                      Assigned to: {ca.responsiblePersonName}
+
+                  <div className="mt-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <p
+                      className={cn(
+                        "text-xs font-medium",
+                        focus.tone === "critical" && "text-red-700",
+                        focus.tone === "success" && "text-emerald-700",
+                        focus.tone === "warning" && "text-amber-700",
+                        focus.tone === "neutral" && "text-zinc-700"
+                      )}
+                    >
+                      {focus.label}
                     </p>
-                  )}
-                  {ca.targetCompletionDate && (
-                    <div className="flex items-center gap-1 text-sm text-zinc-500 mt-2">
-                      <Clock className="w-4 h-4" />
-                      Due: {new Date(ca.targetCompletionDate).toLocaleDateString("en-GB")}
-                    </div>
-                  )}
+                    {focus.detail ? (
+                      <p className="mt-1 text-[11px] text-zinc-500">{focus.detail}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-zinc-600">
+                    {ca.responsiblePersonName ? (
+                      <span className="flex items-center gap-1">
+                        <User className="h-3.5 w-3.5" />
+                        {ca.responsiblePersonName}
+                      </span>
+                    ) : (
+                      <span className="text-amber-700">Responsabile da assegnare</span>
+                    )}
+
+                    {deadline ? (
+                      <span
+                        className={cn(
+                          "flex items-center gap-1",
+                          overdue ? "text-red-700 font-medium" : ""
+                        )}
+                      >
+                        <Clock className="h-3.5 w-3.5" />
+                        {formatAuditDateLabel(deadline)}
+                        {overdue ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
+                      </span>
+                    ) : (
+                      <span className="text-amber-700">Scadenza da definire</span>
+                    )}
+                  </div>
                 </div>
+
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Badge className={CA_STATUS_COLORS[ca.status]}>
                     {CA_STATUS_LABELS[ca.status]}
@@ -186,7 +263,8 @@ export function CorrectiveActionsList({
                 </div>
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

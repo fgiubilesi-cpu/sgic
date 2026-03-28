@@ -11,6 +11,7 @@ import {
 import { AuditTimeline } from "@/features/audits/components/audit-timeline";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { buildAuditHistorySummary } from "@/features/audits/lib/audit-history-view";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function AuditHistoryPage() {
       .from("clients")
       .select("name")
       .eq("id", ctx.clientId)
+      .is("deleted_at", null)
       .single();
 
     if (client?.name) {
@@ -34,19 +36,7 @@ export default async function AuditHistoryPage() {
     }
   }
 
-  const totalAudits = timelineData.length;
-  const closedAudits = timelineData.filter((event) => event.status === "Closed").length;
-  const inProgressAudits = timelineData.filter(
-    (event) => event.status === "In Progress"
-  ).length;
-  const scoredEvents = timelineData.filter((event) => event.score !== null);
-  const averageCompliance =
-    scoredEvents.length > 0
-      ? Math.round(
-          scoredEvents.reduce((sum, event) => sum + (event.score || 0), 0) /
-            scoredEvents.length
-        )
-      : 0;
+  const summary = buildAuditHistorySummary(timelineData);
 
   return (
     <div className="space-y-6">
@@ -75,7 +65,7 @@ export default async function AuditHistoryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{totalAudits}</div>
+            <div className="text-3xl font-bold">{summary.totalAudits}</div>
           </CardContent>
         </Card>
 
@@ -86,7 +76,7 @@ export default async function AuditHistoryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-600">{closedAudits}</div>
+            <div className="text-3xl font-bold text-green-600">{summary.closedAudits}</div>
           </CardContent>
         </Card>
 
@@ -97,7 +87,7 @@ export default async function AuditHistoryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-yellow-600">{inProgressAudits}</div>
+            <div className="text-3xl font-bold text-yellow-600">{summary.inProgressAudits}</div>
           </CardContent>
         </Card>
 
@@ -109,7 +99,7 @@ export default async function AuditHistoryPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-emerald-600">
-              {averageCompliance}%
+              {summary.averageCompliance}%
             </div>
           </CardContent>
         </Card>

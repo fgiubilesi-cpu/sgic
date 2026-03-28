@@ -23,7 +23,8 @@ export async function importClientsFromFM(
   const { data: existingClients } = await supabase
     .from("clients")
     .select("id, name, vat_number, fm_record_id")
-    .eq("organization_id", organizationId);
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
 
   const byFmId = new Map<string, string>(); // fm_record_id → SGIC id
   const byVat = new Map<string, string>(); // vat_number → SGIC id
@@ -93,7 +94,8 @@ async function importLocationsFromFM(
   const { data: clients } = await supabase
     .from("clients")
     .select("id, fm_record_id")
-    .eq("organization_id", organizationId);
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
 
   const clientByFmId = new Map<string, string>();
   for (const c of clients ?? []) {

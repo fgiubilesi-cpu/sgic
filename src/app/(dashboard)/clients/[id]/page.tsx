@@ -62,6 +62,7 @@ export default async function ClientDetailPage({ params: paramsProm }: ClientDet
           .select('audit_id, status')
           .eq('organization_id', orgContext.organizationId)
           .in('audit_id', auditIds)
+          .is('deleted_at', null)
           .neq('status', 'closed')
       : { data: [] };
 

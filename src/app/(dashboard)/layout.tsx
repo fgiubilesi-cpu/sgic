@@ -16,6 +16,12 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -32,6 +38,9 @@ import {
   Settings,
   Users,
   Clock,
+  ListTodo,
+  BellRing,
+  Scale,
 } from "lucide-react";
 import { ClientFilter } from "@/features/clients/components/client-filter";
 import { getClientsList } from "@/features/clients/queries/get-clients-list";
@@ -51,77 +60,158 @@ type NavItem =
   | { label: string; href: string; icon: React.ElementType; disabled?: false }
   | { label: string; href: null; icon: React.ElementType; disabled: true };
 
-function getNavItems(role?: string | null): NavItem[] {
+type NavSection = {
+  items: NavItem[];
+  label: string;
+};
+
+function getNavSections(role?: string | null): NavSection[] {
   if (role === "client") {
-    // Client users see only the client dashboard
     return [
-      { label: "Dashboard cliente", href: "/client-dashboard", icon: HomeIcon },
+      {
+        label: "Workspace",
+        items: [
+          { label: "My Day", href: "/my-day", icon: ListTodo },
+          { label: "Dashboard cliente", href: "/client-dashboard", icon: HomeIcon },
+        ],
+      },
     ];
   }
 
-  // Inspector and admin users see the full menu
-  const items: NavItem[] = [
-    { label: "Dashboard", href: "/dashboard", icon: HomeIcon },
-    { label: "Audit", href: "/audits", icon: ClipboardCheck },
-    { label: "Clienti", href: "/clients", icon: Building2 },
-    { label: "Personale", href: "/personnel", icon: Users },
-    { label: "Documenti", href: "/documents", icon: FileText },
-    { label: "Formazione", href: "/training", icon: GraduationCap },
-    { label: "Campionamenti", href: "/samplings", icon: FlaskConical },
-    { label: "Scadenze", href: "/deadlines", icon: Clock },
-    { label: "Organizzazione", href: "/organization", icon: Building2 },
-    { label: "Account", href: "/settings", icon: Settings },
+  return [
+    {
+      label: "Workspace",
+      items: [
+        { label: "My Day", href: "/my-day", icon: ListTodo },
+        { label: "Dashboard", href: "/dashboard", icon: HomeIcon },
+        { label: "Notifiche", href: "/notifications", icon: BellRing },
+      ],
+    },
+    {
+      label: "Operativita",
+      items: [
+        { label: "Audit", href: "/audits", icon: ClipboardCheck },
+        { label: "Campionamenti", href: "/samplings", icon: FlaskConical },
+        { label: "Formazione", href: "/training", icon: GraduationCap },
+        { label: "Scadenze", href: "/deadlines", icon: Clock },
+      ],
+    },
+    {
+      label: "Contesto",
+      items: [
+        { label: "Clienti", href: "/clients", icon: Building2 },
+        { label: "Personale", href: "/personnel", icon: Users },
+        { label: "Documenti", href: "/documents", icon: FileText },
+        { label: "Normative", href: "/regulatory", icon: Scale },
+      ],
+    },
+    {
+      label: "Sistema",
+      items: [
+        ...(role === "admin"
+          ? [
+              {
+                label: "Direzione",
+                href: "/management",
+                icon: BriefcaseBusiness,
+              } satisfies NavItem,
+            ]
+          : []),
+        { label: "Organizzazione", href: "/organization", icon: Building2 },
+        { label: "Account", href: "/settings", icon: Settings },
+      ],
+    },
   ];
-
-  if (role === "admin") {
-    items.splice(1, 0, {
-      label: "Direzione",
-      href: "/management",
-      icon: BriefcaseBusiness,
-    });
-  }
-
-  return items;
 }
 
-function NavLinks({ role }: { role?: string | null }) {
-  const NAV_ITEMS = getNavItems(role);
+function NavLinkItem({ item }: { item: NavItem }) {
+  const Icon = item.icon;
+
+  if (item.disabled) {
+    return (
+      <div
+        className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-400 cursor-not-allowed select-none"
+        title="Prossimamente"
+      >
+        <Icon className="h-4 w-4 text-zinc-300" />
+        <span className="flex-1">{item.label}</span>
+        <Badge
+          variant="secondary"
+          className="text-[10px] px-1.5 py-0 h-4 bg-zinc-100 text-zinc-400 border-zinc-200"
+        >
+          presto
+        </Badge>
+      </div>
+    );
+  }
 
   return (
-    <nav className="flex-1 space-y-1 px-3 py-4">
-      {NAV_ITEMS.map((item) => {
-        const Icon = item.icon;
+    <Link
+      href={item.href}
+      className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+    >
+      <Icon className="h-4 w-4 text-zinc-500" />
+      <span>{item.label}</span>
+    </Link>
+  );
+}
 
-        if (item.disabled) {
-          return (
-            <div
-              key={item.label}
-              className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-400 cursor-not-allowed select-none"
-              title="Prossimamente"
+function NavLinks({
+  role,
+  mobile = false,
+}: {
+  role?: string | null;
+  mobile?: boolean;
+}) {
+  const sections = getNavSections(role);
+
+  if (mobile) {
+    return (
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <Accordion
+          type="multiple"
+          defaultValue={sections.map((section) => section.label)}
+          className="space-y-2"
+        >
+          {sections.map((section) => (
+            <AccordionItem
+              key={section.label}
+              value={section.label}
+              className="rounded-xl border border-zinc-200 bg-zinc-50 px-3"
             >
-              <Icon className="h-4 w-4 text-zinc-300" />
-              <span className="flex-1">{item.label}</span>
-              <Badge
-                variant="secondary"
-                className="text-[10px] px-1.5 py-0 h-4 bg-zinc-100 text-zinc-400 border-zinc-200"
-              >
-                presto
-              </Badge>
-            </div>
-          );
-        }
+              <AccordionTrigger className="py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500 hover:no-underline">
+                {section.label}
+              </AccordionTrigger>
+              <AccordionContent className="pb-3">
+                <div className="space-y-1">
+                  {section.items.map((item) => (
+                    <NavLinkItem key={item.label} item={item} />
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </nav>
+    );
+  }
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
-          >
-            <Icon className="h-4 w-4 text-zinc-500" />
-            <span>{item.label}</span>
-          </Link>
-        );
-      })}
+  return (
+    <nav className="flex-1 overflow-y-auto px-3 py-4">
+      {sections.map((section) => (
+        <div key={section.label} className="mb-5 last:mb-0">
+          <div className="px-3 pb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
+              {section.label}
+            </span>
+          </div>
+          <div className="space-y-1">
+            {section.items.map((item) => (
+              <NavLinkItem key={item.label} item={item} />
+            ))}
+          </div>
+        </div>
+      ))}
     </nav>
   );
 }
@@ -211,7 +301,7 @@ export default async function DashboardLayout({
                   </SheetTrigger>
                   <SheetContent side="left" className="flex w-72 flex-col p-0">
                     <BrandLogo />
-                    <NavLinks role={dashboardUser.role} />
+                    <NavLinks role={dashboardUser.role} mobile />
                     <div className="border-t px-4 py-3">
                       <UserNav user={dashboardUser} />
                     </div>

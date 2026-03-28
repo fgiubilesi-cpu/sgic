@@ -1,11 +1,16 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import { getResendClient, FROM_EMAIL } from "@/lib/email/resend-client";
 import {
   buildOverdueACEmail,
   type OverdueACItem,
 } from "@/lib/email/templates";
+import {
+  getNotificationDispatchAudience,
+  recordNotificationDispatch,
+} from "@/features/notifications/lib/notification-dispatch-log";
 
 export type SendOverdueACResult =
   | { success: true; sent: number; skipped: number }
@@ -19,6 +24,7 @@ export async function sendOverdueACNotificationsAction(
   if (ctx.role !== "admin" && ctx.role !== "inspector") {
     return { success: false, error: "Permesso negato." };
   }
+  const audience = await getNotificationDispatchAudience(ctx);
 
   const { supabase, organizationId } = ctx;
   const today = new Date().toISOString().split("T")[0];
@@ -43,6 +49,20 @@ export async function sendOverdueACNotificationsAction(
     .lt("due_date", today);
 
   if (error) {
+    await recordNotificationDispatch(ctx, {
+      audience,
+      channel: "email",
+      details: error.message,
+      payload: {
+        client_id: clientId ?? null,
+      },
+      severity: "danger",
+      status: "failed",
+      targetRef: clientId ?? null,
+      title: "Notifica AC scadute",
+      type: "overdue_corrective_actions",
+    });
+    revalidatePath("/notifications");
     return { success: false, error: error.message };
   }
 
@@ -103,8 +123,44 @@ export async function sendOverdueACNotificationsAction(
   }
 
   if (items.length === 0) {
+    await recordNotificationDispatch(ctx, {
+      audience,
+      channel: "email",
+      details: "Nessuna azione correttiva scaduta con destinatario valido.",
+      payload: {
+        client_id: clientId ?? null,
+        items_count: 0,
+      },
+      severity: "danger",
+      status: "skipped",
+      targetRef: clientId ?? null,
+      title: "Notifica AC scadute",
+      type: "overdue_corrective_actions",
+    });
+    revalidatePath("/notifications");
     return { success: false, error: "Nessuna AC scaduta con email destinatario." };
   }
+
+  await recordNotificationDispatch(ctx, {
+    audience,
+    channel: "email",
+    details:
+      sent > 0
+        ? `${sent} email inviate${skipped > 0 ? `, ${skipped} saltate` : ""}.`
+        : `${skipped} email saltate, nessun invio riuscito.`,
+    payload: {
+      client_id: clientId ?? null,
+      items_count: items.length,
+      sent,
+      skipped,
+    },
+    severity: "danger",
+    status: sent > 0 ? "sent" : "failed",
+    targetRef: clientId ?? null,
+    title: "Notifica AC scadute",
+    type: "overdue_corrective_actions",
+  });
+  revalidatePath("/notifications");
 
   return { success: true, sent, skipped };
 }

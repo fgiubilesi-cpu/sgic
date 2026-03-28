@@ -795,7 +795,8 @@ export async function switchAuditTemplate(input: {
         .from('non_conformities')
         .select('id', { count: 'exact', head: true })
         .eq('audit_id', parsed.data.auditId)
-        .eq('organization_id', organizationId),
+        .eq('organization_id', organizationId)
+        .is('deleted_at', null),
     ])
 
   if (mediaError) {

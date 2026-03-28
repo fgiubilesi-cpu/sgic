@@ -19,6 +19,25 @@ interface PageProps {
     params: Promise<{ id: string }>;
 }
 
+type SamplingRow = {
+    location: string | null;
+    matrix: string;
+    operator_name: string | null;
+    sampling_date: string;
+    status: string;
+    title: string;
+};
+
+type LabResultRow = {
+    created_at: string;
+    id: string;
+    limit_value: number | null;
+    outcome: "fail" | "pass" | "pending";
+    parameter: string;
+    result_value: number;
+    uom: string;
+};
+
 export default async function SamplingDetailPage({ params }: PageProps) {
     const { id } = await params;
     const supabase = await createClient();
@@ -37,25 +56,24 @@ export default async function SamplingDetailPage({ params }: PageProps) {
     if (!organizationId) redirect("/onboarding");
 
     // Fetch Sampling
-    const samplingRes = await (supabase
+    const samplingRes = await supabase
         .from("samplings")
         .select("*")
         .eq("id", id)
         .eq("organization_id", organizationId)
-        .single() as any);
+        .single();
 
-    if (!samplingRes.data) notFound();
-
-    const sampling = samplingRes.data;
+    const sampling = samplingRes.data as SamplingRow | null;
+    if (!sampling) notFound();
 
     // Fetch Lab Results
-    const resultsRes = await (supabase
+    const resultsRes = await supabase
         .from("lab_results")
         .select("*")
         .eq("sampling_id", id)
-        .order("created_at", { ascending: false }) as any);
+        .order("created_at", { ascending: false });
 
-    const labResults = resultsRes.data || [];
+    const labResults = (resultsRes.data ?? []) as LabResultRow[];
 
     const getStatusBadge = (status: string) => {
         switch (status) {

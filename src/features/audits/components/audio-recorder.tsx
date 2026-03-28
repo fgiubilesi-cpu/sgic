@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
-import { Mic, Square, Loader2, Trash2, PlayCircle } from "lucide-react";
+import { Mic, Square, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { uploadChecklistMedia, deleteChecklistMedia } from "@/features/audits/actions";
 import {
@@ -228,7 +228,6 @@ export function AudioRecorder({
 
           <div className="flex flex-col gap-3">
             {url && (
-              // eslint-disable-next-line jsx-a11y/media-has-caption
               <audio controls src={url} className="w-full" />
             )}
           </div>

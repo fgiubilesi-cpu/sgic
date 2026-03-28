@@ -1,8 +1,13 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import { getResendClient, FROM_EMAIL } from "@/lib/email/resend-client";
 import { buildAuditReportEmail, type AuditReportData } from "@/lib/email/templates";
+import {
+  getNotificationDispatchAudience,
+  recordNotificationDispatch,
+} from "@/features/notifications/lib/notification-dispatch-log";
 
 export type SendAuditReportResult =
   | { success: true; to: string }
@@ -17,6 +22,7 @@ export async function sendAuditReportAction(
   if (ctx.role !== "admin" && ctx.role !== "inspector") {
     return { success: false, error: "Permesso negato." };
   }
+  const audience = await getNotificationDispatchAudience(ctx);
 
   const { supabase, organizationId } = ctx;
 
@@ -85,9 +91,41 @@ export async function sendAuditReportAction(
       subject,
       html,
     });
+    await recordNotificationDispatch(ctx, {
+      audience,
+      channel: "email",
+      details: `Report audit inviato a ${recipientEmail}.`,
+      payload: {
+        audit_id: auditId,
+        pending_acs: pendingACs,
+        total_ncs: ncList.length,
+      },
+      recipient: recipientEmail,
+      severity: "default",
+      status: "sent",
+      targetRef: auditId,
+      title: "Invio report audit",
+      type: "audit_report",
+    });
+    revalidatePath("/notifications");
     return { success: true, to: recipientEmail };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Errore invio email.";
+    await recordNotificationDispatch(ctx, {
+      audience,
+      channel: "email",
+      details: message,
+      payload: {
+        audit_id: auditId,
+      },
+      recipient: recipientEmail,
+      severity: "default",
+      status: "failed",
+      targetRef: auditId,
+      title: "Invio report audit",
+      type: "audit_report",
+    });
+    revalidatePath("/notifications");
     return { success: false, error: message };
   }
 }

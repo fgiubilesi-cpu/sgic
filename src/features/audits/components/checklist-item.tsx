@@ -274,6 +274,8 @@ export function ChecklistItem({
 
           {optimisticItem.evidenceUrl && (
             <div className="relative">
+              {/* Evidence previews use direct object/storage URLs and don't benefit from Next image optimization. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={optimisticItem.evidenceUrl}
                 alt="Evidence photo"

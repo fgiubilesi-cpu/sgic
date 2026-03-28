@@ -1,5 +1,24 @@
 import type { OrgContext } from "@/lib/supabase/get-org-context";
+import { runClientsQueryWithSoftDeleteFallback } from "@/lib/supabase/clients-soft-delete";
 import { getTrainingWindowSummary } from "@/features/personnel/lib/personnel-status";
+import {
+  addDays,
+  addToSetMap,
+  buildManagementCoverageRows,
+  buildNativePortfolioRow,
+  buildStagingPortfolioRow,
+  classifyDueDate,
+  compareDateStrings,
+  dedupeAndSortDueItems,
+  isClosedLikeStatus,
+  isRecurringCadence,
+  normalizeLookupValue,
+  normalizeStatus,
+  startOfToday,
+  toDateKey,
+  type ManagementCoverageBucket,
+  type ManagementStagingOnlyClientAccumulator,
+} from "@/features/management/lib/management-dashboard-derivations";
 
 type ClientRow = {
   id: string;
@@ -296,72 +315,6 @@ async function safeArrayQuery<T>(
   return data ?? [];
 }
 
-function startOfToday() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function normalizeStatus(status: string | null | undefined) {
-  return (status ?? "").trim().toLowerCase();
-}
-
-function normalizeLookupValue(value: string | null | undefined) {
-  return (value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-}
-
-function isClosedLikeStatus(status: string | null | undefined) {
-  const normalized = normalizeStatus(status);
-  return [
-    "archived",
-    "cancelled",
-    "closed",
-    "completed",
-    "done",
-    "expired",
-    "inactive",
-    "verified",
-  ].includes(normalized);
-}
-
-function isRecurringCadence(cadence: string | null | undefined) {
-  const normalized = normalizeLookupValue(cadence);
-  return Boolean(normalized) && !["one-shot", "singolo", "spot", "una tantum"].includes(normalized);
-}
-
-function addToSetMap(map: Map<string, Set<string>>, key: string, value: string) {
-  const bucket = map.get(key) ?? new Set<string>();
-  bucket.add(value);
-  map.set(key, bucket);
-}
-
-function toDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function compareDateStrings(left: string, right: string) {
-  return new Date(left).getTime() - new Date(right).getTime();
-}
-
-function classifyDueDate(dateString: string, todayKey: string, soonLimitKey: string) {
-  if (dateString < todayKey) return "overdue" as const;
-  if (dateString <= soonLimitKey) return "due_soon" as const;
-  return "planned" as const;
-}
-
 export async function getManagementDashboardData(
   ctx: OrgContext
 ): Promise<ManagementDashboardData> {
@@ -395,11 +348,18 @@ export async function getManagementDashboardData(
     stagingCapacity,
   ] = await Promise.all([
     supabase.from("organizations").select("name").eq("id", organizationId).single(),
-    supabase
-      .from("clients")
-      .select("id, name, is_active")
-      .eq("organization_id", organizationId)
-      .order("name"),
+    runClientsQueryWithSoftDeleteFallback((useSoftDeleteGuard) => {
+      let query = supabase
+        .from("clients")
+        .select("id, name, is_active")
+        .eq("organization_id", organizationId);
+
+      if (useSoftDeleteGuard) {
+        query = query.is("deleted_at", null);
+      }
+
+      return query.order("name");
+    }),
     supabase
       .from("locations")
       .select("id, client_id")
@@ -411,11 +371,13 @@ export async function getManagementDashboardData(
     supabase
       .from("non_conformities")
       .select("id, audit_id, severity, status")
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null),
     supabase
       .from("corrective_actions")
       .select("id, non_conformity_id, status, target_completion_date")
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null),
     safeArrayQuery<DocumentRow>(
       supabase
         .from("documents")
@@ -545,16 +507,7 @@ export async function getManagementDashboardData(
   const fallbackServicesByClient = new Map<string, number>();
   const nativeServiceAreasByClient = new Map<string, Set<string>>();
   const fallbackServiceAreasByClient = new Map<string, Set<string>>();
-  const coverageRowsMap = new Map<
-    string,
-    {
-      annualValue: number;
-      nativeClients: Set<string>;
-      recurringCount: number;
-      serviceLineCount: number;
-      stagingClients: Set<string>;
-    }
-  >();
+  const coverageRowsMap = new Map<string, ManagementCoverageBucket>();
   const nativeActivePersonnelByClient = new Map<string, number>();
   const fallbackPresidioByClient = new Map<string, number>();
   const trainingRecordsByPersonnel = new Map<string, TrainingRecordRow[]>();
@@ -579,23 +532,8 @@ export async function getManagementDashboardData(
     sourceRecordId: string;
   };
 
-  type StagingOnlyClientAccumulator = {
-    activeLocations: number;
-    annualValue: number;
-    clientCode: string | null;
-    clientName: string;
-    contractDueCount: number;
-    deadlineDueCount: number;
-    key: string;
-    overdueItems: number;
-    plannedAssignments: number;
-    plannedHours: number;
-    serviceAreas: Set<string>;
-    serviceLines: number;
-  };
-
   const stagingClientBySourceRecordId = new Map<string, ResolvedStagingClient>();
-  const stagingOnlyClients = new Map<string, StagingOnlyClientAccumulator>();
+  const stagingOnlyClients = new Map<string, ManagementStagingOnlyClientAccumulator>();
 
   const addCoverageRow = (
     label: string,
@@ -649,7 +587,7 @@ export async function getManagementDashboardData(
     }
 
     const stagingClient = stagingClientBySourceRecordId.get(key);
-    const entry: StagingOnlyClientAccumulator = {
+    const entry: ManagementStagingOnlyClientAccumulator = {
       activeLocations: activeLocationsCount ?? stagingClient?.activeLocationsCount ?? 0,
       annualValue: 0,
       clientCode: fallbackCode ?? stagingClient?.clientCode ?? null,
@@ -1202,176 +1140,32 @@ export async function getManagementDashboardData(
     }
   }
 
-  const coverageRows = Array.from(coverageRowsMap.entries())
-    .map<ManagementCoverageRow>(([label, value]) => {
-      const nativeClientCount = value.nativeClients.size;
-      const stagingClientCount = value.stagingClients.size;
+  const coverageRows: ManagementCoverageRow[] =
+    buildManagementCoverageRows(coverageRowsMap);
 
-      return {
-        annualValue: value.annualValue,
-        clientCount: nativeClientCount + stagingClientCount,
-        label,
-        nativeClientCount,
-        recurringCount: value.recurringCount,
-        serviceLineCount: value.serviceLineCount,
-        source:
-          nativeClientCount > 0 && stagingClientCount > 0
-            ? "blended"
-            : nativeClientCount > 0
-              ? "native"
-              : "staging",
-        stagingClientCount,
-      };
+  const nativePortfolioRows: ManagementPortfolioRow[] = activeClients.map((client) =>
+    buildNativePortfolioRow({
+      client,
+      criticalNcByClient,
+      expiringDocumentsByClient,
+      fallbackPresidioByClient,
+      fallbackServiceAreasByClient,
+      fallbackServicesByClient,
+      lastAuditDateByClient,
+      locationsByClient,
+      nativeActivePersonnelByClient,
+      nativeServiceAreasByClient,
+      nativeServicesByClient,
+      openNcByClient,
+      overdueActionsByClient,
+      overdueItemsByClient,
+      stagingSignalsByClient,
     })
-    .sort((left, right) => {
-      if (right.clientCount !== left.clientCount) {
-        return right.clientCount - left.clientCount;
-      }
-
-      return right.serviceLineCount - left.serviceLineCount;
-    });
-
-  const nativePortfolioRows = activeClients.map<ManagementPortfolioRow>((client) => {
-    const nativeServiceLinesCount = nativeServicesByClient.get(client.id) ?? 0;
-    const fallbackServiceLinesCount = fallbackServicesByClient.get(client.id) ?? 0;
-    const serviceLinesCount =
-      nativeServiceLinesCount > 0 ? nativeServiceLinesCount : fallbackServiceLinesCount;
-    const serviceAreasCount =
-      nativeServiceLinesCount > 0
-        ? nativeServiceAreasByClient.get(client.id)?.size ?? 0
-        : fallbackServiceAreasByClient.get(client.id)?.size ?? 0;
-    const nativePersonnelCount = nativeActivePersonnelByClient.get(client.id) ?? 0;
-    const fallbackPresidioCount = fallbackPresidioByClient.get(client.id) ?? 0;
-    const activePersonnelCount =
-      nativePersonnelCount > 0 ? nativePersonnelCount : fallbackPresidioCount;
-    const openNCs = openNcByClient.get(client.id) ?? 0;
-    const criticalNCs = criticalNcByClient.get(client.id) ?? 0;
-    const overdueActions = overdueActionsByClient.get(client.id) ?? 0;
-    const overdueItems = overdueItemsByClient.get(client.id) ?? 0;
-    const expiringDocuments = expiringDocumentsByClient.get(client.id) ?? 0;
-    const usesStagingFallback =
-      fallbackServiceLinesCount > 0 || fallbackPresidioCount > 0;
-
-    const riskScore =
-      criticalNCs * 6 +
-      openNCs * 2 +
-      overdueActions * 4 +
-      overdueItems * 3 +
-      expiringDocuments +
-      (serviceLinesCount === 0 ? 3 : 0) +
-      (activePersonnelCount === 0 ? 2 : 0);
-
-    const attentionReasons: string[] = [];
-    if (usesStagingFallback && nativeServiceLinesCount === 0 && fallbackServiceLinesCount > 0) {
-      attentionReasons.push("copertura servizi letta da staging FileMaker");
-    }
-    if (usesStagingFallback && nativePersonnelCount === 0 && fallbackPresidioCount > 0) {
-      attentionReasons.push("presidio interno letto da staging FileMaker");
-    }
-    if (criticalNCs > 0) {
-      attentionReasons.push(`${criticalNCs} NC critiche`);
-    }
-    if (overdueActions > 0) {
-      attentionReasons.push(`${overdueActions} AC scadute`);
-    }
-    if (overdueItems > 0) {
-      attentionReasons.push(`${overdueItems} scadenze oltre termine`);
-    }
-    if (expiringDocuments > 0) {
-      attentionReasons.push(`${expiringDocuments} documenti in scadenza`);
-    }
-    if (serviceLinesCount === 0) {
-      attentionReasons.push("copertura servizi da allineare");
-    }
-    if (activePersonnelCount === 0) {
-      attentionReasons.push("nessun presidio interno associato");
-    }
-    if (attentionReasons.length === 0) {
-      attentionReasons.push("nessuna criticita immediata");
-    }
-
-    const coverageStatus =
-      serviceLinesCount === 0
-        ? "uncovered"
-        : serviceLinesCount < 3
-          ? "partial"
-          : "covered";
-
-    return {
-      activeLocations: locationsByClient.get(client.id) ?? 0,
-      activePersonnel: activePersonnelCount,
-      attentionReasons,
-      clientHref: `/clients/${client.id}`,
-      clientId: client.id,
-      clientKey: client.id,
-      clientName: client.name,
-      coverageStatus,
-      expiringDocuments,
-      lastAuditDate: lastAuditDateByClient.get(client.id) ?? null,
-      openNCs,
-      overdueActions,
-      overdueItems,
-      riskScore,
-      serviceAreas: serviceAreasCount,
-      serviceLines: serviceLinesCount,
-      source: stagingSignalsByClient.has(client.id) ? "merged" : "sgic",
-    };
-  });
-
-  const stagingPortfolioRows = Array.from(stagingOnlyClients.values()).map<ManagementPortfolioRow>(
-    (client) => {
-      const riskScore =
-        client.overdueItems * 3 +
-        (client.serviceLines === 0 ? 3 : 0) +
-        (client.plannedAssignments === 0 ? 2 : 0);
-
-      const attentionReasons = ["cliente importato da FileMaker", "mappatura SGIC da completare"];
-      if (client.overdueItems > 0) {
-        attentionReasons.unshift(`${client.overdueItems} scadenze oltre termine`);
-      }
-      if (client.deadlineDueCount > 0 && client.overdueItems === 0) {
-        attentionReasons.push(`${client.deadlineDueCount} scadenze importate`);
-      }
-      if (client.contractDueCount > 0) {
-        attentionReasons.push(`${client.contractDueCount} rinnovi/contratti importati`);
-      }
-      if (client.serviceLines === 0) {
-        attentionReasons.push("copertura servizi non ancora importata");
-      }
-      if (client.plannedAssignments === 0) {
-        attentionReasons.push("nessun presidio staging pianificato");
-      } else if (client.plannedHours > 0) {
-        attentionReasons.push(`${client.plannedHours}h di presidio pianificate`);
-      }
-
-      const coverageStatus =
-        client.serviceLines === 0
-          ? "uncovered"
-          : client.serviceLines < 3
-            ? "partial"
-            : "covered";
-
-      return {
-        activeLocations: client.activeLocations,
-        activePersonnel: client.plannedAssignments,
-        attentionReasons,
-        clientHref: "/management",
-        clientId: null,
-        clientKey: `staging:${client.key}`,
-        clientName: client.clientName,
-        coverageStatus,
-        expiringDocuments: 0,
-        lastAuditDate: null,
-        openNCs: 0,
-        overdueActions: 0,
-        overdueItems: client.overdueItems,
-        riskScore,
-        serviceAreas: client.serviceAreas.size,
-        serviceLines: client.serviceLines,
-        source: "staging",
-      };
-    }
   );
+
+  const stagingPortfolioRows: ManagementPortfolioRow[] = Array.from(
+    stagingOnlyClients.values()
+  ).map((client) => buildStagingPortfolioRow(client));
 
   const portfolioRows = [...nativePortfolioRows, ...stagingPortfolioRows].sort((left, right) => {
     if (right.riskScore !== left.riskScore) {
@@ -1381,17 +1175,7 @@ export async function getManagementDashboardData(
     return left.clientName.localeCompare(right.clientName, "it");
   });
 
-  const dueItemsByKey = new Map<string, ManagementDueItem>();
-  for (const item of dueItems) {
-    const key = `${item.type}:${item.clientId ?? item.clientName}:${item.label}:${item.dueDate}`;
-    if (!dueItemsByKey.has(key)) {
-      dueItemsByKey.set(key, item);
-    }
-  }
-
-  const sortedDueItems = Array.from(dueItemsByKey.values())
-    .sort((left, right) => compareDateStrings(left.dueDate, right.dueDate))
-    .slice(0, 12);
+  const sortedDueItems = dedupeAndSortDueItems(dueItems).slice(0, 12);
 
   const nativeCoveredClients = activeClients.filter((client) => {
     const nativeServiceLinesCount = nativeServicesByClient.get(client.id) ?? 0;

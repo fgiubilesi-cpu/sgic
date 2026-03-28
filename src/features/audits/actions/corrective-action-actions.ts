@@ -1,7 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertInternalOperator } from "@/lib/access-control";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
+import {
+  normalizeCorrectiveActionDateFields,
+} from "@/features/quality/lib/nc-ac-contract";
+import { syncNonConformityStatusFromCorrectiveActions } from "@/features/quality/lib/nc-ac-status-sync";
 import {
   createCorrectiveActionSchema,
   updateCorrectiveActionSchema,
@@ -20,9 +25,16 @@ export async function createCorrectiveAction(
     const validated = createCorrectiveActionSchema.parse(input);
 
     const ctx = await getOrganizationContext();
-    if (!ctx) return { success: false, error: "Unauthorized" };
+    try {
+      assertInternalOperator(ctx, "azioni correttive audit");
+    } catch {
+      return { success: false, error: "Unauthorized" };
+    }
 
     const { supabase, organizationId } = ctx;
+    const dateFields = normalizeCorrectiveActionDateFields({
+      targetCompletionDate: validated.targetCompletionDate,
+    });
 
     const { data, error } = await supabase
       .from("corrective_actions")
@@ -33,7 +45,7 @@ export async function createCorrectiveAction(
         action_plan: validated.actionPlan,
         responsible_person_name: validated.responsiblePersonName,
         responsible_person_email: validated.responsiblePersonEmail,
-        target_completion_date: validated.targetCompletionDate,
+        ...dateFields,
         organization_id: organizationId,
       })
       .select("id")
@@ -43,10 +55,16 @@ export async function createCorrectiveAction(
       return { success: false, error: error.message };
     }
 
+    await syncNonConformityStatusFromCorrectiveActions({
+      nonConformityId: validated.nonConformityId,
+      supabase,
+    });
+
     const { data: nc } = await supabase
       .from("non_conformities")
       .select("audit_id")
       .eq("id", validated.nonConformityId)
+      .is("deleted_at", null)
       .single();
 
     if (nc?.audit_id) {
@@ -79,9 +97,22 @@ export async function updateCorrectiveAction(
     // updateCorrectiveAction doesn't need org-scoping (RLS protects it)
     // but we reuse the context for the supabase client
     const ctx = await getOrganizationContext();
-    if (!ctx) return { success: false, error: "Unauthorized" };
+    try {
+      assertInternalOperator(ctx, "azioni correttive audit");
+    } catch {
+      return { success: false, error: "Unauthorized" };
+    }
 
     const { supabase } = ctx;
+    const hasDatePatch =
+      Object.prototype.hasOwnProperty.call(validated, "dueDate") ||
+      Object.prototype.hasOwnProperty.call(validated, "targetCompletionDate");
+    const datePatch = hasDatePatch
+      ? normalizeCorrectiveActionDateFields({
+          dueDate: validated.dueDate,
+          targetCompletionDate: validated.targetCompletionDate,
+        })
+      : {};
 
     const { error } = await supabase
       .from("corrective_actions")
@@ -91,8 +122,7 @@ export async function updateCorrectiveAction(
         action_plan: validated.actionPlan,
         responsible_person_name: validated.responsiblePersonName,
         responsible_person_email: validated.responsiblePersonEmail,
-        due_date: validated.dueDate,
-        target_completion_date: validated.targetCompletionDate,
+        ...datePatch,
         status: validated.status,
         updated_at: new Date().toISOString(),
       })
@@ -106,22 +136,20 @@ export async function updateCorrectiveAction(
       .from("corrective_actions")
       .select("non_conformity_id")
       .eq("id", validated.id)
+      .is("deleted_at", null)
       .single();
 
     if (ca?.non_conformity_id) {
-      // N5: When AC is completed → NC becomes closed (risolta)
-      if (validated.status === "completed") {
-        await supabase
-          .from("non_conformities")
-          .update({ status: "closed", closed_at: new Date().toISOString() })
-          .eq("id", ca.non_conformity_id)
-          .eq("status", "pending_verification");
-      }
+      await syncNonConformityStatusFromCorrectiveActions({
+        nonConformityId: ca.non_conformity_id,
+        supabase,
+      });
 
       const { data: nc } = await supabase
         .from("non_conformities")
         .select("audit_id")
         .eq("id", ca.non_conformity_id)
+        .is("deleted_at", null)
         .single();
 
       if (nc?.audit_id) {
@@ -141,9 +169,20 @@ export async function deleteCorrectiveAction(
 ): Promise<ActionResult<null>> {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) return { success: false, error: "Unauthorized" };
+    try {
+      assertInternalOperator(ctx, "azioni correttive audit");
+    } catch {
+      return { success: false, error: "Unauthorized" };
+    }
 
     const { supabase } = ctx;
+
+    const { data: ca } = await supabase
+      .from("corrective_actions")
+      .select("non_conformity_id")
+      .eq("id", id)
+      .is("deleted_at", null)
+      .single();
 
     const now = new Date().toISOString();
     const { error } = await supabase
@@ -155,17 +194,17 @@ export async function deleteCorrectiveAction(
       return { success: false, error: error.message };
     }
 
-    const { data: ca } = await supabase
-      .from("corrective_actions")
-      .select("non_conformity_id")
-      .eq("id", id)
-      .single();
-
     if (ca?.non_conformity_id) {
+      await syncNonConformityStatusFromCorrectiveActions({
+        nonConformityId: ca.non_conformity_id,
+        supabase,
+      });
+
       const { data: nc } = await supabase
         .from("non_conformities")
         .select("audit_id")
         .eq("id", ca.non_conformity_id)
+        .is("deleted_at", null)
         .single();
 
       if (nc?.audit_id) {
@@ -187,7 +226,11 @@ export async function completeCorrectiveAction(
     const validated = completeCorrectiveActionSchema.parse(input);
 
     const ctx = await getOrganizationContext();
-    if (!ctx) return { success: false, error: "Unauthorized" };
+    try {
+      assertInternalOperator(ctx, "azioni correttive audit");
+    } catch {
+      return { success: false, error: "Unauthorized" };
+    }
 
     const { supabase } = ctx;
 
@@ -209,20 +252,20 @@ export async function completeCorrectiveAction(
       .from("corrective_actions")
       .select("non_conformity_id")
       .eq("id", validated.id)
+      .is("deleted_at", null)
       .single();
 
     if (ca?.non_conformity_id) {
-      // N5: When CA is completed, move NC to "pending_verification"
-      await supabase
-        .from("non_conformities")
-        .update({ status: "pending_verification" })
-        .eq("id", ca.non_conformity_id)
-        .eq("status", "open");
+      await syncNonConformityStatusFromCorrectiveActions({
+        nonConformityId: ca.non_conformity_id,
+        supabase,
+      });
 
       const { data: nc } = await supabase
         .from("non_conformities")
         .select("audit_id")
         .eq("id", ca.non_conformity_id)
+        .is("deleted_at", null)
         .single();
 
       if (nc?.audit_id) {

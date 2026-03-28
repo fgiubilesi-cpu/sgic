@@ -51,7 +51,6 @@ export function ChecklistRow({
   auditId,
   clientId,
   locationId,
-  isSelected,
   hasNc = false,
   onSelect,
   path,
@@ -321,7 +320,11 @@ export function ChecklistRow({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                isListening ? stopListening() : startListening();
+                if (isListening) {
+                  stopListening();
+                } else {
+                  startListening();
+                }
               }}
               className={cn(
                 "inline-flex items-center justify-center w-6 h-6 rounded transition-colors shrink-0",

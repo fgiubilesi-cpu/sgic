@@ -27,9 +27,9 @@ interface LabResult {
     id: string;
     parameter: string;
     uom: string;
-    result_value: string;
-    limit_value: string | null;
-    outcome: "compliant" | "non_compliant" | "warning";
+    result_value: number;
+    limit_value: number | null;
+    outcome: "pass" | "fail" | "pending";
     created_at: string;
 }
 
@@ -49,7 +49,7 @@ export function LabResultsTable({ samplingId, initialResults }: LabResultsTableP
     const [newUom, setNewUom] = useState("");
     const [newValue, setNewValue] = useState("");
     const [newLimit, setNewLimit] = useState("");
-    const [newOutcome, setNewOutcome] = useState<"compliant" | "non_compliant" | "warning">("compliant");
+    const [newOutcome, setNewOutcome] = useState<LabResult["outcome"]>("pending");
 
     async function handleAddResult() {
         if (!newParameter || !newUom || !newValue) {
@@ -62,8 +62,8 @@ export function LabResultsTable({ samplingId, initialResults }: LabResultsTableP
             id: tempId,
             parameter: newParameter,
             uom: newUom,
-            result_value: newValue,
-            limit_value: newLimit || null,
+            result_value: Number(newValue),
+            limit_value: newLimit ? Number(newLimit) : null,
             outcome: newOutcome,
             created_at: new Date().toISOString(),
         };
@@ -76,8 +76,8 @@ export function LabResultsTable({ samplingId, initialResults }: LabResultsTableP
                     sampling_id: samplingId,
                     parameter: newParameter,
                     uom: newUom,
-                    result_value: newValue,
-                    limit_value: newLimit || null,
+                    result_value: Number(newValue),
+                    limit_value: newLimit ? Number(newLimit) : null,
                     outcome: newOutcome,
                 });
 
@@ -89,9 +89,9 @@ export function LabResultsTable({ samplingId, initialResults }: LabResultsTableP
                     setNewUom("");
                     setNewValue("");
                     setNewLimit("");
-                    setNewOutcome("compliant");
+                    setNewOutcome("pending");
                 }
-            } catch (error: any) {
+            } catch {
                 toast.error("Si è verificato un errore");
             }
         });
@@ -99,22 +99,22 @@ export function LabResultsTable({ samplingId, initialResults }: LabResultsTableP
 
     const getOutcomeBadge = (outcome: string) => {
         switch (outcome) {
-            case "compliant":
+            case "pass":
                 return (
                     <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1">
                         <CheckCircle2 className="w-3 h-3" /> Conforme
                     </Badge>
                 );
-            case "non_compliant":
+            case "fail":
                 return (
                     <Badge variant="destructive" className="gap-1">
                         <XCircle className="w-3 h-3" /> Non Conforme
                     </Badge>
                 );
-            case "warning":
+            case "pending":
                 return (
                     <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 gap-1">
-                        <AlertCircle className="w-3 h-3" /> Incertezza
+                        <AlertCircle className="w-3 h-3" /> In attesa
                     </Badge>
                 );
             default:
@@ -174,16 +174,16 @@ export function LabResultsTable({ samplingId, initialResults }: LabResultsTableP
                             <TableCell>
                                 <Select
                                     value={newOutcome}
-                                    onValueChange={(v: any) => setNewOutcome(v)}
+                                    onValueChange={(value: LabResult["outcome"]) => setNewOutcome(value)}
                                     disabled={isPending}
                                 >
                                     <SelectTrigger className="w-[140px]">
                                         <SelectValue placeholder="Esito" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="compliant">Conforme</SelectItem>
-                                        <SelectItem value="non_compliant">Non Conforme</SelectItem>
-                                        <SelectItem value="warning">Incertezza</SelectItem>
+                                        <SelectItem value="pass">Conforme</SelectItem>
+                                        <SelectItem value="fail">Non Conforme</SelectItem>
+                                        <SelectItem value="pending">In attesa</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </TableCell>

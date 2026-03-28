@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabase/server";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 
 export type DeadlineType =

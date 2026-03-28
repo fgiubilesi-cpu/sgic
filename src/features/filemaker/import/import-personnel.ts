@@ -36,7 +36,8 @@ export async function importPersonnelFromFM(
   const { data: clients } = await supabase
     .from("clients")
     .select("id, fm_record_id")
-    .eq("organization_id", organizationId);
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
 
   const clientByFmId = new Map<string, string>();
   for (const c of clients ?? []) {

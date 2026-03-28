@@ -20,6 +20,21 @@ export type AuditWithNCCount = Audit & {
   nc_count: number;
 };
 
+type AuditRow = {
+  client_id: string | null;
+  id: string;
+  location_id: string | null;
+  scheduled_date: string | null;
+  score: number | null;
+  status: AuditStatus | null;
+  template_id: string | null;
+  title: string | null;
+};
+
+type ClientNameRow = { id: string; name: string | null };
+type LocationNameRow = { id: string; name: string | null };
+type NonConformityCountRow = { audit_id: string };
+
 export async function getAudits(): Promise<AuditWithNCCount[]> {
   const ctx = await getOrganizationContext();
   if (!ctx) return [];
@@ -44,38 +59,42 @@ export async function getAudits(): Promise<AuditWithNCCount[]> {
   const clientIds = Array.from(
     new Set(
       audits
-        .map((audit: any) => audit.client_id as string | null)
+        .map((audit: AuditRow) => audit.client_id)
         .filter((value): value is string => Boolean(value))
     )
   );
   const locationIds = Array.from(
     new Set(
       audits
-        .map((audit: any) => audit.location_id as string | null)
+        .map((audit: AuditRow) => audit.location_id)
         .filter((value): value is string => Boolean(value))
     )
   );
 
   const [{ data: clients }, { data: locations }] = await Promise.all([
     clientIds.length > 0
-      ? supabase.from("clients").select("id, name").in("id", clientIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; name: string | null }> }),
+      ? supabase
+          .from("clients")
+          .select("id, name")
+          .in("id", clientIds)
+          .is("deleted_at", null)
+      : Promise.resolve({ data: [] as ClientNameRow[] }),
     locationIds.length > 0
       ? supabase.from("locations").select("id, name").in("id", locationIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; name: string | null }> }),
+      : Promise.resolve({ data: [] as LocationNameRow[] }),
   ]);
 
   const clientNameById = new Map(
-    (clients ?? []).map((client: { id: string; name: string | null }) => [client.id, client.name])
+    (clients ?? []).map((client: ClientNameRow) => [client.id, client.name])
   );
   const locationNameById = new Map(
-    (locations ?? []).map((location: { id: string; name: string | null }) => [
+    (locations ?? []).map((location: LocationNameRow) => [
       location.id,
       location.name,
     ])
   );
 
-  const auditIds = audits.map((audit: any) => audit.id);
+  const auditIds = (audits as AuditRow[]).map((audit) => audit.id);
   const { data: ncCounts } = await supabase
     .from("non_conformities")
     .select("audit_id")
@@ -84,14 +103,14 @@ export async function getAudits(): Promise<AuditWithNCCount[]> {
     .is("deleted_at", null);
 
   const ncCountByAuditId = (ncCounts ?? []).reduce(
-    (acc: Record<string, number>, nc: any) => {
-      acc[nc.audit_id] = (acc[nc.audit_id] ?? 0) + 1;
+    (acc: Record<string, number>, nonConformity: NonConformityCountRow) => {
+      acc[nonConformity.audit_id] = (acc[nonConformity.audit_id] ?? 0) + 1;
       return acc;
     },
     {}
   );
 
-  return audits.map((audit: any) => ({
+  return (audits as AuditRow[]).map((audit) => ({
     id: String(audit.id),
     title: audit.title ?? null,
     status: audit.status ?? "Scheduled",

@@ -6,8 +6,21 @@ import { getOrganizationContext } from "@/lib/supabase/get-org-context";
 import { getClientOptions } from "@/features/clients/queries/get-client-options";
 import { getPersonnelList } from "@/features/personnel/queries/get-personnel";
 import { ManageDocumentSheet } from "@/features/documents/components/manage-document-sheet";
-import { DocumentIntakeReviewSheet } from "@/features/documents/components/document-intake-review-sheet";
 import { DocumentGovernanceDialog } from "@/features/documents/components/document-governance-dialog";
+import { DocumentActionSuggestionsCard } from "@/features/documents/components/document-action-suggestions-card";
+import {
+  buildDocumentActionSuggestions,
+  extractDocumentIntakeProposal,
+} from "@/features/documents/lib/document-action-suggestions";
+import {
+  buildDocumentDetailListItem,
+  formatDocumentEntityConfidence,
+  formatDocumentReviewAction,
+  getDocumentExpiryInfo,
+  getDocumentIngestionLabel,
+  getDocumentStatusLabel,
+  getDocumentStatusTone,
+} from "@/features/documents/lib/document-detail-view";
 import type { DocumentListItem } from "@/features/documents/queries/get-documents";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,7 +51,6 @@ import {
   Clock,
   History,
   Link2,
-  ExternalLink,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -86,7 +98,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     ctx.supabase
       .from("document_extraction_reviews")
       .select(
-        "id, status, review_action, reviewer_notes, reviewed_at, created_at"
+        "id, status, review_action, reviewed_payload, reviewer_notes, reviewed_at, created_at"
       )
       .eq("organization_id", ctx.organizationId)
       .eq("document_id", id)
@@ -110,6 +122,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
           .from("clients")
           .select("name")
           .eq("id", document.client_id)
+          .is("deleted_at", null)
           .single()
           .then((r) => r.data?.name ?? null)
       : null,
@@ -136,25 +149,17 @@ export default async function DocumentDetailPage({ params }: PageProps) {
       : null,
   ]);
 
-  // Build DocumentListItem-compatible object for existing components
-  const docListItem: DocumentListItem = {
-    ...document,
-    access_url: null,
-    client_name: clientName,
-    ingestion_status: document.ingestion_status ?? "manual",
-    last_review_action:
-      (reviews ?? [])[0]?.review_action ?? null,
-    last_reviewed_at:
-      (reviews ?? [])[0]?.reviewed_at ?? null,
-    linked_entity_count: (entities ?? []).length,
-    location_name: locationName,
-    personnel_name: personnelName,
-    review_count: (reviews ?? []).length,
-    version_count: Math.max(
-      (versions ?? []).length,
-      document.storage_path ? 1 : 0
-    ),
-  };
+  const docListItem: DocumentListItem = buildDocumentDetailListItem({
+    clientName,
+    document,
+    entitiesCount: (entities ?? []).length,
+    locationName,
+    personnelName,
+    reviewsCount: (reviews ?? []).length,
+    reviewsLastAction: (reviews ?? [])[0]?.review_action ?? null,
+    reviewsLastAt: (reviews ?? [])[0]?.reviewed_at ?? null,
+    versionsCount: (versions ?? []).length,
+  });
 
   // Generate signed URL for download
   let downloadUrl: string | null = null;
@@ -167,43 +172,23 @@ export default async function DocumentDetailPage({ params }: PageProps) {
 
   const latestIngestion = (ingestions ?? [])[0] ?? null;
   const extractedText = latestIngestion?.extracted_text ?? null;
+  const latestReview = (reviews ?? [])[0] ?? null;
+  const latestProposal =
+    extractDocumentIntakeProposal(latestReview?.reviewed_payload) ??
+    extractDocumentIntakeProposal(document.extracted_payload);
+  const actionSuggestions = buildDocumentActionSuggestions({
+    document: {
+      category: document.category ?? null,
+      client_id: document.client_id ?? null,
+      expiry_date: document.expiry_date ?? null,
+      ingestion_status: document.ingestion_status ?? null,
+      linked_entity_count: (entities ?? []).length,
+      title: document.title ?? null,
+    },
+    proposal: latestProposal,
+  });
 
-  function statusTone(status: string | null) {
-    if (status === "published")
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    if (status === "archived")
-      return "border-zinc-200 bg-zinc-50 text-zinc-500";
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  }
-
-  function statusLabel(status: string | null) {
-    if (status === "published") return "Pubblicato";
-    if (status === "archived") return "Archiviato";
-    return "Bozza";
-  }
-
-  function ingestionLabel(status: string | null) {
-    if (status === "uploaded") return "Caricato";
-    if (status === "parsed") return "Estratto";
-    if (status === "review_required") return "Da validare";
-    if (status === "reviewed") return "Validato";
-    if (status === "linked") return "Collegato";
-    if (status === "failed") return "Errore";
-    return "Manuale";
-  }
-
-  function expiryInfo(expiryDate: string | null) {
-    if (!expiryDate) return { label: "Nessuna scadenza", tone: "text-zinc-500" };
-    const exp = new Date(expiryDate);
-    const today = new Date();
-    const in30 = new Date();
-    in30.setDate(today.getDate() + 30);
-    if (exp < today) return { label: "Scaduto", tone: "text-rose-700" };
-    if (exp <= in30) return { label: "In scadenza", tone: "text-amber-700" };
-    return { label: "Valido", tone: "text-emerald-700" };
-  }
-
-  const expiry = expiryInfo(document.expiry_date);
+  const expiry = getDocumentExpiryInfo(document.expiry_date);
 
   return (
     <div className="space-y-6">
@@ -220,8 +205,8 @@ export default async function DocumentDetailPage({ params }: PageProps) {
               {document.title || "Documento senza titolo"}
             </h1>
             <div className="flex flex-wrap items-center gap-2 mt-1 text-muted-foreground">
-              <Badge variant="outline" className={statusTone(document.status)}>
-                {statusLabel(document.status)}
+              <Badge variant="outline" className={getDocumentStatusTone(document.status)}>
+                {getDocumentStatusLabel(document.status)}
               </Badge>
               <Badge
                 variant="outline"
@@ -233,7 +218,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
                 variant="outline"
                 className="border-zinc-200 bg-zinc-50 text-zinc-600"
               >
-                {ingestionLabel(document.ingestion_status)}
+                {getDocumentIngestionLabel(document.ingestion_status)}
               </Badge>
               {document.version && (
                 <span className="text-xs text-zinc-400">
@@ -252,7 +237,6 @@ export default async function DocumentDetailPage({ params }: PageProps) {
               </a>
             </Button>
           )}
-          <DocumentIntakeReviewSheet document={docListItem} />
           <DocumentGovernanceDialog document={docListItem} />
           <ManageDocumentSheet
             clientOptions={clientOptions}
@@ -318,6 +302,12 @@ export default async function DocumentDetailPage({ params }: PageProps) {
           </CardContent>
         </Card>
       </div>
+
+      <DocumentActionSuggestionsCard
+        document={docListItem}
+        linkedEntityCount={(entities ?? []).length}
+        suggestions={actionSuggestions}
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Info Card */}
@@ -503,11 +493,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
                     {(reviews ?? []).map((r) => (
                       <TableRow key={r.id}>
                         <TableCell className="font-medium">
-                          {r.review_action === "apply_to_workspace"
-                            ? "Applicato al workspace"
-                            : r.review_action === "save_review"
-                              ? "Salvato review"
-                              : r.review_action ?? "—"}
+                          {formatDocumentReviewAction(r.review_action)}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">
@@ -583,19 +569,9 @@ export default async function DocumentDetailPage({ params }: PageProps) {
                     <TableCell>
                       <Badge
                         variant="outline"
-                        className={
-                          e.confidence === "high"
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : e.confidence === "medium"
-                              ? "border-amber-200 bg-amber-50 text-amber-700"
-                              : "border-zinc-200 bg-zinc-50 text-zinc-500"
-                        }
+                        className={formatDocumentEntityConfidence(e.confidence).className}
                       >
-                        {e.confidence === "high"
-                          ? "Alta"
-                          : e.confidence === "medium"
-                            ? "Media"
-                            : "Bassa"}
+                        {formatDocumentEntityConfidence(e.confidence).label}
                       </Badge>
                     </TableCell>
                     <TableCell>

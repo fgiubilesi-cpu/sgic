@@ -24,7 +24,9 @@ export async function getOrganizationSystemSnapshot(): Promise<OrganizationSyste
     latestLocalMigration: localMigrations.at(-1) ?? null,
     localMigrationsCount: localMigrations.length,
     releaseCommand: "npm run verify:release",
-    supabaseConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY),
+    supabaseConfigured: Boolean(
+      process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    ),
     version: packageJson.version,
   };
 }

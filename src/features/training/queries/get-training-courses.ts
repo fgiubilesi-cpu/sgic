@@ -18,6 +18,20 @@ export async function getCourseRegistrations(
 ): Promise<CourseRegistration[]> {
   const supabase = await createClient();
 
+  type PersonnelCourseRow = {
+    client: { name?: string | null } | Array<{ name?: string | null }> | null;
+    first_name: string | null;
+    id: string;
+    last_name: string | null;
+  };
+
+  const getClientName = (
+    relation: PersonnelCourseRow["client"],
+  ): string => {
+    const client = Array.isArray(relation) ? relation[0] : relation;
+    return client?.name ?? '';
+  };
+
   const { data: records, error } = await supabase
     .from('training_records')
     .select('id, personnel_id, completion_date, expiry_date')
@@ -34,11 +48,11 @@ export async function getCourseRegistrations(
     .in('id', personnelIds);
 
   const personMap = new Map<string, { name: string; clientName: string }>(
-    (personnel ?? []).map((p: any) => [
-      p.id as string,
+    ((personnel ?? []) as PersonnelCourseRow[]).map((person) => [
+      person.id,
       {
-        name: `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim(),
-        clientName: (p.client as any)?.name ?? '',
+        name: `${person.first_name ?? ''} ${person.last_name ?? ''}`.trim(),
+        clientName: getClientName(person.client),
       },
     ]),
   );

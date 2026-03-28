@@ -70,10 +70,12 @@ export function PersonnelForm({
     clientOptions.find((client) => client.id === selectedClientId)?.locations ?? [];
 
   useEffect(() => {
+    const availableLocations =
+      clientOptions.find((client) => client.id === selectedClientId)?.locations ?? [];
     const currentLocationId = form.getValues('location_id');
 
     if (currentLocationId && currentLocationId !== 'none') {
-      const locationStillAvailable = locationOptions.some(
+      const locationStillAvailable = availableLocations.some(
         (location) => location.id === currentLocationId
       );
 
@@ -84,7 +86,7 @@ export function PersonnelForm({
         });
       }
     }
-  }, [form, locationOptions]);
+  }, [clientOptions, form, selectedClientId]);
 
   async function onSubmit(values: PersonnelFormInput) {
     setLoading(true);

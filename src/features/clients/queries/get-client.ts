@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { runClientsQueryWithSoftDeleteFallback } from "@/lib/supabase/clients-soft-delete";
 import { Database } from '@/types/database.types';
 
 type ClientRow = Database['public']['Tables']['clients']['Row'];
@@ -31,12 +32,20 @@ export async function getClient(
 
   const supabase = await createClient();
 
-  const { data: client, error: clientError } = await supabase
-    .from('clients')
-    .select('*')
-    .eq('id', clientId)
-    .eq('organization_id', organizationId)
-    .single();
+  const { data: client, error: clientError } =
+    await runClientsQueryWithSoftDeleteFallback((useSoftDeleteGuard) => {
+      let query = supabase
+        .from('clients')
+        .select('*')
+        .eq('id', clientId)
+        .eq('organization_id', organizationId);
+
+      if (useSoftDeleteGuard) {
+        query = query.is('deleted_at', null);
+      }
+
+      return query.single();
+    });
 
   if (clientError || !client) {
     if (clientError?.code === 'PGRST116') return null; // not found

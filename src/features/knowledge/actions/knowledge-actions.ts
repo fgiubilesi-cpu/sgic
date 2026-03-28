@@ -39,6 +39,7 @@ export async function getKnowledgeReferencesForNC(
     )
     .eq("id", nonConformityId)
     .eq("organization_id", ctx.organizationId)
+    .is("deleted_at", null)
     .single();
 
   if (!nc) return [];

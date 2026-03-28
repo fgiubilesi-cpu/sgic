@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { OrgContext } from "@/lib/supabase/get-org-context";
 import { getOrganizationContext } from "@/lib/supabase/get-org-context";
+import { assertInternalOperator } from "@/lib/access-control";
 import { z } from "zod";
 
 const completeAuditSchema = z.object({
@@ -20,6 +21,15 @@ type CompletionValidation = {
   nonCompliantWithoutNC: number;
 };
 
+type ChecklistItemOutcomeRow = {
+  id: string;
+  outcome: string | null;
+};
+
+type NonConformityChecklistRow = {
+  checklist_item_id: string | null;
+};
+
 /**
  * Validate audit completion readiness:
  * 1. All checklist items must have an outcome (not "pending")
@@ -32,16 +42,38 @@ async function validateAuditCompletion(
   const { supabase } = ctx;
   const errors: string[] = [];
 
+  const { data: checklists, error: checklistsError } = await supabase
+    .from("checklists")
+    .select("id")
+    .eq("audit_id", auditId);
+
+  if (checklistsError) {
+    return {
+      isValid: false,
+      errors: [checklistsError.message],
+      pendingItems: 0,
+      nonCompliantWithoutNC: 0,
+    };
+  }
+
+  const checklistIds = (checklists ?? []).map((checklist: { id: string }) => checklist.id);
+
+  if (checklistIds.length === 0) {
+    return { isValid: true, errors, pendingItems: 0, nonCompliantWithoutNC: 0 };
+  }
+
   const { data: items, error: itemsError } = await supabase
     .from("checklist_items")
     .select("id, outcome")
-    .eq("audit_id", auditId);
+    .in("checklist_id", checklistIds);
 
   if (itemsError) {
     return { isValid: false, errors: [itemsError.message], pendingItems: 0, nonCompliantWithoutNC: 0 };
   }
 
-  const pendingItems = items?.filter((i: any) => i.outcome === "pending").length || 0;
+  const pendingItems =
+    (items as ChecklistItemOutcomeRow[] | null)?.filter((item) => item.outcome === "pending")
+      .length || 0;
   if (pendingItems > 0) {
     errors.push(
       `${pendingItems} checklist item(s) still have "pending" outcome. All items must be evaluated.`
@@ -51,7 +83,7 @@ async function validateAuditCompletion(
   const { data: nonCompliantItems, error: ncItemsError } = await supabase
     .from("checklist_items")
     .select("id")
-    .eq("audit_id", auditId)
+    .in("checklist_id", checklistIds)
     .eq("outcome", "non_compliant");
 
   if (ncItemsError) {
@@ -64,14 +96,24 @@ async function validateAuditCompletion(
       .from("non_conformities")
       .select("checklist_item_id")
       .eq("audit_id", auditId)
-      .in("checklist_item_id", nonCompliantItems.map((item: any) => item.id));
+      .is("deleted_at", null)
+      .in(
+        "checklist_item_id",
+        (nonCompliantItems as ChecklistItemOutcomeRow[]).map((item) => item.id)
+      );
 
     if (ncError) {
       return { isValid: false, errors: [ncError.message], pendingItems, nonCompliantWithoutNC: 0 };
     }
 
-    const ncItemIds = new Set(nonConformities?.map((nc: any) => nc.checklist_item_id) || []);
-    nonCompliantWithoutNC = nonCompliantItems.filter((item: any) => !ncItemIds.has(item.id)).length;
+    const ncItemIds = new Set(
+      ((nonConformities as NonConformityChecklistRow[] | null) ?? [])
+        .map((nonConformity) => nonConformity.checklist_item_id)
+        .filter((value): value is string => Boolean(value))
+    );
+    nonCompliantWithoutNC = (nonCompliantItems as ChecklistItemOutcomeRow[]).filter(
+      (item) => !ncItemIds.has(item.id)
+    ).length;
 
     if (nonCompliantWithoutNC > 0) {
       errors.push(
@@ -90,7 +132,11 @@ export async function completeAudit(
     const validated = completeAuditSchema.parse(input);
 
     const ctx = await getOrganizationContext();
-    if (!ctx) return { success: false, error: "Unauthorized" };
+    try {
+      assertInternalOperator(ctx, "completamento audit");
+    } catch {
+      return { success: false, error: "Unauthorized" };
+    }
 
     const { supabase, userId, organizationId } = ctx;
 
@@ -159,7 +205,11 @@ export async function closeAudit(
 ): Promise<ActionResult<{ closedAt: string }>> {
   try {
     const ctx = await getOrganizationContext();
-    if (!ctx) return { success: false, error: "Unauthorized" };
+    try {
+      assertInternalOperator(ctx, "chiusura audit");
+    } catch {
+      return { success: false, error: "Unauthorized" };
+    }
 
     const { supabase, userId, organizationId } = ctx;
 

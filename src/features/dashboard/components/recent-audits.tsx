@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink, ClipboardCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ExternalLink } from "lucide-react";
 import type { RecentAudit } from "@/features/dashboard/queries/get-dashboard-data";
 
 interface RecentAuditsProps {

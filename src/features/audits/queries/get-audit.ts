@@ -76,6 +76,7 @@ export async function getAudit(id: string): Promise<AuditWithChecklists | null> 
           .from("clients")
           .select("name")
           .eq("id", (audit as { client_id?: string | null }).client_id!)
+          .is("deleted_at", null)
           .maybeSingle()
       : Promise.resolve({ data: null as { name?: string | null } | null }),
     (audit as { location_id?: string | null }).location_id

@@ -8,6 +8,16 @@ export interface OrgContext {
   clientId?: string;
 }
 
+function isExpectedUnauthenticatedError(error: { message?: string | null }) {
+  const message = error.message?.toLowerCase() ?? "";
+
+  return (
+    message.includes("auth session missing") ||
+    message.includes("invalid refresh token") ||
+    message.includes("refresh token not found")
+  );
+}
+
 /**
  * Resolves the current user and their organization in a single call.
  * Returns null if the user is unauthenticated or has no organization.
@@ -26,7 +36,15 @@ export async function getOrganizationContext(): Promise<OrgContext | null> {
     error: userError,
   } = await supabase.auth.getUser();
 
-  if (userError || !user) {
+  if (userError) {
+    if (isExpectedUnauthenticatedError(userError)) {
+      return null;
+    }
+
+    throw userError;
+  }
+
+  if (!user) {
     return null;
   }
 
@@ -36,7 +54,11 @@ export async function getOrganizationContext(): Promise<OrgContext | null> {
     .eq("id", user.id)
     .single();
 
-  if (profileError || !profile?.organization_id) {
+  if (profileError) {
+    throw profileError;
+  }
+
+  if (!profile?.organization_id) {
     return null;
   }
 

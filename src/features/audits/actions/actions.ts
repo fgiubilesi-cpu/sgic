@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { assertInternalOperator } from '@/lib/access-control'
 import { getOrganizationContext } from '@/lib/supabase/get-org-context'
 import { auditOutcomeSchema } from '@/features/audits/schemas/audit-schema'
 import { getAuditSummary } from '@/features/audits/queries/get-audit-summary'
@@ -18,7 +19,11 @@ const UpdateItemSchema = z.object({
 
 export async function updateChecklistItem(formData: FormData) {
   const ctx = await getOrganizationContext()
-  if (!ctx) return { error: 'Not authenticated.' }
+  try {
+    assertInternalOperator(ctx, 'audit checklist')
+  } catch {
+    return { error: 'Not authenticated.' }
+  }
 
   const { supabase, organizationId } = ctx
 
@@ -163,7 +168,11 @@ const UpdateAuditStatusSchema = z.object({
 
 export async function updateAuditStatus(auditId: string, status: string) {
   const ctx = await getOrganizationContext()
-  if (!ctx) return { error: 'Not authenticated.' }
+  try {
+    assertInternalOperator(ctx, 'stato audit')
+  } catch {
+    return { error: 'Not authenticated.' }
+  }
 
   const { supabase, userId, organizationId } = ctx
 

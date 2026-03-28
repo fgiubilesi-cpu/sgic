@@ -108,6 +108,8 @@ export function EvidenceGallery({ evidence, auditTitle = "Audit Evidence" }: Evi
                   className="group relative aspect-square rounded-lg overflow-hidden border border-zinc-200 bg-zinc-50 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                   onClick={() => setSelectedEvidence(item)}
                 >
+                  {/* Evidence previews use signed/storage URLs and don't need Next image optimization. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.evidenceUrl}
                     alt={item.question}
@@ -175,6 +177,8 @@ export function EvidenceGallery({ evidence, auditTitle = "Audit Evidence" }: Evi
 
             {/* Image */}
             <div className="flex items-center justify-center bg-black min-h-96">
+              {/* Lightbox preserves the original asset URL for fidelity and download parity. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={selectedEvidence.evidenceUrl}
                 alt={selectedEvidence.question}

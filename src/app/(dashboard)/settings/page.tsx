@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import { getOrganizationContext } from '@/lib/supabase/get-org-context';
-import { createClient } from '@/lib/supabase/server';
 import { SettingsPage } from '@/features/settings/components/settings-page';
 
 export const metadata = {

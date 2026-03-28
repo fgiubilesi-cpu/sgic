@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { runClientsQueryWithSoftDeleteFallback } from "@/lib/supabase/clients-soft-delete";
 import type { Tables } from '@/types/database.types';
 
 type DocumentRow = Tables<'documents'>;
@@ -75,8 +76,23 @@ export async function getDocuments({
     { data: entities, error: entitiesError },
   ] = await Promise.all([
     documentClientIds.length
-      ? supabase.from('clients').select('id, name').in('id', documentClientIds)
-      : Promise.resolve({ data: [], error: null }),
+      ? runClientsQueryWithSoftDeleteFallback((useSoftDeleteGuard) => {
+          let query = supabase
+            .from('clients')
+            .select('id, name')
+            .in('id', documentClientIds);
+
+          if (useSoftDeleteGuard) {
+            query = query.is('deleted_at', null);
+          }
+
+          return query;
+        })
+      : Promise.resolve({
+          data: [],
+          error: null,
+          usedClientsSoftDeleteGuard: true,
+        }),
     documentLocationIds.length
       ? supabase.from('locations').select('id, name').in('id', documentLocationIds)
       : Promise.resolve({ data: [], error: null }),

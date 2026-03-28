@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { toast } from "sonner";
 import {
-  ChevronDown, ChevronRight, Plus, AlertTriangle, Calendar, User, Edit2, FileText, Trash2, Check, X
+  ChevronDown, ChevronRight, Plus, AlertTriangle, Calendar, User, Edit2, FileText, Trash2
 } from "lucide-react";
 import {
   Dialog,
@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { AuditWithChecklists } from "@/features/audits/queries/get-audit";
@@ -35,6 +34,17 @@ import {
 } from "@/features/audits/actions/corrective-action-actions";
 import { updateNonConformity } from "@/features/audits/actions/non-conformity-actions";
 import { NCDocumentsPanel } from "@/features/audits/components/nc-documents-panel";
+import {
+  countOpenCorrectiveActions,
+  countOverdueCorrectiveActions,
+  getNonConformityActionSummary,
+  getNonConformityOverviewMetrics,
+} from "@/features/quality/lib/quality-process";
+import {
+  toCanonicalCorrectiveAction,
+  toCanonicalNonConformity,
+  toProcessCorrectiveActionShape,
+} from "@/features/quality/lib/nc-ac-contract";
 
 interface NcAcTabProps {
   audit: AuditWithChecklists;
@@ -108,62 +118,31 @@ function EditCaForm({ ca, onSuccess, onCancel }: EditCaFormProps) {
     <form onSubmit={handleSubmit} className="space-y-3">
       <h4 className="text-sm font-semibold text-zinc-700">Modifica Azione Correttiva</h4>
 
+      <p className="text-xs text-zinc-500">
+        Per la gestione operativa bastano azione, responsabile e data obiettivo. I dettagli estesi restano opzionali.
+      </p>
+
+      <div>
+        <label className="text-xs font-medium text-zinc-600 mb-1 block">
+          Descrizione <span className="text-red-500">*</span>
+        </label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Descrizione dell'azione..."
+          rows={3}
+          className="w-full text-xs border border-zinc-300 rounded px-2 py-1 placeholder:text-zinc-400 focus:ring-1 focus:ring-zinc-500"
+          disabled={isLoading}
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-medium text-zinc-600 mb-1 block">
-            Descrizione <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Descrizione dell'azione..."
-            rows={2}
-            className="w-full text-xs border border-zinc-300 rounded px-2 py-1 placeholder:text-zinc-400 focus:ring-1 focus:ring-zinc-500"
-            disabled={isLoading}
-          />
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-zinc-600 mb-1 block">Piano d'azione</label>
-          <textarea
-            value={actionPlan}
-            onChange={(e) => setActionPlan(e.target.value)}
-            placeholder="Dettagli del piano..."
-            rows={2}
-            className="w-full text-xs border border-zinc-300 rounded px-2 py-1 placeholder:text-zinc-400 focus:ring-1 focus:ring-zinc-500"
-            disabled={isLoading}
-          />
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-zinc-600 mb-1 block">Causa radice</label>
-          <Input
-            value={rootCause}
-            onChange={(e) => setRootCause(e.target.value)}
-            placeholder="Analisi..."
-            className="text-xs h-8"
-            disabled={isLoading}
-          />
-        </div>
-
         <div>
           <label className="text-xs font-medium text-zinc-600 mb-1 block">Responsabile</label>
           <Input
             value={responsiblePersonName}
             onChange={(e) => setResponsiblePersonName(e.target.value)}
             placeholder="Nome"
-            className="text-xs h-8"
-            disabled={isLoading}
-          />
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-zinc-600 mb-1 block">Email</label>
-          <Input
-            type="email"
-            value={responsiblePersonEmail}
-            onChange={(e) => setResponsiblePersonEmail(e.target.value)}
-            placeholder="email@example.com"
             className="text-xs h-8"
             disabled={isLoading}
           />
@@ -180,6 +159,48 @@ function EditCaForm({ ca, onSuccess, onCancel }: EditCaFormProps) {
           />
         </div>
       </div>
+
+      <details className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
+        <summary className="cursor-pointer text-xs font-medium text-zinc-700">
+          Dettagli opzionali
+        </summary>
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div>
+            <label className="text-xs font-medium text-zinc-600 mb-1 block">Piano d&apos;azione</label>
+            <textarea
+              value={actionPlan}
+              onChange={(e) => setActionPlan(e.target.value)}
+              placeholder="Dettagli del piano..."
+              rows={2}
+              className="w-full text-xs border border-zinc-300 rounded px-2 py-1 placeholder:text-zinc-400 focus:ring-1 focus:ring-zinc-500"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-zinc-600 mb-1 block">Causa radice</label>
+            <Input
+              value={rootCause}
+              onChange={(e) => setRootCause(e.target.value)}
+              placeholder="Analisi..."
+              className="text-xs h-8"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-zinc-600 mb-1 block">Email</label>
+            <Input
+              type="email"
+              value={responsiblePersonEmail}
+              onChange={(e) => setResponsiblePersonEmail(e.target.value)}
+              placeholder="email@example.com"
+              className="text-xs h-8"
+              disabled={isLoading}
+            />
+          </div>
+        </div>
+      </details>
 
       <div className="flex gap-2 justify-end pt-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isLoading}>
@@ -246,62 +267,31 @@ function AddCaForm({ ncId, onSuccess, onCancel }: AddCaFormProps) {
     <form onSubmit={handleSubmit} className="space-y-3">
       <h4 className="text-sm font-semibold text-zinc-700">Nuova Azione Correttiva</h4>
 
+      <p className="text-xs text-zinc-500">
+        Vista audit orientata all&apos;azione: raccogli prima il minimo operativo, aggiungi il resto solo se serve.
+      </p>
+
+      <div>
+        <label className="text-xs font-medium text-zinc-600 mb-1 block">
+          Descrizione <span className="text-red-500">*</span>
+        </label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Descrizione dell'azione..."
+          rows={3}
+          className="w-full text-xs border border-zinc-300 rounded px-2 py-1 placeholder:text-zinc-400 focus:ring-1 focus:ring-zinc-500"
+          disabled={isLoading}
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-medium text-zinc-600 mb-1 block">
-            Descrizione <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Descrizione dell'azione..."
-            rows={2}
-            className="w-full text-xs border border-zinc-300 rounded px-2 py-1 placeholder:text-zinc-400 focus:ring-1 focus:ring-zinc-500"
-            disabled={isLoading}
-          />
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-zinc-600 mb-1 block">Piano d'azione</label>
-          <textarea
-            value={actionPlan}
-            onChange={(e) => setActionPlan(e.target.value)}
-            placeholder="Dettagli del piano..."
-            rows={2}
-            className="w-full text-xs border border-zinc-300 rounded px-2 py-1 placeholder:text-zinc-400 focus:ring-1 focus:ring-zinc-500"
-            disabled={isLoading}
-          />
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-zinc-600 mb-1 block">Causa radice</label>
-          <Input
-            value={rootCause}
-            onChange={(e) => setRootCause(e.target.value)}
-            placeholder="Analisi..."
-            className="text-xs h-8"
-            disabled={isLoading}
-          />
-        </div>
-
         <div>
           <label className="text-xs font-medium text-zinc-600 mb-1 block">Responsabile</label>
           <Input
             value={responsiblePersonName}
             onChange={(e) => setResponsiblePersonName(e.target.value)}
             placeholder="Nome"
-            className="text-xs h-8"
-            disabled={isLoading}
-          />
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-zinc-600 mb-1 block">Email</label>
-          <Input
-            type="email"
-            value={responsiblePersonEmail}
-            onChange={(e) => setResponsiblePersonEmail(e.target.value)}
-            placeholder="email@example.com"
             className="text-xs h-8"
             disabled={isLoading}
           />
@@ -318,6 +308,48 @@ function AddCaForm({ ncId, onSuccess, onCancel }: AddCaFormProps) {
           />
         </div>
       </div>
+
+      <details className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
+        <summary className="cursor-pointer text-xs font-medium text-zinc-700">
+          Dettagli opzionali
+        </summary>
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div>
+            <label className="text-xs font-medium text-zinc-600 mb-1 block">Piano d&apos;azione</label>
+            <textarea
+              value={actionPlan}
+              onChange={(e) => setActionPlan(e.target.value)}
+              placeholder="Dettagli del piano..."
+              rows={2}
+              className="w-full text-xs border border-zinc-300 rounded px-2 py-1 placeholder:text-zinc-400 focus:ring-1 focus:ring-zinc-500"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-zinc-600 mb-1 block">Causa radice</label>
+            <Input
+              value={rootCause}
+              onChange={(e) => setRootCause(e.target.value)}
+              placeholder="Analisi..."
+              className="text-xs h-8"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-zinc-600 mb-1 block">Email</label>
+            <Input
+              type="email"
+              value={responsiblePersonEmail}
+              onChange={(e) => setResponsiblePersonEmail(e.target.value)}
+              placeholder="email@example.com"
+              className="text-xs h-8"
+              disabled={isLoading}
+            />
+          </div>
+        </div>
+      </details>
 
       <div className="flex gap-2 justify-end pt-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isLoading}>
@@ -352,37 +384,36 @@ function generateNcAcReport(
   report += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
 
   nonConformities.forEach((nc, index) => {
+    const canonicalNc = toCanonicalNonConformity({
+      ...nc,
+      correctiveActions: correctiveActions.filter((ca) => ca.nonConformityId === nc.id),
+    });
+    const processActions = canonicalNc.correctiveActions.map(toProcessCorrectiveActionShape);
     const severity = (nc.severity as string).toUpperCase();
     const status = NC_STATUS_LABELS[nc.status as keyof typeof NC_STATUS_LABELS] || nc.status;
+    const summary = getNonConformityActionSummary({
+      corrective_actions: processActions,
+      severity: canonicalNc.severity,
+    });
+    const openActions = countOpenCorrectiveActions(processActions);
+    const activeOwner = canonicalNc.correctiveActions.find((action) => action.status !== "completed")?.responsiblePersonName;
 
     report += `NC #${index + 1} — ${severity} — Stato: ${status}\n`;
-    report += `Domanda: ${nc.checklistItem?.question || nc.title}\n`;
+    report += `Domanda: ${nc.checklistItem?.question || canonicalNc.title || "NC"}\n`;
 
-    if (nc.description) {
-      report += `Descrizione: ${nc.description}\n`;
+    if (canonicalNc.description) {
+      report += `Descrizione: ${canonicalNc.description}\n`;
     }
 
-    const ncCas = correctiveActions.filter((ca) => ca.nonConformityId === nc.id);
-
-    if (ncCas.length > 0) {
-      ncCas.forEach((ca) => {
-        report += `  → Azione Correttiva:\n`;
-        report += `     ${ca.description}\n`;
-
-        if (ca.responsiblePersonName) {
-          report += `     Responsabile: ${ca.responsiblePersonName}\n`;
-        }
-
-        if (ca.dueDate) {
-          const caDate = new Intl.DateTimeFormat("it-IT").format(new Date(ca.dueDate));
-          report += `     Scadenza: ${caDate}\n`;
-        }
-
-        const caStatus = CA_STATUS_LABELS[ca.status as keyof typeof CA_STATUS_LABELS] || ca.status;
-        report += `     Stato: ${caStatus}\n`;
-      });
-    } else {
-      report += `  → Nessuna azione correttiva registrata.\n`;
+    report += `Presa in carico: ${summary.label}\n`;
+    if (summary.detail) {
+      report += `Dettaglio: ${summary.detail}\n`;
+    }
+    if (openActions > 0) {
+      report += `Azioni aperte: ${openActions}\n`;
+    }
+    if (activeOwner) {
+      report += `Responsabile attivo: ${activeOwner}\n`;
     }
 
     report += "\n";
@@ -408,7 +439,7 @@ function ReportModal({ isOpen, reportText, onClose }: ReportModalProps) {
     try {
       await navigator.clipboard.writeText(reportText);
       toast.success("Report copiato negli appunti!");
-    } catch (error) {
+    } catch {
       toast.error("Errore durante la copia.");
     }
   };
@@ -461,6 +492,20 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
   const [updatingNcStatusId, setUpdatingNcStatusId] = useState<string | null>(null);
 
   const reportText = generateNcAcReport(audit, nonConformities, correctiveActions);
+  const overviewMetrics = getNonConformityOverviewMetrics(
+    nonConformities.map((nc) =>
+      toCanonicalNonConformity({
+        ...nc,
+        correctiveActions: correctiveActions.filter((ca) => ca.nonConformityId === nc.id),
+      })
+    ).map((nc) => ({
+      corrective_actions: nc.correctiveActions.map(toProcessCorrectiveActionShape),
+      severity: nc.severity,
+    }))
+  );
+  const overdueCorrectiveActions = correctiveActions.filter(
+    (ca) => ca.status !== "completed" && isDueDateOverdue(ca.dueDate ?? ca.targetCompletionDate ?? null)
+  ).length;
 
   if (nonConformities.length === 0) {
     return (
@@ -480,14 +525,20 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
     <div className="rounded-lg border border-zinc-200 bg-white overflow-hidden shadow-sm">
       {/* Header */}
       <div className="px-4 py-4 border-b border-zinc-200">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
               Non Conformità e Azioni Correttive
             </h2>
             <p className="text-sm text-zinc-500 mt-1">
-              {nonConformities.length} NC trovate · {correctiveActions.length} AC registrate
+              Vista di controllo audit: priorità, avanzamento e ritardi delle azioni correttive.
             </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge className="bg-zinc-100 text-zinc-700 border-0">{overviewMetrics.total} NC</Badge>
+              <Badge className="bg-red-100 text-red-700 border-0">{overviewMetrics.critical} critiche</Badge>
+              <Badge className="bg-amber-100 text-amber-700 border-0">{overviewMetrics.unplanned} senza piano</Badge>
+              <Badge className="bg-red-50 text-red-700 border border-red-100">{overdueCorrectiveActions} AC in ritardo</Badge>
+            </div>
           </div>
           {!readOnly && (
             <Button
@@ -526,6 +577,16 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
               const severity = nc.severity as keyof typeof NC_SEVERITY_LABELS;
               const status = nc.status as keyof typeof NC_STATUS_LABELS;
               const isExpanded = expandedNcId === nc.id;
+              const actionSummary = getNonConformityActionSummary({
+                corrective_actions: ncCas.map((ca) => toProcessCorrectiveActionShape(toCanonicalCorrectiveAction(ca))),
+                severity: nc.severity,
+              });
+              const openActions = countOpenCorrectiveActions(
+                ncCas.map((ca) => toProcessCorrectiveActionShape(toCanonicalCorrectiveAction(ca)))
+              );
+              const overdueActions = countOverdueCorrectiveActions(
+                ncCas.map((ca) => toProcessCorrectiveActionShape(toCanonicalCorrectiveAction(ca)))
+              );
 
               return (
                 <React.Fragment key={nc.id}>
@@ -577,18 +638,12 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
 
                     {/* Azione Correttiva */}
                     <td className="px-3 py-0 min-w-0">
-                      {ncCas.length > 0 ? (
-                        <div className="flex items-center gap-1 truncate">
-                          <span className="text-xs text-zinc-600 truncate">
-                            {ncCas[0]?.description || "N/A"}
-                          </span>
-                          {ncCas.length > 1 && (
-                            <span className="text-xs text-zinc-400 shrink-0">+{ncCas.length - 1}</span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-zinc-400 italic">Nessuna AC</span>
-                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-zinc-700 truncate">{actionSummary.label}</p>
+                        {actionSummary.detail ? (
+                          <p className="text-[11px] text-zinc-500 truncate">{actionSummary.detail}</p>
+                        ) : null}
+                      </div>
                     </td>
 
                     {/* Azioni */}
@@ -620,26 +675,21 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
                     <tr className="border-b border-zinc-100 bg-zinc-50">
                       <td colSpan={6} className="px-4 py-3">
                         <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid gap-6 lg:grid-cols-2">
                           {/* NC EDIT FORM */}
                           <div className="rounded-lg border border-zinc-200 bg-white p-3 space-y-2">
-                            <h4 className="text-sm font-semibold text-zinc-700">Non Conformità</h4>
-                            <div>
-                              <label className="text-xs font-medium text-zinc-600 block mb-1">Titolo</label>
-                              <Input
-                                value={nc.title || ""}
-                                readOnly
-                                className="text-xs h-8 bg-zinc-100"
-                              />
-                            </div>
+                            <h4 className="text-sm font-semibold text-zinc-700">Contesto NC</h4>
+                            {nc.checklistItem?.question ? (
+                              <div>
+                                <label className="text-xs font-medium text-zinc-600 block mb-1">Domanda audit</label>
+                                <p className="text-sm text-zinc-800 leading-relaxed">{nc.checklistItem.question}</p>
+                              </div>
+                            ) : null}
                             <div>
                               <label className="text-xs font-medium text-zinc-600 block mb-1">Descrizione</label>
-                              <Textarea
-                                value={nc.description || ""}
-                                readOnly
-                                rows={2}
-                                className="text-xs bg-zinc-100"
-                              />
+                              <p className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 leading-relaxed">
+                                {nc.description || "Nessuna descrizione operativa disponibile."}
+                              </p>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div>
@@ -684,6 +734,21 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
 
                           {/* AC SECTION */}
                           <div className="space-y-3">
+                            <div className="grid gap-2 sm:grid-cols-3">
+                              <div className="rounded-lg border bg-white px-3 py-2">
+                                <p className="text-[11px] uppercase tracking-wide text-zinc-500">Aperte</p>
+                                <p className="text-lg font-semibold text-zinc-900">{openActions}</p>
+                              </div>
+                              <div className="rounded-lg border bg-white px-3 py-2">
+                                <p className="text-[11px] uppercase tracking-wide text-zinc-500">In ritardo</p>
+                                <p className="text-lg font-semibold text-red-600">{overdueActions}</p>
+                              </div>
+                              <div className="rounded-lg border bg-white px-3 py-2">
+                                <p className="text-[11px] uppercase tracking-wide text-zinc-500">Totali</p>
+                                <p className="text-lg font-semibold text-zinc-900">{ncCas.length}</p>
+                              </div>
+                            </div>
+
                             {ncCas.map((ca) => {
                               const isEditingCa = editingCaId === ca.id;
                               const overdue = ca.dueDate ? isDueDateOverdue(ca.dueDate) : false;
@@ -703,14 +768,18 @@ export function NcAcTab({ audit, nonConformities, correctiveActions, readOnly = 
                                     </div>
                                   ) : (
                                     <div
-                                      onClick={() => !readOnly && setEditingCaId(ca.id)}
                                       className={cn(
-                                        "rounded-lg border border-zinc-200 bg-white p-3 cursor-pointer transition hover:shadow-sm",
-                                        !readOnly && "hover:border-blue-300"
+                                        "rounded-lg border border-zinc-200 bg-white p-3 transition",
+                                        overdue && ca.status !== "completed" ? "border-red-200 bg-red-50/40" : ""
                                       )}
                                     >
                                       <div className="flex items-start justify-between gap-2 mb-2">
-                                        <p className="text-xs text-zinc-800 flex-1">{ca.description}</p>
+                                        <div className="flex-1 space-y-1">
+                                          <p className="text-sm font-medium text-zinc-900">{ca.description}</p>
+                                          {ca.actionPlan ? (
+                                            <p className="text-xs text-zinc-500 line-clamp-2">{ca.actionPlan}</p>
+                                          ) : null}
+                                        </div>
                                         <div className="flex gap-1 shrink-0">
                                           {!readOnly && (
                                             <>

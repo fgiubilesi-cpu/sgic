@@ -52,6 +52,7 @@ export async function getGlobalSearchResults(rawQuery: string): Promise<GlobalSe
     .from("clients")
     .select("id, name, email, vat_number")
     .eq("organization_id", ctx.organizationId)
+    .is("deleted_at", null)
     .ilike("name", ilikeTerm)
     .limit(6);
 

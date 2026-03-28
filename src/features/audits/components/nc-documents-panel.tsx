@@ -78,15 +78,23 @@ export function NCDocumentsPanel({ nonConformityId, readOnly = false }: NCDocume
   }, [nonConformityId]);
 
   useEffect(() => {
-    loadLinks();
-    loadReferences();
+    const timer = window.setTimeout(() => {
+      void loadLinks();
+      void loadReferences();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loadLinks, loadReferences]);
 
   useEffect(() => {
     if (!dialogOpen) return;
     if (searchQuery.length < 2) {
-      setSearchResults([]);
-      return;
+      const resetTimer = window.setTimeout(() => {
+        setSearchResults([]);
+        setSearching(false);
+      }, 0);
+
+      return () => window.clearTimeout(resetTimer);
     }
     const timer = setTimeout(async () => {
       setSearching(true);
